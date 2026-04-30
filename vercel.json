@@ -1,18 +1,12 @@
 {
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/admin", "destination": "/admin/index.html" },
-    { "source": "/admin/(.*)", "destination": "/admin/$1" },
-    { "source": "/(.*)", "destination": "/public/$1" }
-  ],
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
-      ]
-    }
+  "version": 2,
+  "routes": [
+    { "src": "/api/products", "dest": "/api/products.js" },
+    { "src": "/api/orders", "dest": "/api/orders.js" },
+    { "src": "/admin/dashboard", "dest": "/admin/dashboard.html" },
+    { "src": "/admin", "dest": "/admin/index.html" },
+    { "src": "/style.css", "dest": "/public/style.css" },
+    { "src": "/app.js", "dest": "/public/app.js" },
+    { "src": "/", "dest": "/public/index.html" }
   ]
 }

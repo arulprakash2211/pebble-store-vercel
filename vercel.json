@@ -1,12 +1,12 @@
 {
   "version": 2,
-  "routes": [
-    { "src": "/api/products", "dest": "/api/products.js" },
-    { "src": "/api/orders", "dest": "/api/orders.js" },
-    { "src": "/admin/dashboard", "dest": "/admin/dashboard.html" },
-    { "src": "/admin", "dest": "/admin/index.html" },
-    { "src": "/style.css", "dest": "/public/style.css" },
-    { "src": "/app.js", "dest": "/public/app.js" },
-    { "src": "/", "dest": "/public/index.html" }
+  "rewrites": [
+    { "source": "/api/products", "destination": "/api/products.js" },
+    { "source": "/api/orders", "destination": "/api/orders.js" },
+    { "source": "/admin/dashboard", "destination": "/admin/dashboard.html" },
+    { "source": "/admin", "destination": "/admin/index.html" },
+    { "source": "/style.css", "destination": "/public/style.css" },
+    { "source": "/app.js", "destination": "/public/app.js" },
+    { "source": "/", "destination": "/public/index.html" }
   ]
 }

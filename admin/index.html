@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pebble Store – Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root { --bark:#5c3d2e; --moss:#4a5c3a; --cream:#f5f0e8; --dark:#2b1f14; --clay:#a07850; --warm-white:#faf8f3; --light-text:#7a6a58; }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Jost',sans-serif;background:var(--cream);min-height:100vh;display:flex;align-items:center;justify-content:center}
+    .login-box{background:var(--warm-white);padding:3rem;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(43,31,20,0.15)}
+    .login-logo{font-family:'Playfair Display',serif;font-size:1.8rem;color:var(--bark);text-align:center;margin-bottom:0.3rem}
+    .login-sub{text-align:center;font-size:0.78rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--clay);margin-bottom:2rem}
+    .form-group{display:flex;flex-direction:column;gap:0.4rem;margin-bottom:1.2rem}
+    label{font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--light-text);font-weight:500}
+    input{font-family:'Jost',sans-serif;font-size:0.95rem;padding:0.8rem 1rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;transition:border-color 0.2s;border-radius:0}
+    input:focus{border-color:var(--clay)}
+    .btn{width:100%;padding:1rem;background:var(--bark);color:var(--cream);border:none;font-family:'Jost',sans-serif;font-size:0.85rem;letter-spacing:0.12em;text-transform:uppercase;font-weight:500;cursor:pointer;transition:background 0.2s;margin-top:0.5rem}
+    .btn:hover{background:var(--dark)}
+    .btn:disabled{opacity:0.6;cursor:not-allowed}
+    .error{display:none;background:#fde8e8;color:#c0392b;padding:0.7rem 1rem;font-size:0.82rem;margin-bottom:1rem;border-left:3px solid #c0392b}
+    .back-link{display:block;text-align:center;margin-top:1.5rem;font-size:0.78rem;color:var(--light-text);text-decoration:none}
+    .back-link:hover{color:var(--bark)}
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <div class="login-logo">Pebble Store</div>
+    <div class="login-sub">Admin Panel</div>
+
+    <div class="error" id="errorMsg"></div>
+
+    <div class="form-group">
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="admin@pebblestore.com" autocomplete="email"/>
+    </div>
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password"/>
+    </div>
+    <button class="btn" id="loginBtn" onclick="login()">Sign In</button>
+    <a class="back-link" href="/">← Back to store</a>
+  </div>
+
+  <!-- Firebase Auth -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
+      authDomain: "pebble-store-70889.firebaseapp.com",
+      projectId: "pebble-store-70889",
+      storageBucket: "pebble-store-70889.firebasestorage.app",
+      messagingSenderId: "611731436877",
+      appId: "1:611731436877:web:eee0ef64cd8b4b86467304"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    // If already logged in → go to dashboard
+    onAuthStateChanged(auth, user => {
+      if (user) window.location.href = '/admin/dashboard.html';
+    });
+
+    window.login = async function() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const btn = document.getElementById('loginBtn');
+      const err = document.getElementById('errorMsg');
+
+      if (!email || !password) {
+        err.textContent = 'Please enter your email and password.';
+        err.style.display = 'block';
+        return;
+      }
+
+      btn.textContent = 'Signing in…';
+      btn.disabled = true;
+      err.style.display = 'none';
+
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        window.location.href = '/admin/dashboard.html';
+      } catch (e) {
+        err.textContent = 'Invalid email or password. Please try again.';
+        err.style.display = 'block';
+        btn.textContent = 'Sign In';
+        btn.disabled = false;
+      }
+    };
+
+    // Allow Enter key to submit
+    document.getElementById('password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') window.login();
+    });
+  </script>
+</body>
+</html>

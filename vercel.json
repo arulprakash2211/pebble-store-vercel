@@ -1,12 +1,7 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/api/products", "destination": "/api/products.js" },
-    { "source": "/api/orders", "destination": "/api/orders.js" },
-    { "source": "/admin/dashboard", "destination": "/admin/dashboard.html" },
     { "source": "/admin", "destination": "/admin/index.html" },
-    { "source": "/style.css", "destination": "/public/style.css" },
-    { "source": "/app.js", "destination": "/public/app.js" },
-    { "source": "/", "destination": "/public/index.html" }
+    { "source": "/admin/dashboard", "destination": "/admin/dashboard.html" }
   ]
 }

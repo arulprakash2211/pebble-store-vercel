@@ -1,10 +1,24 @@
 /* ═══════════════════════════════════════
-   PEBBLE STORE – app.js (Vercel + Firebase)
+   PEBBLE STORE – app.js
+   Reads products directly from Firestore
    ═══════════════════════════════════════ */
 
-const WHATSAPP_NUMBER = '919659451260';
-const API_BASE = '/api';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, getDocs, addDoc, orderBy, query } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
+const firebaseConfig = {
+  apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
+  authDomain: "pebble-store-70889.firebaseapp.com",
+  projectId: "pebble-store-70889",
+  storageBucket: "pebble-store-70889.firebasestorage.app",
+  messagingSenderId: "611731436877",
+  appId: "1:611731436877:web:eee0ef64cd8b4b86467304"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const WHATSAPP_NUMBER = '919659451260';
 let allProducts = [];
 const cart = {};
 const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
@@ -25,22 +39,20 @@ function initDevice() {
   }
 }
 
-// ── Load products from Firestore via API ──
+// ── Load products from Firestore ──
 async function loadProducts() {
   const grid = document.getElementById('productsGrid');
   const filtersEl = document.getElementById('categoryFilters');
   try {
-    const res = await fetch(`${API_BASE}/products`);
-    if (!res.ok) throw new Error('Failed');
-    const data = await res.json();
-    allProducts = data.products;
+    const snap = await getDocs(collection(db, 'products'));
+    allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     if (!allProducts.length) {
       grid.innerHTML = '<p style="color:var(--light-text);grid-column:1/-1;font-style:italic">No products yet. Check back soon!</p>';
       return;
     }
 
-    const categories = ['All', ...new Set(allProducts.map(p => p.category))];
+    const categories = ['All', ...new Set(allProducts.map(p => p.category).filter(Boolean))];
     filtersEl.innerHTML = categories.map((cat, i) =>
       `<button class="filter-btn ${i === 0 ? 'active' : ''}" data-cat="${cat}">${cat}</button>`
     ).join('');
@@ -55,7 +67,7 @@ async function loadProducts() {
 
     renderProducts(allProducts);
   } catch (err) {
-    grid.innerHTML = '<p style="color:var(--clay);grid-column:1/-1">⚠️ Could not load products. Please refresh the page.</p>';
+    grid.innerHTML = `<p style="color:var(--clay);grid-column:1/-1">⚠️ Could not load products. Please refresh. (${err.message})</p>`;
     console.error(err);
   }
 }
@@ -99,8 +111,8 @@ function renderProducts(products) {
   }).join('');
 }
 
-// ── Cart functions ──
-function changeQty(id, delta) {
+// ── Cart ──
+window.changeQty = function(id, delta) {
   const newQty = Math.max(0, (cart[id] || 0) + delta);
   if (newQty === 0) delete cart[id]; else cart[id] = newQty;
   const qtyEl = document.getElementById('qty-' + id);
@@ -109,9 +121,9 @@ function changeQty(id, delta) {
   if (btnEl) { btnEl.textContent = newQty > 0 ? '✓ Added' : 'Add to Order'; btnEl.classList.toggle('selected', newQty > 0); }
   updateSummary();
   if (!isMobile) refreshQR();
-}
+};
 
-function addToOrder(id) {
+window.addToOrder = function(id) {
   if (!cart[id]) {
     cart[id] = 1;
     const qtyEl = document.getElementById('qty-' + id);
@@ -122,9 +134,9 @@ function addToOrder(id) {
   updateSummary();
   if (!isMobile) refreshQR();
   document.getElementById('order').scrollIntoView({ behavior: 'smooth' });
-}
+};
 
-function removeFromCart(id) {
+window.removeFromCart = function(id) {
   delete cart[id];
   const qtyEl = document.getElementById('qty-' + id);
   const btnEl = document.getElementById('btn-' + id);
@@ -132,18 +144,16 @@ function removeFromCart(id) {
   if (btnEl) { btnEl.textContent = 'Add to Order'; btnEl.classList.remove('selected'); }
   updateSummary();
   if (!isMobile) refreshQR();
-}
+};
 
-// ── Update summary table ──
+// ── Order summary ──
 function updateSummary() {
   const container = document.getElementById('summaryContent');
   const items = Object.entries(cart).filter(([, q]) => q > 0);
-
   if (!items.length) {
     container.innerHTML = '<span class="empty-selection">No products added yet — set a quantity above and click "Add to Order"</span>';
     return;
   }
-
   let total = 0;
   const rows = items.map(([id, qty]) => {
     const p = allProducts.find(x => x.id === id);
@@ -151,14 +161,13 @@ function updateSummary() {
     const sub = p.price * qty;
     total += sub;
     return `<tr>
-      <td>${p.emoji} ${p.name}</td>
+      <td>${p.emoji || '🧼'} ${p.name}</td>
       <td style="text-align:center">₹${p.price}</td>
       <td style="text-align:center">${qty}</td>
       <td style="text-align:right">₹${sub}</td>
       <td style="text-align:center"><button class="summary-remove" onclick="removeFromCart('${id}')" title="Remove">×</button></td>
     </tr>`;
   }).join('');
-
   container.innerHTML = `
     <table class="summary-table">
       <thead><tr>
@@ -173,17 +182,14 @@ function updateSummary() {
     </table>`;
 }
 
-// ── Build order payload ──
-function buildOrderPayload(orderVia) {
+// ── Build order ──
+function buildOrder(orderVia) {
   const items = Object.entries(cart)
     .filter(([, q]) => q > 0)
     .map(([id, qty]) => {
       const p = allProducts.find(x => x.id === id);
       return p ? { id, name: p.name, price: p.price, qty, subtotal: p.price * qty } : null;
     }).filter(Boolean);
-
-  const total = items.reduce((sum, i) => sum + i.subtotal, 0);
-
   return {
     name: document.getElementById('custName').value.trim(),
     phone: document.getElementById('phone').value.trim(),
@@ -191,40 +197,34 @@ function buildOrderPayload(orderVia) {
     address: document.getElementById('address').value.trim(),
     notes: document.getElementById('notes').value.trim(),
     items,
-    total,
-    orderVia
+    total: items.reduce((s, i) => s + i.subtotal, 0),
+    orderVia,
+    status: 'new',
+    paid: false,
+    createdAt: new Date().toISOString()
   };
 }
 
-// ── Save order to Firestore via API ──
+// ── Save order to Firestore ──
 async function saveOrder(orderVia) {
-  const payload = buildOrderPayload(orderVia);
-  const res = await fetch(`${API_BASE}/orders`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-  if (!res.ok) throw new Error('Failed to save order');
-  return await res.json();
+  const order = buildOrder(orderVia);
+  await addDoc(collection(db, 'orders'), order);
+  return order;
 }
 
-// ── WhatsApp URL ──
+// ── WhatsApp ──
 function buildWhatsAppUrl() {
   const name    = document.getElementById('custName').value.trim();
   const phone   = document.getElementById('phone').value.trim();
   const address = document.getElementById('address').value.trim();
   const notes   = document.getElementById('notes').value.trim();
-
   let total = 0;
-  const lines = Object.entries(cart)
-    .filter(([, q]) => q > 0)
-    .map(([id, qty]) => {
-      const p = allProducts.find(x => x.id === id);
-      if (!p) return '';
-      total += p.price * qty;
-      return `• ${p.name} x${qty} = ₹${p.price * qty}`;
-    }).filter(Boolean).join('\n');
-
+  const lines = Object.entries(cart).filter(([, q]) => q > 0).map(([id, qty]) => {
+    const p = allProducts.find(x => x.id === id);
+    if (!p) return '';
+    total += p.price * qty;
+    return `• ${p.name} x${qty} = ₹${p.price * qty}`;
+  }).filter(Boolean).join('\n');
   let msg = `🛒 *New Order – Pebble Store*\n\n`;
   if (name)    msg += `*Name:* ${name}\n`;
   if (phone)   msg += `*Phone:* ${phone}\n`;
@@ -239,24 +239,14 @@ function generateQR() {
   if (typeof QRCode === 'undefined') return;
   const container = document.getElementById('qrCode');
   container.innerHTML = '';
-  new QRCode(container, {
-    text: `https://wa.me/${WHATSAPP_NUMBER}`,
-    width: 180, height: 180,
-    colorDark: '#2b1f14', colorLight: '#ffffff',
-    correctLevel: QRCode.CorrectLevel.M
-  });
+  new QRCode(container, { text: `https://wa.me/${WHATSAPP_NUMBER}`, width: 180, height: 180, colorDark: '#2b1f14', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
 }
 
 function refreshQR() {
   if (typeof QRCode === 'undefined') return;
   const container = document.getElementById('qrCode');
   container.innerHTML = '';
-  new QRCode(container, {
-    text: buildWhatsAppUrl(),
-    width: 180, height: 180,
-    colorDark: '#2b1f14', colorLight: '#ffffff',
-    correctLevel: QRCode.CorrectLevel.M
-  });
+  new QRCode(container, { text: buildWhatsAppUrl(), width: 180, height: 180, colorDark: '#2b1f14', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
 }
 
 // ── Validate ──
@@ -266,14 +256,13 @@ function validateOrder() {
   const name = document.getElementById('custName').value.trim();
   const phone = document.getElementById('phone').value.trim();
   const address = document.getElementById('address').value.trim();
-
-  if (!hasItems) { err.textContent = '⚠️ Please add at least one product to your order.'; err.style.display = 'block'; err.scrollIntoView({ behavior: 'smooth', block: 'center' }); return false; }
+  if (!hasItems) { err.textContent = '⚠️ Please add at least one product.'; err.style.display = 'block'; err.scrollIntoView({ behavior: 'smooth', block: 'center' }); return false; }
   if (!name || !phone || !address) { err.textContent = '⚠️ Please fill in your name, phone and address.'; err.style.display = 'block'; err.scrollIntoView({ behavior: 'smooth', block: 'center' }); return false; }
   err.style.display = 'none';
   return true;
 }
 
-// ── Show success page ──
+// ── Success page ──
 function showSuccessPage() {
   const items = Object.entries(cart).filter(([, q]) => q > 0);
   let total = 0;
@@ -282,9 +271,8 @@ function showSuccessPage() {
     if (!p) return '';
     const sub = p.price * qty;
     total += sub;
-    return `<div class="success-order-row"><span>${p.emoji} ${p.name} × ${qty}</span><span>₹${sub}</span></div>`;
+    return `<div class="success-order-row"><span>${p.emoji || '🧼'} ${p.name} × ${qty}</span><span>₹${sub}</span></div>`;
   }).filter(Boolean).join('');
-
   document.getElementById('successOrderDetails').innerHTML = rows;
   document.getElementById('successTotal').innerHTML = `<span>Total</span><span>₹${total}</span>`;
   document.getElementById('orderFormView').style.display = 'none';
@@ -292,8 +280,8 @@ function showSuccessPage() {
   document.getElementById('order').scrollIntoView({ behavior: 'smooth' });
 }
 
-// ── Reset order ──
-function resetOrder() {
+// ── Reset ──
+window.resetOrder = function() {
   Object.keys(cart).forEach(id => {
     delete cart[id];
     const qtyEl = document.getElementById('qty-' + id);
@@ -305,53 +293,44 @@ function resetOrder() {
   document.getElementById('orderForm').reset();
   document.getElementById('orderSuccessView').style.display = 'none';
   document.getElementById('orderFormView').style.display = 'block';
-  if (!isMobile) refreshQR();
+  if (!isMobile) generateQR();
   document.getElementById('products').scrollIntoView({ behavior: 'smooth' });
-}
+};
 
-// ── Email form submit ──
-document.getElementById('orderForm').addEventListener('submit', async function (e) {
+// ── Email submit ──
+document.getElementById('orderForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   if (!validateOrder()) return;
-
-  const submitBtn = this.querySelector('button[type="submit"]');
-  submitBtn.textContent = 'Sending…';
-  submitBtn.disabled = true;
-
+  const btn = this.querySelector('button[type="submit"]');
+  btn.textContent = 'Sending…'; btn.disabled = true;
   try {
     await saveOrder('Email');
     showSuccessPage();
   } catch (err) {
-    document.getElementById('errorMsg').textContent = '⚠️ Something went wrong. Please try WhatsApp or try again.';
+    document.getElementById('errorMsg').textContent = '⚠️ Something went wrong. Please try WhatsApp.';
     document.getElementById('errorMsg').style.display = 'block';
-    submitBtn.textContent = '📧 Send Order by Email';
-    submitBtn.disabled = false;
+    btn.textContent = '📧 Send Order by Email'; btn.disabled = false;
   }
 });
 
 // ── WhatsApp button ──
 const waBtn = document.getElementById('whatsappBtn');
 if (waBtn) {
-  waBtn.addEventListener('click', async function () {
+  waBtn.addEventListener('click', async function() {
     if (!validateOrder()) return;
-    try {
-      await saveOrder('WhatsApp');
-    } catch (err) {
-      console.warn('Order save failed but continuing to WhatsApp', err);
-    }
+    try { await saveOrder('WhatsApp'); } catch (err) { console.warn('Save failed', err); }
     window.open(buildWhatsAppUrl(), '_blank');
     setTimeout(showSuccessPage, 800);
   });
 }
 
-// ── Nav scroll highlight ──
+// ── Nav scroll ──
 const navSections = document.querySelectorAll('section[id]');
-const navLinks    = document.querySelectorAll('.nav-links a');
+const navLinks = document.querySelectorAll('.nav-links a');
 window.addEventListener('scroll', () => {
   let current = '';
   navSections.forEach(s => { if (window.scrollY >= s.offsetTop - 120) current = s.id; });
   navLinks.forEach(a => { a.style.color = a.getAttribute('href') === '#' + current ? 'var(--bark)' : ''; });
 });
 
-// ── Init ──
 init();

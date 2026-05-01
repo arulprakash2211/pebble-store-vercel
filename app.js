@@ -297,6 +297,25 @@ window.resetOrder = function() {
   document.getElementById('products').scrollIntoView({ behavior: 'smooth' });
 };
 
+// ── Send email via Formspree ──
+async function sendEmailViaFormspree(order) {
+  const itemsList = order.items.map(i => `${i.name} x${i.qty} = Rs.${i.subtotal}`).join(', ');
+  const formData = new FormData();
+  formData.append('name', order.name);
+  formData.append('phone', order.phone);
+  formData.append('email', order.email);
+  formData.append('address', order.address);
+  formData.append('order_details', itemsList);
+  formData.append('order_total', 'Rs.' + order.total);
+  formData.append('order_via', order.orderVia);
+  formData.append('notes', order.notes || '');
+  const res = await fetch('https://formspree.io/f/xdabogzl', {
+    method: 'POST', body: formData,
+    headers: { 'Accept': 'application/json' }
+  });
+  if (!res.ok) console.warn('Formspree email failed');
+}
+
 // ── Email submit ──
 document.getElementById('orderForm').addEventListener('submit', async function(e) {
   e.preventDefault();
@@ -304,7 +323,9 @@ document.getElementById('orderForm').addEventListener('submit', async function(e
   const btn = this.querySelector('button[type="submit"]');
   btn.textContent = 'Sending…'; btn.disabled = true;
   try {
-    await saveOrder('Email');
+    const order = await saveOrder('Email');
+    // Send email via Formspree in parallel (don't block success page)
+    sendEmailViaFormspree(order).catch(err => console.warn('Email error:', err));
     showSuccessPage();
   } catch (err) {
     document.getElementById('errorMsg').textContent = '⚠️ Something went wrong. Please try WhatsApp.';

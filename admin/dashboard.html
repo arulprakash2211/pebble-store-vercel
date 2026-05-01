@@ -38,6 +38,9 @@
     .badge-confirmed{background:#cce5ff;color:#004085}
     .badge-dispatched{background:#d4edda;color:#155724}
     .badge-delivered{background:#d1ecf1;color:#0c5460}
+    .badge-cancelled{background:#f8d7da;color:#721c24}
+    .badge-payment_pending{background:#e2d9f3;color:#4a235a}
+    .badge-cancelled{background:#f8d7da;color:#721c24}
     .badge-paid{background:#d4edda;color:#155724}
     .badge-unpaid{background:#f8d7da;color:#721c24}
     .btn{padding:0.5rem 1rem;border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:0.75rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;transition:all 0.2s;border-radius:2px}
@@ -265,7 +268,7 @@
         document.getElementById('ordersBody').innerHTML = orders.map(o => {
           const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
           const itemsSummary = (o.items || []).map(i => `${i.name} ×${i.qty}`).join('<br>');
-          const statusClass = { new: 'badge-new', confirmed: 'badge-confirmed', dispatched: 'badge-dispatched', delivered: 'badge-delivered' }[o.status] || 'badge-new';
+          const statusClass = { new: 'badge-new', confirmed: 'badge-confirmed', dispatched: 'badge-dispatched', delivered: 'badge-delivered', cancelled: 'badge-cancelled' }[o.status] || 'badge-new';
 
           // FIX: each button only updates the specific field it should
           return `<tr>
@@ -279,9 +282,11 @@
             <td><span class="badge ${o.paid ? 'badge-paid' : 'badge-unpaid'}">${o.paid ? '✓ Paid' : 'Unpaid'}</span></td>
             <td>
               <div class="action-btns">
-                <button class="btn btn-sm btn-ghost" onclick="updateOrderStatus('${o.id}', 'confirmed')">Confirm</button>
-                <button class="btn btn-sm btn-green" onclick="updateOrderStatus('${o.id}', 'dispatched')">Dispatch</button>
-                <button class="btn btn-sm btn-clay" onclick="markPaid('${o.id}')">Mark Paid</button>
+                ${o.status === 'new' ? `<button class="btn btn-sm btn-ghost" onclick="updateOrderStatus('${o.id}', 'confirmed')">Confirm</button>` : ''}
+                ${o.status === 'confirmed' ? `<button class="btn btn-sm btn-green" onclick="updateOrderStatus('${o.id}', 'dispatched')">Dispatch</button>` : ''}
+                ${o.status === 'dispatched' ? `<button class="btn btn-sm btn-primary" onclick="updateOrderStatus('${o.id}', 'delivered')">Delivered</button>` : ''}
+                ${!o.paid ? `<button class="btn btn-sm btn-clay" onclick="markPaid('${o.id}')">Mark Paid</button>` : '<span style="font-size:0.7rem;color:var(--moss)">✓ Paid</span>'}
+                ${['new','confirmed'].includes(o.status) ? `<button class="btn btn-sm btn-red" onclick="cancelOrder('${o.id}')">Cancel</button>` : ''}
               </div>
             </td>
           </tr>`;
@@ -311,6 +316,32 @@
           updatedAt: new Date().toISOString()
         });
         toast('✅ Order marked as paid');
+        loadOrders();
+      } catch (err) { toast('❌ Failed: ' + err.message); }
+    };
+
+    // Cancel order — only allowed before dispatch
+    window.cancelOrder = async (id) => {
+      if (!confirm('Cancel this order? This cannot be undone.')) return;
+      try {
+        await updateDoc(doc(db, 'orders', id), {
+          status: 'cancelled',
+          updatedAt: new Date().toISOString()
+        });
+        toast('✅ Order cancelled');
+        loadOrders();
+      } catch (err) { toast('❌ Failed: ' + err.message); }
+    };
+
+    // Cancel order — only allowed for new/confirmed
+    window.cancelOrder = async (id) => {
+      if (!confirm('Cancel this order? This cannot be undone.')) return;
+      try {
+        await updateDoc(doc(db, 'orders', id), {
+          status: 'cancelled',
+          updatedAt: new Date().toISOString()
+        });
+        toast('🚫 Order cancelled');
         loadOrders();
       } catch (err) { toast('❌ Failed: ' + err.message); }
     };

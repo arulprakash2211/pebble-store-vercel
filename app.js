@@ -4,7 +4,7 @@
    ═══════════════════════════════════════ */
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, getDocs, addDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, collection, getDocs, addDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
@@ -98,8 +98,9 @@ window.doTrackByPhone = async function() {
   el.innerHTML = '<p style="color:var(--light-text);font-style:italic;font-size:0.85rem">Looking up your order…</p>';
   el.style.display = 'block';
   try {
-    const snap = await getDocs(query(collection(db, 'orders'), where('phone', '==', phone)));
+    const snap = await getDocs(collection(db, 'orders'));
     const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(o => { const c = phone.replace(/[^0-9]/g, ''); return o.phone && o.phone.replace(/[^0-9]/g, '') === c; })
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     if (!orders.length) { showTrackError('No orders found for this phone number.'); return; }
     if (orders.length === 1) { showTrackResult(orders[0]); return; }

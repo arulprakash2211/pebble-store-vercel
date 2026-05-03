@@ -4,7 +4,7 @@
    ═══════════════════════════════════════ */
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, getDocs, addDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, collection, getDocs, addDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
@@ -21,6 +21,114 @@ const db  = getFirestore(app);
 const WHATSAPP_NUMBER = '919659451260';
 let allProducts = [];
 const cart = {};
+
+
+// ══════════════════════════════
+// ORDER TRACKING (inline section)
+// ══════════════════════════════
+const COURIER_URLS = {
+  'ST Courier':           id => `https://www.stcourier.com/tracking.php?trackid=${id}`,
+  'Professional Courier': id => `https://www.tpcindia.com/tracking.php?id=${id}&type=0&service=0`,
+  'DTDC':                 id => `https://www.dtdc.in/tracking/tracking_results.asp?Ttype=awb&strCNno=${id}`,
+  'India Post':           id => `https://www.indiapost.gov.in/VAS/Pages/trackconsignment.aspx`,
+};
+
+const STATUS_LABEL = {
+  new: '🟡 Order Received', confirmed: '🔵 Confirmed',
+  dispatched: '🚚 Dispatched', delivered: '✅ Delivered', cancelled: '❌ Cancelled'
+};
+
+window.switchTrackTab = function(tab) {
+  const isPhone = tab === 'phone';
+  document.getElementById('trackPhonePanel').style.display = isPhone ? 'block' : 'none';
+  document.getElementById('trackIdPanel').style.display    = isPhone ? 'none'  : 'block';
+  document.getElementById('tabPhoneBtn').style.background  = isPhone ? 'var(--bark)' : 'var(--warm-white)';
+  document.getElementById('tabPhoneBtn').style.color       = isPhone ? 'var(--cream)' : 'var(--stone)';
+  document.getElementById('tabTrackBtn').style.background  = isPhone ? 'var(--warm-white)' : 'var(--bark)';
+  document.getElementById('tabTrackBtn').style.color       = isPhone ? 'var(--stone)' : 'var(--cream)';
+  document.getElementById('trackResultInline').style.display = 'none';
+};
+
+function showTrackResult(order) {
+  const el = document.getElementById('trackResultInline');
+  const date = new Date(order.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
+  const items = (order.items || []).map(i => `${i.name} ×${i.qty}`).join(', ');
+  const statusLabel = STATUS_LABEL[order.status] || order.status;
+
+  let trackingHtml = '';
+  if (order.tracking) {
+    const { courier, trackingId } = order.tracking;
+    const url = COURIER_URLS[courier] ? COURIER_URLS[courier](trackingId) : null;
+    trackingHtml = `
+      <div style="margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid rgba(92,61,46,0.1)">
+        <div style="font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--stone);margin-bottom:0.4rem">Courier Details</div>
+        <div style="font-size:0.88rem;color:var(--dark)"><strong>${courier}</strong> · <span style="font-family:monospace">${trackingId}</span></div>
+        ${url ? `<a href="${url}" target="_blank" style="display:inline-flex;align-items:center;gap:0.4rem;margin-top:0.6rem;padding:0.5rem 1rem;background:var(--moss);color:white;text-decoration:none;font-size:0.75rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;border-radius:2px">🔍 Track on ${courier} →</a>` : ''}
+      </div>`;
+  }
+
+  el.innerHTML = `
+    <div style="font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);margin-bottom:0.8rem;font-weight:500">Order Found</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem 1.5rem;font-size:0.85rem;margin-bottom:0.5rem">
+      <div><span style="color:var(--light-text)">Name:</span> <strong>${order.name}</strong></div>
+      <div><span style="color:var(--light-text)">Date:</span> ${date}</div>
+      <div><span style="color:var(--light-text)">Items:</span> ${items}</div>
+      <div><span style="color:var(--light-text)">Total:</span> <strong>₹${order.total}</strong></div>
+    </div>
+    <div style="font-size:0.9rem;margin-top:0.5rem"><span style="color:var(--light-text)">Status:</span> <strong>${statusLabel}</strong></div>
+    ${trackingHtml}
+    <div style="margin-top:1rem"><a href="/track.html" style="font-size:0.78rem;color:var(--clay);text-decoration:none">View full tracking page →</a></div>`;
+
+  el.style.display = 'block';
+  el.style.borderLeftColor = order.tracking ? 'var(--moss)' : 'var(--clay)';
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function showTrackError(msg) {
+  const el = document.getElementById('trackResultInline');
+  el.innerHTML = `<p style="color:#c0392b;font-size:0.88rem">${msg}</p>`;
+  el.style.display = 'block';
+  el.style.borderLeftColor = '#c0392b';
+}
+
+window.doTrackByPhone = async function() {
+  const phone = document.getElementById('trackPhone').value.trim();
+  if (!phone) { showTrackError('Please enter your phone number.'); return; }
+  const el = document.getElementById('trackResultInline');
+  el.innerHTML = '<p style="color:var(--light-text);font-style:italic;font-size:0.85rem">Looking up your order…</p>';
+  el.style.display = 'block';
+  try {
+    const snap = await getDocs(query(collection(db, 'orders'), where('phone', '==', phone)));
+    const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    if (!orders.length) { showTrackError('No orders found for this phone number.'); return; }
+    if (orders.length === 1) { showTrackResult(orders[0]); return; }
+    // Multiple orders
+    el.innerHTML = `<div style="font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);margin-bottom:0.8rem;font-weight:500">Select an order:</div>` +
+      orders.map(o => {
+        const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short' });
+        return `<div onclick='showTrackResult(${JSON.stringify(o)})' style="padding:0.7rem 1rem;background:var(--warm-white);margin-bottom:0.4rem;cursor:pointer;border:1.5px solid transparent;font-size:0.85rem;transition:border-color 0.2s" onmouseover="this.style.borderColor='var(--bark)'" onmouseout="this.style.borderColor='transparent'">
+          <strong>${date}</strong> · ₹${o.total} · <em style="color:var(--light-text)">${o.status}</em>
+        </div>`;
+      }).join('');
+    el.style.display = 'block';
+  } catch (err) { showTrackError('Something went wrong. Please try again.'); }
+};
+
+window.doTrackById = async function() {
+  const trackId = document.getElementById('trackId').value.trim();
+  if (!trackId) { showTrackError('Please enter your tracking ID.'); return; }
+  const el = document.getElementById('trackResultInline');
+  el.innerHTML = '<p style="color:var(--light-text);font-style:italic;font-size:0.85rem">Looking up your order…</p>';
+  el.style.display = 'block';
+  try {
+    const snap = await getDocs(collection(db, 'orders'));
+    const order = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .find(o => o.tracking?.trackingId === trackId);
+    if (!order) { showTrackError('No order found with this tracking ID.'); return; }
+    showTrackResult(order);
+  } catch (err) { showTrackError('Something went wrong. Please try again.'); }
+};
 
 // ── Init ──
 async function init() {

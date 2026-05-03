@@ -316,9 +316,42 @@ document.getElementById('orderForm').addEventListener('submit', async function(e
   }
 });
 
-// ── WhatsApp query button ──
+// ── WhatsApp button — QR on desktop, open on mobile ──
+const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+let waQrGenerated = false;
+
 document.getElementById('whatsappBtn').addEventListener('click', function() {
-  window.open(buildWhatsAppQueryUrl(), '_blank');
+  if (isMobile) {
+    // Mobile → open WhatsApp directly
+    window.open(buildWhatsAppQueryUrl(), '_blank');
+  } else {
+    // Desktop → toggle QR panel
+    const panel = document.getElementById('waQrPanel');
+    const isOpen = panel.classList.contains('visible');
+    if (isOpen) {
+      panel.classList.remove('visible');
+      document.getElementById('waBtnSub').textContent = 'Questions? We'll reply instantly';
+      return;
+    }
+    // Generate QR — wait for library if not ready yet
+    function generateWaQR() {
+      if (typeof QRCode === 'undefined') {
+        setTimeout(generateWaQR, 100);
+        return;
+      }
+      document.getElementById('waQrCode').innerHTML = '';
+      new QRCode(document.getElementById('waQrCode'), {
+        text: buildWhatsAppQueryUrl(),
+        width: 180, height: 180,
+        colorDark: '#2b1f14', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+    generateWaQR();
+    panel.classList.add('visible');
+    document.getElementById('waBtnSub').textContent = 'Scan QR with your phone';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
 });
 
 // ── Nav scroll highlight ──

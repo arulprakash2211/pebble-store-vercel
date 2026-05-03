@@ -330,7 +330,7 @@ document.getElementById('whatsappBtn').addEventListener('click', function() {
     const isOpen = panel.classList.contains('visible');
     if (isOpen) {
       panel.classList.remove('visible');
-      document.getElementById('waBtnSub').textContent = 'Questions? We'll reply instantly';
+      document.getElementById("waBtnSub").textContent = "Questions? We'll reply instantly";
       return;
     }
     // Generate QR — wait for library if not ready yet
@@ -349,7 +349,7 @@ document.getElementById('whatsappBtn').addEventListener('click', function() {
     }
     generateWaQR();
     panel.classList.add('visible');
-    document.getElementById('waBtnSub').textContent = 'Scan QR with your phone';
+    document.getElementById("waBtnSub").textContent = "Scan QR with your phone";
     panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 });

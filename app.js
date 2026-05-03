@@ -1,5 +1,6 @@
 /* ═══════════════════════════════════════
    PEBBLE STORE – app.js
+   2 options: Payment | WhatsApp query
    ═══════════════════════════════════════ */
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -15,7 +16,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const db  = getFirestore(app);
 
 const WHATSAPP_NUMBER = '919659451260';
 let allProducts = [];
@@ -28,10 +29,10 @@ async function init() {
 
 // ── Load products from Firestore ──
 async function loadProducts() {
-  const grid = document.getElementById('productsGrid');
+  const grid     = document.getElementById('productsGrid');
   const filtersEl = document.getElementById('categoryFilters');
   try {
-    const snap = await getDocs(collection(db, 'products'));
+    const snap  = await getDocs(collection(db, 'products'));
     allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     if (!allProducts.length) {
@@ -54,7 +55,8 @@ async function loadProducts() {
 
     renderProducts(allProducts);
   } catch (err) {
-    grid.innerHTML = `<p style="color:var(--clay);grid-column:1/-1">⚠️ Could not load products. Please refresh. (${err.message})</p>`;
+    grid.innerHTML = `<p style="color:var(--clay);grid-column:1/-1">⚠️ Could not load products. Please refresh.</p>`;
+    console.error(err);
   }
 }
 
@@ -104,10 +106,7 @@ window.changeQty = function(id, delta) {
   const qtyEl = document.getElementById('qty-' + id);
   const btnEl = document.getElementById('btn-' + id);
   if (qtyEl) qtyEl.textContent = newQty;
-  if (btnEl) {
-    btnEl.textContent = newQty > 0 ? '✓ Added' : 'Add to Order';
-    btnEl.classList.toggle('selected', newQty > 0);
-  }
+  if (btnEl) { btnEl.textContent = newQty > 0 ? '✓ Added' : 'Add to Order'; btnEl.classList.toggle('selected', newQty > 0); }
   updateSummary();
 };
 
@@ -132,7 +131,7 @@ window.removeFromCart = function(id) {
   updateSummary();
 };
 
-// ── Order summary ──
+// ── Cart total ──
 function getCartTotal() {
   return Object.entries(cart)
     .filter(([, q]) => q > 0)
@@ -142,6 +141,7 @@ function getCartTotal() {
     }, 0);
 }
 
+// ── Order summary table ──
 function updateSummary() {
   const container = document.getElementById('summaryContent');
   const items = Object.entries(cart).filter(([, q]) => q > 0);
@@ -177,7 +177,7 @@ function updateSummary() {
     </table>`;
 }
 
-// ── Build order ──
+// ── Build order object ──
 function buildOrder() {
   const items = Object.entries(cart)
     .filter(([, q]) => q > 0)
@@ -186,16 +186,16 @@ function buildOrder() {
       return p ? { id, name: p.name, price: p.price, qty, subtotal: p.price * qty } : null;
     }).filter(Boolean);
   return {
-    name:    document.getElementById('custName').value.trim(),
-    phone:   document.getElementById('phone').value.trim(),
-    email:   document.getElementById('email').value.trim(),
-    address: document.getElementById('address').value.trim(),
-    notes:   document.getElementById('notes').value.trim(),
+    name:      document.getElementById('custName').value.trim(),
+    phone:     document.getElementById('phone').value.trim(),
+    email:     document.getElementById('email').value.trim(),
+    address:   document.getElementById('address').value.trim(),
+    notes:     document.getElementById('notes').value.trim(),
     items,
-    total:   items.reduce((s, i) => s + i.subtotal, 0),
-    status:  'new',
-    paid:    false,
-    tracking: null,
+    total:     items.reduce((s, i) => s + i.subtotal, 0),
+    status:    'new',
+    paid:      false,
+    tracking:  null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -208,13 +208,13 @@ async function saveOrder() {
   return { ...order, id: docRef.id };
 }
 
-// ── Validate ──
+// ── Validate form ──
 function validateOrder() {
   const hasItems = Object.values(cart).some(q => q > 0);
-  const err = document.getElementById('errorMsg');
-  const name    = document.getElementById('custName').value.trim();
-  const phone   = document.getElementById('phone').value.trim();
-  const address = document.getElementById('address').value.trim();
+  const err      = document.getElementById('errorMsg');
+  const name     = document.getElementById('custName').value.trim();
+  const phone    = document.getElementById('phone').value.trim();
+  const address  = document.getElementById('address').value.trim();
   if (!hasItems) {
     err.textContent = '⚠️ Please add at least one product to your order.';
     err.style.display = 'block';
@@ -248,7 +248,7 @@ function showSuccessPage() {
 
   document.getElementById('successOrderDetails').innerHTML = rows;
   document.getElementById('successTotal').innerHTML = `<span>Total</span><span>₹${total}</span>`;
-  document.getElementById('orderFormView').style.display = 'none';
+  document.getElementById('orderFormView').style.display  = 'none';
   document.getElementById('orderSuccessView').style.display = 'block';
   document.getElementById('order').scrollIntoView({ behavior: 'smooth' });
 }
@@ -265,7 +265,7 @@ window.resetOrder = function() {
   updateSummary();
   document.getElementById('orderForm').reset();
   document.getElementById('orderSuccessView').style.display = 'none';
-  document.getElementById('orderFormView').style.display = 'block';
+  document.getElementById('orderFormView').style.display    = 'block';
   document.getElementById('products').scrollIntoView({ behavior: 'smooth' });
 };
 
@@ -273,36 +273,46 @@ window.resetOrder = function() {
 function buildWhatsAppQueryUrl() {
   const name  = document.getElementById('custName').value.trim();
   const items = Object.entries(cart).filter(([, q]) => q > 0);
-  let msg = `Hi Pebble Store! 👋 I have a query about my order.\n\n`;
-  if (name) msg += `*Name:* ${name}\n`;
+  let msg = `Hi Pebble Store! 👋\n\n`;
+  if (name) msg += `I'm ${name} and I have a query about my order.\n\n`;
   if (items.length) {
-    msg += `\n*Products I'm interested in:*\n`;
+    msg += `*Products I'm interested in:*\n`;
     items.forEach(([id, qty]) => {
       const p = allProducts.find(x => x.id === id);
       if (p) msg += `• ${p.name} × ${qty} = ₹${p.price * qty}\n`;
     });
-    msg += `\n*Total: ₹${getCartTotal()}*\n`;
+    msg += `\n*Total: ₹${getCartTotal()}*\n\n`;
   }
-  msg += `\nCould you please help me?`;
+  msg += `Could you please help me?`;
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
 }
 
-// ── Place Order form submit ──
+// ── Payment button (order form submit) ──
+// TODO: Replace saveOrder() with Razorpay payment initiation when ready
 document.getElementById('orderForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   if (!validateOrder()) return;
+
   const btn = document.getElementById('placeOrderBtn');
-  btn.textContent = 'Placing order…';
-  btn.disabled = true;
+  btn.style.opacity = '0.7';
+  btn.style.pointerEvents = 'none';
+  btn.querySelector('.btn-sub').textContent = 'Placing order…';
+
   try {
     await saveOrder();
+    // ── PAYMENT INTEGRATION POINT ──
+    // When Razorpay is ready, replace saveOrder() above with:
+    // 1. saveOrder() to get orderId
+    // 2. Open Razorpay checkout with orderId + total
+    // 3. On payment success → mark order as paid in Firestore
     showSuccessPage();
   } catch (err) {
     const errEl = document.getElementById('errorMsg');
     errEl.textContent = '⚠️ Something went wrong. Please try again.';
     errEl.style.display = 'block';
-    btn.textContent = 'Place Order →';
-    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.style.pointerEvents = 'auto';
+    btn.querySelector('.btn-sub').textContent = 'Secure checkout · Cards, UPI & more';
   }
 });
 

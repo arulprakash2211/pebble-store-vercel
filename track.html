@@ -1,246 +1,339 @@
-// api/track.js — Universal courier tracking
-// Supports: ST Courier, DTDC, Professional Courier, India Post
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Track Your Order – Pebble Store</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    .track-page{min-height:100vh;padding:8rem 2rem 4rem;background:var(--cream)}
+    .track-inner{max-width:600px;margin:0 auto}
+    .track-title{font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--dark);margin-bottom:0.5rem}
+    .track-sub{color:var(--light-text);font-size:0.95rem;margin-bottom:2.5rem;font-weight:300;line-height:1.7}
+    .track-tabs{display:flex;gap:0;margin-bottom:2rem;border:1.5px solid rgba(92,61,46,0.2)}
+    .track-tab{flex:1;padding:0.8rem;text-align:center;cursor:pointer;font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;font-weight:500;color:var(--stone);background:var(--warm-white);border:none;font-family:'Jost',sans-serif;transition:all 0.2s}
+    .track-tab.active{background:var(--bark);color:var(--cream)}
+    .track-form{background:var(--warm-white);padding:1.8rem;margin-bottom:1.5rem}
+    .track-input-group{display:flex;gap:0.8rem;margin-top:0.5rem;flex-wrap:wrap}
+    .track-input{flex:1;font-family:'Jost',sans-serif;font-size:0.95rem;padding:0.8rem 1rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0;min-width:200px}
+    .track-input:focus{border-color:var(--clay)}
+    .track-btn{padding:0.8rem 1.5rem;background:var(--bark);color:var(--cream);border:none;font-family:'Jost',sans-serif;font-size:0.8rem;letter-spacing:0.1em;text-transform:uppercase;font-weight:500;cursor:pointer;white-space:nowrap;transition:background 0.2s}
+    .track-btn:hover{background:var(--dark)}
+    .track-result{display:none;background:var(--warm-white);padding:1.8rem;border-left:3px solid var(--moss)}
+    .track-result.visible{display:block}
+    .track-result.error{border-left-color:#c0392b}
+    .result-title{font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--dark);margin-bottom:1rem}
+    .result-row{display:flex;justify-content:space-between;align-items:flex-start;padding:0.6rem 0;border-bottom:1px solid rgba(92,61,46,0.08);font-size:0.88rem;gap:1rem}
+    .result-row:last-child{border-bottom:none}
+    .result-label{color:var(--stone);font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;white-space:nowrap}
+    .result-val{color:var(--dark);font-weight:500;text-align:right}
+    .status-badge{display:inline-block;padding:0.25rem 0.7rem;font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;border-radius:2px}
+    .s-new{background:#fff3cd;color:#856404}
+    .s-confirmed{background:#cce5ff;color:#004085}
+    .s-dispatched{background:#d4edda;color:#155724}
+    .s-delivered{background:#d1ecf1;color:#0c5460}
+    .s-cancelled{background:#f8d7da;color:#721c24}
+    .courier-track-btn{display:inline-flex;align-items:center;gap:0.5rem;margin-top:1rem;padding:0.7rem 1.2rem;background:var(--moss);color:white;text-decoration:none;font-family:'Jost',sans-serif;font-size:0.78rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;transition:background 0.2s;border-radius:2px}
+    .courier-track-btn:hover{background:#3a4a2e}
+    .multiple-orders{margin-top:0.5rem}
+    .order-select-item{padding:0.8rem 1rem;background:var(--cream);margin-bottom:0.5rem;cursor:pointer;border:1.5px solid transparent;transition:border-color 0.2s;font-size:0.85rem}
+    .order-select-item:hover{border-color:var(--bark)}
+    .order-select-label{font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);font-weight:500;margin-bottom:0.5rem}
+    .tab-content{display:none}.tab-content.active{display:block}
+  </style>
+</head>
+<body>
+  <nav>
+    <a class="nav-logo" href="/">Pebble Store</a>
+    <ul class="nav-links">
+      <li><a href="/">Shop</a></li>
+      <li><a href="/#order">Order</a></li>
+      <li><a href="/track.html" style="color:var(--bark)">Track</a></li>
+    </ul>
+  </nav>
 
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+  <div class="track-page">
+    <div class="track-inner">
+      <h1 class="track-title">Track Your Order</h1>
+      <p class="track-sub">Enter your phone number or tracking ID to check your order status and get live courier tracking.</p>
 
-function initFirebase() {
-  if (getApps().length === 0) {
-    initializeApp({
-      credential: cert({
-        projectId:   process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey:  process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      }),
-    });
-  }
-  return getFirestore();
-}
+      <!-- TABS -->
+      <div class="track-tabs">
+        <button class="track-tab active" onclick="switchTab('phone', this)">📱 By Phone Number</button>
+        <button class="track-tab" onclick="switchTab('tracking', this)">📦 By Tracking ID</button>
+      </div>
 
-// ── Helper: fetch with browser-like headers ──
-async function fetchPage(url, options = {}) {
-  return fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-      ...options.headers
-    },
-    ...options
-  });
-}
+      <!-- TAB: Phone -->
+      <div class="tab-content active" id="tab-phone">
+        <div class="track-form">
+          <label style="font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);font-weight:500">Phone Number used while ordering</label>
+          <div class="track-input-group">
+            <input class="track-input" id="phoneInput" type="tel" placeholder="+91 00000 00000" />
+            <button class="track-btn" onclick="trackByPhone()">Track →</button>
+          </div>
+        </div>
+      </div>
 
-// ── Map raw status to our order status ──
-function mapStatus(htmlLower) {
-  if (htmlLower.includes('delivered')) return { mapped: 'delivered', raw: 'Delivered' };
-  if (htmlLower.includes('out for delivery')) return { mapped: 'dispatched', raw: 'Out for Delivery' };
-  if (htmlLower.includes('in transit')) return { mapped: 'dispatched', raw: 'In Transit' };
-  if (htmlLower.includes('reached')) return { mapped: 'dispatched', raw: 'Reached Destination' };
-  if (htmlLower.includes('picked up') || htmlLower.includes('booked') || htmlLower.includes('manifested')) return { mapped: 'dispatched', raw: 'Picked Up' };
-  if (htmlLower.includes('dispatched')) return { mapped: 'dispatched', raw: 'Dispatched' };
-  return { mapped: null, raw: 'In Transit' };
-}
+      <!-- TAB: Tracking ID -->
+      <div class="tab-content" id="tab-tracking">
+        <div class="track-form">
+          <label style="font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);font-weight:500">Courier Tracking ID</label>
+          <div class="track-input-group">
+            <input class="track-input" id="trackingInput" type="text" placeholder="e.g. 1234567890" />
+            <button class="track-btn" onclick="trackByTrackingId()">Track →</button>
+          </div>
+        </div>
+      </div>
 
-// ── Extract text from HTML rows ──
-function extractRows(html, limit = 5) {
-  const rows = [];
-  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  let m;
-  while ((m = rowRegex.exec(html)) !== null) {
-    const text = m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    if (text.length > 8 && !/tracking\s*id|awb|consignment/i.test(text)) {
-      rows.push(text);
-    }
-  }
-  return rows.slice(0, limit).join(' → ');
-}
+      <!-- MULTIPLE ORDERS (phone lookup) -->
+      <div id="multipleOrders" style="display:none;margin-bottom:1.5rem">
+        <div class="order-select-label">Multiple orders found — select one:</div>
+        <div id="orderList" class="multiple-orders"></div>
+      </div>
 
-// ════════════════════════════════════
-// ST COURIER
-// ════════════════════════════════════
-async function trackSTCourier(trackingId) {
-  try {
-    const res = await fetchPage(`https://www.stcourier.com/tracking.php?trackid=${trackingId}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const html = await res.text();
-    const htmlLower = html.toLowerCase();
+      <!-- RESULT -->
+      <div class="track-result" id="trackResult">
+        <div class="result-title">Order Details</div>
+        <div id="resultContent"></div>
+      </div>
 
-    if (htmlLower.includes('not found') || htmlLower.includes('invalid')) {
-      return { success: false, error: 'Tracking ID not found on ST Courier' };
-    }
+    </div>
+  </div>
 
-    const { mapped, raw } = mapStatus(htmlLower);
-    const details = extractRows(html);
+  <footer>
+    <div class="footer-logo">Pebble Store</div>
+    <div class="footer-links">
+      <a href="/">Shop</a>
+      <a href="/#about">Our Story</a>
+      <a href="/#order">Order</a>
+    </div>
+    <p class="footer-copy">© 2025 Pebble Store · Made with 🌿 and lots of love</p>
+  </footer>
 
-    return { success: true, rawStatus: raw, mappedStatus: mapped, details };
-  } catch (err) {
-    return { success: false, error: 'Could not reach ST Courier: ' + err.message };
-  }
-}
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-// ════════════════════════════════════
-// DTDC
-// ════════════════════════════════════
-async function trackDTDC(trackingId) {
-  try {
-    // DTDC has a JSON API endpoint
-    const res = await fetchPage(
-      `https://www.dtdc.in/trace/TrackingApi?action=track_single&cno=${trackingId}`,
-      { headers: { 'Referer': 'https://www.dtdc.in/', 'Accept': 'application/json' } }
-    );
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
-
-    // Try JSON parse first
-    try {
-      const data = JSON.parse(text);
-      const events = data?.shipmentTrackingDetails || data?.trackingDetails || [];
-      if (events.length > 0) {
-        const latest = events[0];
-        const rawStatus = latest.status || latest.remarks || 'In Transit';
-        const { mapped } = mapStatus(rawStatus.toLowerCase());
-        const details = events.slice(0, 3)
-          .map(e => `${e.date || ''} ${e.location || ''} ${e.status || e.remarks || ''}`.trim())
-          .join(' → ');
-        return { success: true, rawStatus, mappedStatus: mapped, details };
-      }
-    } catch(_) {}
-
-    // Fall back to HTML scraping
-    const htmlLower = text.toLowerCase();
-    if (htmlLower.includes('not found') || htmlLower.includes('invalid')) {
-      return { success: false, error: 'Tracking ID not found on DTDC' };
-    }
-    const { mapped, raw } = mapStatus(htmlLower);
-    const details = extractRows(text);
-    return { success: true, rawStatus: raw, mappedStatus: mapped, details };
-
-  } catch (err) {
-    return { success: false, error: 'Could not reach DTDC: ' + err.message };
-  }
-}
-
-// ════════════════════════════════════
-// PROFESSIONAL COURIER (TPC India)
-// ════════════════════════════════════
-async function trackProfessional(trackingId) {
-  try {
-    // TPC India tracking page
-    const res = await fetchPage(
-      `https://www.tpcindia.com/tracking.php?id=${trackingId}&type=0&service=0`,
-      { headers: { 'Referer': 'https://www.tpcindia.com/' } }
-    );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const html = await res.text();
-    const htmlLower = html.toLowerCase();
-
-    if (htmlLower.includes('not found') || htmlLower.includes('invalid') || htmlLower.includes('no record')) {
-      return { success: false, error: 'Tracking ID not found on Professional Courier' };
-    }
-
-    const { mapped, raw } = mapStatus(htmlLower);
-    const details = extractRows(html);
-    return { success: true, rawStatus: raw, mappedStatus: mapped, details };
-
-  } catch (err) {
-    return { success: false, error: 'Could not reach Professional Courier: ' + err.message };
-  }
-}
-
-// ════════════════════════════════════
-// INDIA POST (Official API)
-// ════════════════════════════════════
-async function trackIndiaPost(trackingId) {
-  try {
-    // India Post official tracking API
-    const res = await fetch(
-      `https://www.indiapost.gov.in/VAS/api/Tracking/GetTrackingData?id=${trackingId}`,
-      {
-        headers: {
-          'Accept': 'application/json',
-          'Referer': 'https://www.indiapost.gov.in/',
-          'User-Agent': 'Mozilla/5.0 Chrome/120.0.0.0'
-        }
-      }
-    );
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-
-    // India Post API response format
-    const events = data?.data?.trackingData || data?.trackingData || [];
-    if (events.length > 0) {
-      const latest = events[events.length - 1];
-      const rawStatus = latest.eventType || latest.description || 'In Transit';
-      const { mapped } = mapStatus(rawStatus.toLowerCase());
-      const details = events.slice(-3).reverse()
-        .map(e => `${e.eventDate || ''} ${e.office || ''}: ${e.eventType || ''}`.trim())
-        .join(' → ');
-      return { success: true, rawStatus, mappedStatus: mapped, details };
-    }
-
-    // Fallback — try HTML page
-    const htmlRes = await fetchPage(`https://www.indiapost.gov.in/VAS/Pages/trackconsignment.aspx`);
-    return { success: false, error: 'Could not fetch India Post status. Please check the India Post website.' };
-
-  } catch (err) {
-    return { success: false, error: 'Could not reach India Post: ' + err.message };
-  }
-}
-
-// ════════════════════════════════════
-// MAIN HANDLER
-// ════════════════════════════════════
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  const { orderId, trackingId, courier } = req.body;
-  if (!orderId || !trackingId || !courier) {
-    return res.status(400).json({ error: 'orderId, trackingId and courier required' });
-  }
-
-  // Route to correct courier tracker
-  let result;
-  switch (courier) {
-    case 'ST Courier':           result = await trackSTCourier(trackingId);   break;
-    case 'DTDC':                 result = await trackDTDC(trackingId);         break;
-    case 'Professional Courier': result = await trackProfessional(trackingId); break;
-    case 'India Post':           result = await trackIndiaPost(trackingId);    break;
-    default:
-      return res.status(200).json({ success: false, error: `Auto-tracking not available for ${courier}. Please visit their website.` });
-  }
-
-  if (!result.success) {
-    return res.status(200).json(result);
-  }
-
-  // Update Firestore
-  try {
-    const db = initFirebase();
-    const updates = {
-      'tracking.rawStatus':  result.rawStatus,
-      'tracking.details':    result.details || '',
-      'tracking.fetchedAt':  new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+    const firebaseConfig = {
+      apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
+      authDomain: "pebble-store-70889.firebaseapp.com",
+      projectId: "pebble-store-70889",
+      storageBucket: "pebble-store-70889.firebasestorage.app",
+      messagingSenderId: "611731436877",
+      appId: "1:611731436877:web:eee0ef64cd8b4b86467304"
     };
-    if (result.mappedStatus === 'delivered') {
-      updates.status = 'delivered';
-    }
-    await db.collection('orders').doc(orderId).update(updates);
-  } catch (err) {
-    console.error('Firestore update error:', err);
-  }
 
-  return res.status(200).json({
-    success:      true,
-    rawStatus:    result.rawStatus,
-    mappedStatus: result.mappedStatus,
-    details:      result.details || '',
-    fetchedAt:    new Date().toISOString()
-  });
-}
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+
+    // Courier tracking URLs
+    const COURIER_MANUAL = ['ST Courier', 'India Post'];
+    const COURIER_URLS = {
+      'ST Courier':             id => `https://www.stcourier.com/`,
+      'Professional Courier':   id => `https://www.tpcindia.com/tracking.php?id=${id}&type=0&service=0`,
+      'DTDC':                   id => `https://www.dtdc.in/tracking/tracking_results.asp?Ttype=awb&strCNno=${id}`,
+      'India Post':             id => `https://www.indiapost.gov.in/VAS/Pages/trackconsignment.aspx`,
+    };
+
+    const STATUS_CLASS = {
+      new: 's-new', confirmed: 's-confirmed',
+      dispatched: 's-dispatched', delivered: 's-delivered', cancelled: 's-cancelled'
+    };
+
+    const STATUS_LABEL = {
+      new: '🟡 Order Received', confirmed: '🔵 Order Confirmed',
+      dispatched: '🚚 Dispatched', delivered: '✅ Delivered', cancelled: '❌ Cancelled'
+    };
+
+    // ── Tab switch ──
+    window.switchTab = (tab, el) => {
+      document.querySelectorAll('.track-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('tab-' + tab).classList.add('active');
+      document.getElementById('trackResult').classList.remove('visible', 'error');
+      document.getElementById('multipleOrders').style.display = 'none';
+    };
+
+    // ── Track by phone ──
+    window.trackByPhone = async () => {
+      const phone = document.getElementById('phoneInput').value.trim();
+      if (!phone) { showError('Please enter your phone number.'); return; }
+
+      showLoading();
+      try {
+        const snap = await getDocs(collection(db, 'orders'));
+        const cleanPhone = phone.replace(/\s/g, '');
+        const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+          .filter(o => o.phone && o.phone.replace(/\s/g, '') === cleanPhone)
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        if (!orders.length) {
+          showError('No orders found for this phone number. Please check and try again.');
+          return;
+        }
+
+        if (orders.length === 1) {
+          showOrderResult(orders[0]);
+        } else {
+          // Multiple orders — show selector
+          document.getElementById('trackResult').classList.remove('visible', 'error');
+          const listEl = document.getElementById('orderList');
+          listEl.innerHTML = orders.map(o => {
+            const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+            const items = (o.items || []).map(i => i.name).join(', ');
+            return `<div class="order-select-item" onclick="showOrderResult(${JSON.stringify(o).replace(/"/g, '&quot;')})">
+              <strong>${date}</strong> &nbsp;·&nbsp; ₹${o.total}
+              <div style="font-size:0.78rem;color:var(--light-text);margin-top:0.2rem">${items}</div>
+              <span class="status-badge ${STATUS_CLASS[o.status] || 's-new'}" style="margin-top:0.4rem;display:inline-block">${o.status}</span>
+            </div>`;
+          }).join('');
+          document.getElementById('multipleOrders').style.display = 'block';
+        }
+      } catch (err) {
+        showError('Something went wrong. Please try again.');
+        console.error(err);
+      }
+    };
+
+    // ── Track by tracking ID ──
+    window.trackByTrackingId = async () => {
+      const trackId = document.getElementById('trackingInput').value.trim();
+      if (!trackId) { showError('Please enter your tracking ID.'); return; }
+
+      showLoading();
+      try {
+        const snap = await getDocs(collection(db, 'orders'));
+        const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const order = orders.find(o => o.tracking?.trackingId === trackId);
+
+        if (!order) {
+          showError('No order found with this tracking ID. Please check and try again.');
+          return;
+        }
+        document.getElementById('multipleOrders').style.display = 'none';
+        showOrderResult(order);
+      } catch (err) {
+        showError('Something went wrong. Please try again.');
+      }
+    };
+
+    // ── Show order result ──
+    window.showOrderResult = async (order) => {
+      // Auto-fetch ST Courier live status
+      const SUPPORTED_COURIERS = ['ST Courier', 'DTDC', 'Professional Courier', 'India Post'];
+  if (SUPPORTED_COURIERS.includes(order.tracking?.courier) && order.tracking?.trackingId && order.status !== 'delivered') {
+        document.getElementById('resultContent').innerHTML = '<p style="color:var(--light-text);font-style:italic">Fetching live status from ST Courier…</p>';
+        document.getElementById('trackResult').classList.add('visible');
+        try {
+          const r = await fetch('/api/track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId: order.id, trackingId: order.tracking.trackingId, courier: order.tracking.courier })
+          });
+          const d = await r.json();
+          if (d.success) {
+            order.tracking.rawStatus = d.rawStatus;
+            order.tracking.details   = d.details;
+            order.tracking.fetchedAt = d.fetchedAt;
+            if (d.mappedStatus) order.status = d.mappedStatus;
+          }
+        } catch(e) { console.warn('Live fetch failed', e); }
+      }
+      document.getElementById('multipleOrders').style.display = 'none';
+      const result = document.getElementById('trackResult');
+      const date = new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+      const items = (order.items || []).map(i => `${i.name} × ${i.qty}`).join(', ');
+      const statusClass = STATUS_CLASS[order.status] || 's-new';
+      const statusLabel = STATUS_LABEL[order.status] || order.status;
+
+      let trackingSection = '';
+      if (order.tracking) {
+        const { courier, trackingId } = order.tracking;
+        const courierUrl = COURIER_URLS[courier] ? COURIER_URLS[courier](trackingId) : null;
+        const isManual = COURIER_MANUAL && COURIER_MANUAL.includes(courier);
+        const { rawStatus, details, fetchedAt } = order.tracking;
+        const liveStatusHtml = rawStatus
+          ? `<div class="result-row"><span class="result-label">Live Status</span><span class="result-val" style="color:var(--moss);font-weight:600">📍 ${rawStatus}</span></div>
+             ${details ? `<div class="result-row"><span class="result-label">Details</span><span class="result-val" style="font-size:0.78rem">${details}</span></div>` : ''}
+             ${fetchedAt ? `<div style="font-size:0.7rem;color:var(--stone);padding:0.3rem 0.5rem">Last checked: ${new Date(fetchedAt).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'})}</div>` : ''}`
+          : '';
+        trackingSection = `${liveStatusHtml}
+          <div class="result-row">
+            <span class="result-label">Courier</span>
+            <span class="result-val">${courier}</span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">Tracking ID</span>
+            <span class="result-val">
+              <span style="font-family:monospace;font-weight:600">${trackingId}</span>
+              <button onclick="navigator.clipboard.writeText('${trackingId}').then(()=>this.textContent='✓ Copied!').catch(()=>{})" style="margin-left:0.5rem;padding:0.2rem 0.6rem;background:var(--bark);color:white;border:none;cursor:pointer;font-size:0.68rem;font-family:'Jost',sans-serif">Copy</button>
+            </span>
+          </div>
+          ${isManual
+            ? `<button onclick="navigator.clipboard.writeText('${trackingId}').then(()=>{}).catch(()=>{}); window.open('${courierUrl}','_blank')" class="courier-track-btn" style="border:none;cursor:pointer">🔍 Open ${courier} Site <small style="opacity:0.8">(ID auto-copied)</small></button>`
+            : courierUrl
+              ? `<a class="courier-track-btn" href="${courierUrl}" target="_blank">🔍 Track on ${courier} →</a>`
+              : `<p style="font-size:0.82rem;color:var(--light-text);margin-top:0.8rem">Visit ${courier} website and enter tracking ID: <strong>${trackingId}</strong></p>`
+          }`;
+      } else if (order.status === 'dispatched') {
+        trackingSection = `<p style="font-size:0.82rem;color:var(--light-text);margin-top:0.8rem">Tracking details will be updated shortly.</p>`;
+      }
+
+      document.getElementById('resultContent').innerHTML = `
+        <div class="result-row">
+          <span class="result-label">Order Date</span>
+          <span class="result-val">${date}</span>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Name</span>
+          <span class="result-val">${order.name}</span>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Items</span>
+          <span class="result-val" style="max-width:300px;text-align:right">${items}</span>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Total</span>
+          <span class="result-val">₹${order.total}</span>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Status</span>
+          <span class="result-val"><span class="status-badge ${statusClass}">${statusLabel}</span></span>
+        </div>
+        ${trackingSection}`;
+
+      result.classList.remove('error');
+      result.classList.add('visible');
+      result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+
+    function showLoading() {
+      const result = document.getElementById('trackResult');
+      document.getElementById('resultContent').innerHTML = '<p style="color:var(--light-text);font-style:italic">Looking up your order…</p>';
+      result.classList.remove('error');
+      result.classList.add('visible');
+    }
+
+    function showError(msg) {
+      const result = document.getElementById('trackResult');
+      document.getElementById('resultContent').innerHTML = `<p style="color:#c0392b">${msg}</p>`;
+      result.classList.add('visible', 'error');
+      result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // Auto-fill from URL param e.g. /track.html?phone=9999999999
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('phone')) {
+      document.getElementById('phoneInput').value = urlParams.get('phone');
+      trackByPhone();
+    }
+    if (urlParams.get('tracking')) {
+      document.getElementById('trackingInput').value = urlParams.get('tracking');
+      switchTab('tracking', document.querySelectorAll('.track-tab')[1]);
+      trackByTrackingId();
+    }
+  </script>
+</body>
+</html>

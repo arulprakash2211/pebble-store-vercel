@@ -122,6 +122,9 @@ function showTrackError(msg) {
   el.style.borderLeftColor = '#c0392b';
 }
 
+// Store found orders by index for onclick reference
+const trackOrderCache = {};
+
 window.doTrackByPhone = async function() {
   const phone = document.getElementById('trackPhone').value.trim();
   if (!phone) { showTrackError('Please enter your phone number.'); return; }
@@ -134,13 +137,18 @@ window.doTrackByPhone = async function() {
       .filter(o => { const c = phone.replace(/[^0-9]/g, ''); return o.phone && o.phone.replace(/[^0-9]/g, '') === c; })
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     if (!orders.length) { showTrackError('No orders found for this phone number.'); return; }
-    if (orders.length === 1) { showTrackResult(orders[0]); return; }
-    // Multiple orders
-    el.innerHTML = `<div style="font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);margin-bottom:0.8rem;font-weight:500">Select an order:</div>` +
-      orders.map(o => {
-        const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short' });
-        return `<div onclick='showTrackResult(${JSON.stringify(o)})' style="padding:0.7rem 1rem;background:var(--warm-white);margin-bottom:0.4rem;cursor:pointer;border:1.5px solid transparent;font-size:0.85rem;transition:border-color 0.2s" onmouseover="this.style.borderColor='var(--bark)'" onmouseout="this.style.borderColor='transparent'">
-          <strong>${date}</strong> · ₹${o.total} · <em style="color:var(--light-text)">${o.status}</em>
+    if (orders.length === 1) { await showTrackResult(orders[0]); return; }
+
+    // Multiple orders — store in cache and reference by index
+    orders.forEach((o, i) => { trackOrderCache[i] = o; });
+    el.innerHTML = `<div style="font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);margin-bottom:0.8rem;font-weight:500">Multiple orders found — select one:</div>` +
+      orders.map((o, i) => {
+        const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
+        const items = (o.items || []).map(x => x.name).join(', ');
+        return `<div onclick="selectTrackOrder(${i})" style="padding:0.8rem 1rem;background:var(--warm-white);margin-bottom:0.5rem;cursor:pointer;border:1.5px solid transparent;font-size:0.85rem;transition:border-color 0.2s" onmouseover="this.style.borderColor='var(--bark)'" onmouseout="this.style.borderColor='transparent'">
+          <strong>${date}</strong> &nbsp;·&nbsp; <strong>₹${o.total}</strong>
+          <div style="font-size:0.75rem;color:var(--light-text);margin-top:0.2rem">${items}</div>
+          <span style="font-size:0.68rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;padding:0.15rem 0.5rem;border-radius:2px;background:#fff3cd;color:#856404;display:inline-block;margin-top:0.3rem">${o.status}</span>
         </div>`;
       }).join('');
     el.style.display = 'block';
@@ -148,6 +156,11 @@ window.doTrackByPhone = async function() {
     console.error('Track by phone error:', err);
     showTrackError('Error: ' + err.message);
   }
+};
+
+window.selectTrackOrder = async function(index) {
+  const order = trackOrderCache[index];
+  if (order) await showTrackResult(order);
 };
 
 window.doTrackById = async function() {

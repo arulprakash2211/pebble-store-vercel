@@ -7,15 +7,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="style.css" />
   <style>
-    .order-methods{display:flex;flex-direction:column;gap:1rem;margin-top:1.5rem}
-    .method-card{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1.2rem 1.5rem;border:1.5px solid rgba(92,61,46,0.18);background:var(--warm-white);flex-wrap:wrap}
-    .method-info{flex:1}
-    .method-name{font-weight:500;font-size:0.95rem;color:var(--dark);margin-bottom:0.2rem}
-    .method-desc{font-size:0.78rem;color:var(--light-text);line-height:1.5}
-    .method-badge{font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;font-weight:600;padding:0.18rem 0.55rem;border-radius:2px;white-space:nowrap;align-self:flex-start}
-    .badge-recommended{background:rgba(74,92,58,0.12);color:var(--moss)}
-    .badge-query{background:rgba(160,120,80,0.12);color:var(--clay)}
-    .order-method-title{font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--stone);font-weight:500;margin-top:1.8rem;margin-bottom:0.8rem}
+    .checkout-actions{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.8rem}
+    .checkout-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5rem;padding:1.3rem 1rem;border:none;cursor:pointer;font-family:'Jost',sans-serif;transition:all 0.25s;text-decoration:none;border-radius:2px}
+    .checkout-btn .btn-icon{font-size:1.6rem}
+    .checkout-btn .btn-title{font-size:0.85rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase}
+    .checkout-btn .btn-sub{font-size:0.72rem;opacity:0.8;text-align:center;line-height:1.4}
+    .btn-payment{background:var(--bark);color:var(--cream)}
+    .btn-payment:hover{background:var(--dark);transform:translateY(-2px);box-shadow:0 8px 24px rgba(92,61,46,0.2)}
+    .btn-whatsapp-checkout{background:#25D366;color:white}
+    .btn-whatsapp-checkout:hover{background:#1da851;transform:translateY(-2px);box-shadow:0 8px 24px rgba(37,211,102,0.25)}
+    @media(max-width:480px){.checkout-actions{grid-template-columns:1fr}.checkout-btn{flex-direction:row;text-align:left;gap:1rem;padding:1rem 1.2rem}.checkout-btn .btn-icon{font-size:1.4rem}}
   </style>
 </head>
 <body>
@@ -91,10 +92,9 @@
         <div class="section-header">
           <p class="section-eyebrow">Place an Order</p>
           <h2 class="section-title">Order Your Soaps</h2>
-          <p class="section-sub">Set quantities above, fill your details below.</p>
+          <p class="section-sub">Set quantities above and fill in your details below.</p>
         </div>
 
-        <!-- Order summary -->
         <div class="order-summary">
           <div class="order-summary-title">Your Order Summary</div>
           <div id="summaryContent">
@@ -102,7 +102,6 @@
           </div>
         </div>
 
-        <!-- Details form -->
         <form id="orderForm">
           <div class="form-grid">
             <div class="form-group">
@@ -123,38 +122,33 @@
             </div>
             <div class="form-group full">
               <label for="notes">Special Notes</label>
-              <textarea id="notes" placeholder="Gifting notes, questions, special requests…"></textarea>
+              <textarea id="notes" placeholder="Gifting notes, allergies, special requests…"></textarea>
             </div>
           </div>
 
           <div class="error-msg" id="errorMsg"></div>
 
-          <!-- ORDER OPTIONS -->
-          <p class="order-method-title">Choose an option:</p>
-          <div class="order-methods">
+          <div class="checkout-actions">
 
-            <!-- Proceed to payment / confirm order -->
-            <div class="method-card">
-              <div class="method-info">
-                <div class="method-name">✅ Proceed to Payment</div>
-                <div class="method-desc">Confirm your order — payment integration coming soon. Your order will be placed immediately.</div>
+            <!-- Payment -->
+            <button type="submit" class="checkout-btn btn-payment" id="placeOrderBtn">
+              <span class="btn-icon">💳</span>
+              <div>
+                <div class="btn-title">Proceed to Payment</div>
+                <div class="btn-sub">Secure checkout · Cards, UPI & more</div>
               </div>
-              <span class="method-badge badge-recommended">Recommended</span>
-              <button type="submit" class="btn btn-primary" id="placeOrderBtn">Place Order →</button>
-            </div>
+            </button>
 
-            <!-- WhatsApp for queries -->
-            <div class="method-card">
-              <div class="method-info">
-                <div class="method-name">💬 Message on WhatsApp</div>
-                <div class="method-desc">Have a question before ordering? Chat with us directly on WhatsApp.</div>
+            <!-- WhatsApp query -->
+            <button type="button" class="checkout-btn btn-whatsapp-checkout" id="whatsappBtn">
+              <span class="btn-icon">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              </span>
+              <div>
+                <div class="btn-title">Chat on WhatsApp</div>
+                <div class="btn-sub">Questions? We'll reply instantly</div>
               </div>
-              <span class="method-badge badge-query">For Queries</span>
-              <button type="button" class="btn btn-whatsapp" id="whatsappBtn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                Chat Now
-              </button>
-            </div>
+            </button>
 
           </div>
         </form>
@@ -165,7 +159,7 @@
         <div class="success-page">
           <div class="success-icon">🌿</div>
           <h2 class="success-title">Order Placed!</h2>
-          <p class="success-subtitle">Thank you! We'll confirm your order and get back to you within 24 hours.</p>
+          <p class="success-subtitle">Thank you! We'll confirm and get back to you within 24 hours.</p>
 
           <div class="success-order-box">
             <div class="success-order-title">Your Order</div>
@@ -173,19 +167,11 @@
             <div class="success-total" id="successTotal"></div>
           </div>
 
-          <!-- Tracking info (shown after dispatch) -->
-          <div id="successTracking" style="display:none">
-            <div class="success-order-box" style="margin-top:1rem;border-left:3px solid var(--moss)">
-              <div class="success-order-title">📦 Tracking Info</div>
-              <div id="successTrackingDetails"></div>
-            </div>
-          </div>
-
           <div class="success-next">
             <p class="success-next-title">What happens next?</p>
             <div class="success-steps">
-              <div class="success-step"><span class="step-num">1</span><span>We review and confirm your order</span></div>
-              <div class="success-step"><span class="step-num">2</span><span>We share payment details via WhatsApp</span></div>
+              <div class="success-step"><span class="step-num">1</span><span>We confirm your order and prepare it</span></div>
+              <div class="success-step"><span class="step-num">2</span><span>We contact you via WhatsApp with updates</span></div>
               <div class="success-step"><span class="step-num">3</span><span>Your soaps are freshly made and dispatched 🧼</span></div>
             </div>
           </div>
@@ -207,7 +193,6 @@
     <p class="footer-copy">© 2025 Pebble Store · Made with 🌿 and lots of love</p>
   </footer>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

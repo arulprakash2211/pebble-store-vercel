@@ -246,7 +246,7 @@
             </span>
           </div>
           ${isManual
-            ? `<p style="font-size:0.82rem;color:var(--light-text);margin-top:0.8rem">Copy the tracking ID and paste it on the <a href="${courierUrl}" target="_blank" style="color:var(--bark)">${courier} website</a> to track your shipment.</p>`
+            ? `<button onclick="navigator.clipboard.writeText('${trackingId}').then(()=>{}).catch(()=>{}); window.open('${courierUrl}','_blank')" class="courier-track-btn" style="border:none;cursor:pointer">🔍 Open ${courier} Site <small style="opacity:0.8">(ID auto-copied)</small></button>`
             : courierUrl
               ? `<a class="courier-track-btn" href="${courierUrl}" target="_blank">🔍 Track on ${courier} →</a>`
               : `<p style="font-size:0.82rem;color:var(--light-text);margin-top:0.8rem">Visit ${courier} website and enter tracking ID: <strong>${trackingId}</strong></p>`

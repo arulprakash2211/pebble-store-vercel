@@ -113,7 +113,10 @@ window.doTrackByPhone = async function() {
         </div>`;
       }).join('');
     el.style.display = 'block';
-  } catch (err) { showTrackError('Something went wrong. Please try again.'); }
+  } catch (err) {
+    console.error('Track by phone error:', err);
+    showTrackError('Error: ' + err.message);
+  }
 };
 
 window.doTrackById = async function() {

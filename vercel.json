@@ -1,8 +1,11 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/admin", "destination": "/admin/index.html" },
+    { "source": "/api/products", "destination": "/api/products.js" },
+    { "source": "/api/orders",   "destination": "/api/orders.js" },
+    { "source": "/api/track",    "destination": "/api/track.js" },
+    { "source": "/admin",        "destination": "/admin/index.html" },
     { "source": "/admin/dashboard", "destination": "/admin/dashboard.html" },
-    { "source": "/track", "destination": "/track.html" }
+    { "source": "/track",        "destination": "/track.html" }
   ]
 }

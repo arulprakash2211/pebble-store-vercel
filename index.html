@@ -42,6 +42,7 @@
       <li><a href="#products">Soaps</a></li>
       <li><a href="#about">Our Story</a></li>
       <li><a href="#order">Order</a></li>
+      <li><a href="/track.html">Track Order</a></li>
     </ul>
   </nav>
 
@@ -200,6 +201,43 @@
         </div>
       </div>
 
+    </div>
+  </section>
+
+
+  <!-- TRACK ORDER SECTION -->
+  <section class="order-section" id="track" style="background:var(--warm-white)">
+    <div class="order-inner">
+      <div class="section-header">
+        <p class="section-eyebrow">Order Tracking</p>
+        <h2 class="section-title">Track Your Order</h2>
+        <p class="section-sub">Enter your phone number or tracking ID to check your order status.</p>
+      </div>
+
+      <div style="display:flex;gap:0;margin-bottom:1.5rem;border:1.5px solid rgba(92,61,46,0.2)">
+        <button id="tabPhoneBtn" onclick="switchTrackTab('phone')" style="flex:1;padding:0.8rem;text-align:center;cursor:pointer;font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;font-weight:500;background:var(--bark);color:var(--cream);border:none;font-family:'Jost',sans-serif;transition:all 0.2s">📱 By Phone</button>
+        <button id="tabTrackBtn" onclick="switchTrackTab('tracking')" style="flex:1;padding:0.8rem;text-align:center;cursor:pointer;font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;font-weight:500;background:var(--warm-white);color:var(--stone);border:none;font-family:'Jost',sans-serif;transition:all 0.2s">📦 By Tracking ID</button>
+      </div>
+
+      <div id="trackPhonePanel">
+        <div style="display:flex;gap:0.8rem;flex-wrap:wrap">
+          <input id="trackPhone" type="tel" placeholder="+91 00000 00000" style="flex:1;font-family:'Jost',sans-serif;font-size:0.95rem;padding:0.8rem 1rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;min-width:200px"/>
+          <button onclick="doTrackByPhone()" class="btn btn-primary">Track →</button>
+        </div>
+      </div>
+
+      <div id="trackIdPanel" style="display:none">
+        <div style="display:flex;gap:0.8rem;flex-wrap:wrap">
+          <input id="trackId" type="text" placeholder="Enter your tracking ID" style="flex:1;font-family:'Jost',sans-serif;font-size:0.95rem;padding:0.8rem 1rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;min-width:200px"/>
+          <button onclick="doTrackById()" class="btn btn-primary">Track →</button>
+        </div>
+      </div>
+
+      <div id="trackResultInline" style="display:none;margin-top:1.5rem;background:var(--cream);padding:1.5rem;border-left:3px solid var(--moss)"></div>
+
+      <div style="text-align:center;margin-top:1.5rem">
+        <a href="/track.html" style="font-size:0.82rem;color:var(--clay);text-decoration:none">Open full tracking page →</a>
+      </div>
     </div>
   </section>
 

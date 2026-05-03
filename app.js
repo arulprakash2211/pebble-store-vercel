@@ -71,8 +71,9 @@ function showTrackResult(order) {
           <span style="font-family:monospace;font-size:1rem;font-weight:600;color:var(--dark);background:var(--cream);padding:0.4rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2)">${trackingId}</span>
           <button onclick="navigator.clipboard.writeText('${trackingId}').then(()=>this.textContent='✓ Copied!').catch(()=>{})" style="padding:0.4rem 0.8rem;background:var(--bark);color:white;border:none;cursor:pointer;font-size:0.72rem;font-family:'Jost',sans-serif;letter-spacing:0.08em;text-transform:uppercase">Copy ID</button>
         </div>
-        ${isManual ? `<p style="font-size:0.78rem;color:var(--light-text);margin-top:0.6rem">Copy the tracking ID above and paste it on the <a href="${url}" target="_blank" style="color:var(--bark)">${courier} website</a> to track your shipment.</p>` 
-        : url ? `<a href="${url}" target="_blank" style="display:inline-flex;align-items:center;gap:0.4rem;margin-top:0.8rem;padding:0.5rem 1rem;background:var(--moss);color:white;text-decoration:none;font-size:0.75rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;border-radius:2px">🔍 Track on ${courier} website →</a>` : ''}
+        ${isManual
+          ? `<button onclick="navigator.clipboard.writeText('${trackingId}').then(()=>{}).catch(()=>{}); window.open('${url}','_blank')" style="display:inline-flex;align-items:center;gap:0.5rem;margin-top:0.8rem;padding:0.6rem 1.2rem;background:var(--moss);color:white;border:none;cursor:pointer;font-size:0.78rem;font-family:'Jost',sans-serif;letter-spacing:0.08em;text-transform:uppercase;font-weight:500">🔍 Open ${courier} Site <span style="opacity:0.8;font-size:0.68rem">(ID auto-copied)</span></button>`
+          : url ? `<a href="${url}" target="_blank" style="display:inline-flex;align-items:center;gap:0.4rem;margin-top:0.8rem;padding:0.5rem 1rem;background:var(--moss);color:white;text-decoration:none;font-size:0.75rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;border-radius:2px">🔍 Track on ${courier} website →</a>` : ''}
       </div>`;
   }
 

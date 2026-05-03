@@ -21,13 +21,13 @@
     .page-header{margin-bottom:1.8rem;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem}
     .page-title{font-family:'Playfair Display',serif;font-size:1.6rem;color:var(--dark);margin-bottom:0.2rem}
     .page-sub{font-size:0.82rem;color:var(--light-text)}
-    .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1rem;margin-bottom:2rem}
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:1rem;margin-bottom:2rem}
     .stat-card{background:var(--cream);padding:1.1rem 1.3rem;border-left:3px solid var(--bark)}
     .stat-label{font-size:0.65rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--stone);margin-bottom:0.4rem}
     .stat-value{font-family:'Playfair Display',serif;font-size:1.6rem;color:var(--dark)}
     .stat-value.green{color:var(--moss)}.stat-value.clay{color:var(--clay)}
     .section{display:none}.section.active{display:block}
-    .table-wrap{background:var(--cream);overflow-x:auto;border-radius:2px}
+    .table-wrap{background:var(--cream);overflow-x:auto}
     table{width:100%;border-collapse:collapse;font-size:0.83rem}
     th{text-align:left;font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);font-weight:500;padding:0.75rem 1rem;border-bottom:1px solid rgba(92,61,46,0.15);white-space:nowrap;background:var(--cream)}
     td{padding:0.75rem 1rem;border-bottom:1px solid rgba(92,61,46,0.06);vertical-align:middle;color:var(--dark)}
@@ -37,42 +37,42 @@
     .badge-new{background:#fff3cd;color:#856404}
     .badge-confirmed{background:#cce5ff;color:#004085}
     .badge-dispatched{background:#d4edda;color:#155724}
-    .badge-delivered{background:#d1ecf1;color:#0c5460}
-    .badge-cancelled{background:#f8d7da;color:#721c24}
-    .badge-payment_pending{background:#e2d9f3;color:#4a235a}
+    .badge-delivered{background:#0d6efd22;color:#0c5460}
     .badge-cancelled{background:#f8d7da;color:#721c24}
     .badge-paid{background:#d4edda;color:#155724}
     .badge-unpaid{background:#f8d7da;color:#721c24}
-    .btn{padding:0.5rem 1rem;border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:0.75rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;transition:all 0.2s;border-radius:2px}
+    .btn{padding:0.45rem 0.9rem;border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;transition:all 0.2s;border-radius:2px}
     .btn-primary{background:var(--bark);color:var(--cream)}.btn-primary:hover{background:var(--dark)}
-    .btn-sm{padding:0.28rem 0.65rem;font-size:0.68rem}
+    .btn-sm{padding:0.25rem 0.6rem;font-size:0.68rem}
     .btn-ghost{background:transparent;border:1px solid rgba(92,61,46,0.3);color:var(--bark)}.btn-ghost:hover{background:var(--bark);color:var(--cream)}
     .btn-green{background:var(--moss);color:white}.btn-green:hover{background:#3a4a2e}
     .btn-red{background:#c0392b;color:white}.btn-red:hover{background:#a93226}
     .btn-clay{background:var(--clay);color:white}.btn-clay:hover{background:#8a6640}
+    .btn-blue{background:#2980b9;color:white}.btn-blue:hover{background:#2471a3}
+    .action-btns{display:flex;flex-direction:column;gap:3px;min-width:90px}
     .editor-wrap{background:var(--cream);padding:1.5rem;margin-bottom:1.5rem}
     .editor-label{font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--stone);font-weight:500;margin-bottom:0.6rem;display:flex;justify-content:space-between;align-items:center}
-    .json-editor{width:100%;min-height:420px;font-family:'Courier New',monospace;font-size:0.82rem;padding:1rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);resize:vertical;outline:none;border-radius:2px;line-height:1.6}
+    .json-editor{width:100%;min-height:400px;font-family:'Courier New',monospace;font-size:0.82rem;padding:1rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);resize:vertical;outline:none;line-height:1.6}
     .json-editor:focus{border-color:var(--clay)}
     .editor-actions{display:flex;gap:0.8rem;margin-top:1rem;flex-wrap:wrap;align-items:center}
     .editor-hint{font-size:0.75rem;color:var(--light-text);font-style:italic}
     .editor-msg{font-size:0.8rem;padding:0.5rem 0.8rem;border-radius:2px;display:none;margin-top:0.8rem}
     .editor-msg.success{background:#d4edda;color:#155724;display:block}
     .editor-msg.error{background:#f8d7da;color:#721c24;display:block}
-    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center}
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;padding:1rem}
     .modal-overlay.open{display:flex}
-    .modal{background:var(--warm-white);padding:2rem;width:100%;max-width:400px;border-radius:2px;position:relative}
+    .modal{background:var(--warm-white);padding:2rem;width:100%;max-width:420px;border-radius:2px;position:relative}
     .modal-title{font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--dark);margin-bottom:1.2rem}
     .modal-close{position:absolute;top:1rem;right:1rem;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--stone)}
     .form-group{display:flex;flex-direction:column;gap:0.35rem;margin-bottom:1rem}
     .form-group label{font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);font-weight:500}
     .form-group input,.form-group select{font-family:'Jost',sans-serif;font-size:0.9rem;padding:0.7rem 0.9rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0;width:100%}
-    .form-group input:focus,.form-group select:focus{border-color:var(--clay)}
+    .form-group input:focus{border-color:var(--clay)}
     .loading{color:var(--light-text);font-size:0.85rem;font-style:italic;padding:1.5rem;text-align:center}
-    .order-items{font-size:0.78rem;color:var(--light-text);max-width:200px;line-height:1.6}
+    .order-items{font-size:0.78rem;color:var(--light-text);max-width:180px;line-height:1.6}
+    .tracking-info{font-size:0.75rem;color:var(--moss);margin-top:0.3rem;font-family:monospace}
     .toast{position:fixed;bottom:2rem;right:2rem;background:var(--dark);color:white;padding:0.8rem 1.3rem;font-size:0.82rem;border-radius:2px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none}
     .toast.show{opacity:1}
-    .action-btns{display:flex;flex-direction:column;gap:4px;min-width:100px}
     @media(max-width:768px){.sidebar{width:100%;height:auto;position:relative;flex-direction:row;flex-wrap:wrap;gap:0.4rem;padding:0.8rem}.main{margin-left:0;padding:1rem}.sidebar-logo,.sidebar-sub,.sidebar-footer{display:none}.nav-item{padding:0.4rem 0.7rem;font-size:0.75rem}}
   </style>
 </head>
@@ -99,18 +99,19 @@
         <button class="btn btn-primary" onclick="loadOrders()">↻ Refresh</button>
       </div>
       <div class="stats-grid">
-        <div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-value" id="statTotal">—</div></div>
+        <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value" id="statTotal">—</div></div>
         <div class="stat-card"><div class="stat-label">New</div><div class="stat-value clay" id="statNew">—</div></div>
+        <div class="stat-card"><div class="stat-label">Confirmed</div><div class="stat-value" id="statConfirmed">—</div></div>
         <div class="stat-card"><div class="stat-label">Dispatched</div><div class="stat-value green" id="statDispatched">—</div></div>
-        <div class="stat-card"><div class="stat-label">Revenue</div><div class="stat-value green" id="statRevenue">—</div></div>
+        <div class="stat-card"><div class="stat-label">Delivered</div><div class="stat-value green" id="statDelivered">—</div></div>
       </div>
       <div class="table-wrap">
         <table>
           <thead><tr>
             <th>Date</th><th>Customer</th><th>Phone</th><th>Items</th>
-            <th>Total</th><th>Via</th><th>Status</th><th>Paid</th><th>Actions</th>
+            <th>Total</th><th>Status</th><th>Tracking</th><th>Actions</th>
           </tr></thead>
-          <tbody id="ordersBody"><tr><td colspan="9" class="loading">Loading orders…</td></tr></tbody>
+          <tbody id="ordersBody"><tr><td colspan="8" class="loading">Loading orders…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -125,7 +126,7 @@
           <span>Product Catalogue (JSON)</span>
           <button class="btn btn-ghost btn-sm" onclick="loadProductsIntoEditor()">↻ Reload</button>
         </div>
-        <textarea class="json-editor" id="jsonEditor" spellcheck="false" placeholder="Loading products..."></textarea>
+        <textarea class="json-editor" id="jsonEditor" spellcheck="false" placeholder="Loading..."></textarea>
         <div class="editor-actions">
           <button class="btn btn-primary" onclick="saveProducts()">💾 Save & Publish</button>
           <button class="btn btn-ghost" onclick="formatJSON()">{ } Format</button>
@@ -164,10 +165,31 @@
 
   </div>
 
+  <!-- DISPATCH MODAL -->
+  <div class="modal-overlay" id="dispatchModal">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal('dispatchModal')">×</button>
+      <div class="modal-title">📦 Mark as Dispatched</div>
+      <p style="font-size:0.82rem;color:var(--light-text);margin-bottom:1.2rem">Enter the courier details for tracking.</p>
+      <div class="form-group">
+        <label>Courier / Vendor *</label>
+        <input type="text" id="courierName" placeholder="e.g. Delhivery, DTDC, India Post, Bluedart"/>
+      </div>
+      <div class="form-group">
+        <label>Tracking ID *</label>
+        <input type="text" id="trackingId" placeholder="e.g. 1234567890"/>
+      </div>
+      <div style="display:flex;gap:0.8rem;margin-top:0.5rem">
+        <button class="btn btn-green" style="flex:1" onclick="confirmDispatch()">✓ Confirm Dispatch</button>
+        <button class="btn btn-ghost" onclick="closeModal('dispatchModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- STOCK MODAL -->
   <div class="modal-overlay" id="stockModal">
     <div class="modal">
-      <button class="modal-close" onclick="closeModal()">×</button>
+      <button class="modal-close" onclick="closeModal('stockModal')">×</button>
       <div class="modal-title">Adjust Stock</div>
       <div class="form-group">
         <label>Product</label>
@@ -190,7 +212,7 @@
       </div>
       <div style="display:flex;gap:0.8rem;margin-top:0.5rem">
         <button class="btn btn-primary" style="flex:1" onclick="saveStock()">Save</button>
-        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-ghost" onclick="closeModal('stockModal')">Cancel</button>
       </div>
     </div>
   </div>
@@ -211,13 +233,14 @@
       appId: "1:611731436877:web:eee0ef64cd8b4b86467304"
     };
 
-    const app = initializeApp(firebaseConfig);
+    const app  = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db   = getFirestore(app);
 
     let allProducts = [];
     let currentStockProductId = null;
     let currentStockValue = 0;
+    let currentDispatchOrderId = null;
 
     // ── Auth guard ──
     onAuthStateChanged(auth, user => {
@@ -232,9 +255,9 @@
       document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
       document.getElementById('section-' + name).classList.add('active');
       el.classList.add('active');
-      if (name === 'orders') loadOrders();
-      if (name === 'products') loadProductsIntoEditor();
-      if (name === 'stock') loadStockTable();
+      if (name === 'orders')    loadOrders();
+      if (name === 'products')  loadProductsIntoEditor();
+      if (name === 'stock')     loadStockTable();
       if (name === 'customers') loadCustomers();
     };
 
@@ -245,6 +268,10 @@
       setTimeout(() => t.classList.remove('show'), duration);
     }
 
+    window.closeModal = (id) => {
+      document.getElementById(id).classList.remove('open');
+    };
+
     // ══════════════════
     // ORDERS
     // ══════════════════
@@ -254,97 +281,126 @@
         const snap = await getDocs(q);
         const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        document.getElementById('statTotal').textContent = orders.length;
-        document.getElementById('statNew').textContent = orders.filter(o => o.status === 'new').length;
+        // Stats
+        document.getElementById('statTotal').textContent     = orders.length;
+        document.getElementById('statNew').textContent       = orders.filter(o => o.status === 'new').length;
+        document.getElementById('statConfirmed').textContent = orders.filter(o => o.status === 'confirmed').length;
         document.getElementById('statDispatched').textContent = orders.filter(o => o.status === 'dispatched').length;
-        const revenue = orders.filter(o => o.paid).reduce((s, o) => s + (o.total || 0), 0);
-        document.getElementById('statRevenue').textContent = `₹${revenue.toLocaleString('en-IN')}`;
+        document.getElementById('statDelivered').textContent  = orders.filter(o => o.status === 'delivered').length;
 
         if (!orders.length) {
-          document.getElementById('ordersBody').innerHTML = '<tr><td colspan="9" class="loading">No orders yet.</td></tr>';
+          document.getElementById('ordersBody').innerHTML = '<tr><td colspan="8" class="loading">No orders yet.</td></tr>';
           return;
         }
 
+        const statusClass = {
+          new: 'badge-new', confirmed: 'badge-confirmed',
+          dispatched: 'badge-dispatched', delivered: 'badge-delivered',
+          cancelled: 'badge-cancelled'
+        };
+
         document.getElementById('ordersBody').innerHTML = orders.map(o => {
           const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-          const itemsSummary = (o.items || []).map(i => `${i.name} ×${i.qty}`).join('<br>');
-          const statusClass = { new: 'badge-new', confirmed: 'badge-confirmed', dispatched: 'badge-dispatched', delivered: 'badge-delivered', cancelled: 'badge-cancelled' }[o.status] || 'badge-new';
+          const items = (o.items || []).map(i => `${i.name} ×${i.qty}`).join('<br>');
+          const sc    = statusClass[o.status] || 'badge-new';
 
-          // FIX: each button only updates the specific field it should
+          // Tracking display
+          const trackingHtml = o.tracking
+            ? `<div style="font-size:0.75rem">
+                <strong>${o.tracking.courier}</strong><br>
+                <span class="tracking-info">${o.tracking.trackingId}</span>
+               </div>`
+            : `<span style="font-size:0.72rem;color:var(--stone)">—</span>`;
+
+          // Action buttons based on status
+          let actions = '';
+          if (o.status === 'new') {
+            actions = `
+              <button class="btn btn-sm btn-ghost" onclick="updateStatus('${o.id}', 'confirmed')">Confirm</button>
+              <button class="btn btn-sm btn-red" onclick="cancelOrder('${o.id}')">Cancel</button>`;
+          } else if (o.status === 'confirmed') {
+            actions = `
+              <button class="btn btn-sm btn-green" onclick="openDispatchModal('${o.id}')">Dispatch</button>
+              <button class="btn btn-sm btn-red" onclick="cancelOrder('${o.id}')">Cancel</button>`;
+          } else if (o.status === 'dispatched') {
+            actions = `<button class="btn btn-sm btn-blue" onclick="updateStatus('${o.id}', 'delivered')">Delivered</button>`;
+          } else if (o.status === 'delivered') {
+            actions = `<span style="font-size:0.72rem;color:var(--moss)">✓ Complete</span>`;
+          } else if (o.status === 'cancelled') {
+            actions = `<span style="font-size:0.72rem;color:#c0392b">✗ Cancelled</span>`;
+          }
+
           return `<tr>
             <td style="white-space:nowrap;font-size:0.78rem">${date}</td>
-            <td><strong>${o.name}</strong><br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
-            <td>${o.phone}</td>
-            <td class="order-items">${itemsSummary}</td>
-            <td><strong>₹${o.total}</strong></td>
-            <td style="font-size:0.75rem">${o.orderVia || 'Web'}</td>
-            <td><span class="badge ${statusClass}">${o.status}</span></td>
-            <td><span class="badge ${o.paid ? 'badge-paid' : 'badge-unpaid'}">${o.paid ? '✓ Paid' : 'Unpaid'}</span></td>
             <td>
-              <div class="action-btns">
-                ${o.status === 'new' ? `<button class="btn btn-sm btn-ghost" onclick="updateOrderStatus('${o.id}', 'confirmed')">Confirm</button>` : ''}
-                ${o.status === 'confirmed' ? `<button class="btn btn-sm btn-green" onclick="updateOrderStatus('${o.id}', 'dispatched')">Dispatch</button>` : ''}
-                ${o.status === 'dispatched' ? `<button class="btn btn-sm btn-primary" onclick="updateOrderStatus('${o.id}', 'delivered')">Delivered</button>` : ''}
-                ${!o.paid ? `<button class="btn btn-sm btn-clay" onclick="markPaid('${o.id}')">Mark Paid</button>` : '<span style="font-size:0.7rem;color:var(--moss)">✓ Paid</span>'}
-                ${['new','confirmed'].includes(o.status) ? `<button class="btn btn-sm btn-red" onclick="cancelOrder('${o.id}')">Cancel</button>` : ''}
-              </div>
+              <strong>${o.name}</strong><br>
+              <span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span>
             </td>
+            <td>${o.phone}</td>
+            <td class="order-items">${items}</td>
+            <td><strong>₹${o.total}</strong></td>
+            <td><span class="badge ${sc}">${o.status}</span></td>
+            <td>${trackingHtml}</td>
+            <td><div class="action-btns">${actions}</div></td>
           </tr>`;
         }).join('');
+
       } catch (err) {
-        document.getElementById('ordersBody').innerHTML = `<tr><td colspan="9" class="loading">Error: ${err.message}</td></tr>`;
+        document.getElementById('ordersBody').innerHTML = `<tr><td colspan="8" class="loading">Error: ${err.message}</td></tr>`;
       }
     };
 
-    // FIX 1: updateOrderStatus only updates status, never touches paid field
-    window.updateOrderStatus = async (id, status) => {
+    // Update status only
+    window.updateStatus = async (id, status) => {
       try {
-        await updateDoc(doc(db, 'orders', id), {
-          status,
-          updatedAt: new Date().toISOString()
-        });
+        await updateDoc(doc(db, 'orders', id), { status, updatedAt: new Date().toISOString() });
         toast(`✅ Order marked as ${status}`);
         loadOrders();
       } catch (err) { toast('❌ Failed: ' + err.message); }
     };
 
-    // FIX 2: markPaid only updates paid field, never touches status
-    window.markPaid = async (id) => {
-      try {
-        await updateDoc(doc(db, 'orders', id), {
-          paid: true,
-          updatedAt: new Date().toISOString()
-        });
-        toast('✅ Order marked as paid');
-        loadOrders();
-      } catch (err) { toast('❌ Failed: ' + err.message); }
-    };
-
-    // Cancel order — only allowed before dispatch
+    // Cancel order
     window.cancelOrder = async (id) => {
       if (!confirm('Cancel this order? This cannot be undone.')) return;
       try {
-        await updateDoc(doc(db, 'orders', id), {
-          status: 'cancelled',
-          updatedAt: new Date().toISOString()
-        });
+        await updateDoc(doc(db, 'orders', id), { status: 'cancelled', updatedAt: new Date().toISOString() });
         toast('✅ Order cancelled');
         loadOrders();
       } catch (err) { toast('❌ Failed: ' + err.message); }
     };
 
-    // Cancel order — only allowed for new/confirmed
-    window.cancelOrder = async (id) => {
-      if (!confirm('Cancel this order? This cannot be undone.')) return;
+    // Open dispatch modal
+    window.openDispatchModal = (orderId) => {
+      currentDispatchOrderId = orderId;
+      document.getElementById('courierName').value = '';
+      document.getElementById('trackingId').value  = '';
+      document.getElementById('dispatchModal').classList.add('open');
+    };
+
+    // Confirm dispatch with tracking details
+    window.confirmDispatch = async () => {
+      const courier    = document.getElementById('courierName').value.trim();
+      const trackingId = document.getElementById('trackingId').value.trim();
+      if (!courier || !trackingId) { toast('⚠️ Please enter courier name and tracking ID'); return; }
+
       try {
-        await updateDoc(doc(db, 'orders', id), {
-          status: 'cancelled',
+        await updateDoc(doc(db, 'orders', currentDispatchOrderId), {
+          status: 'dispatched',
+          tracking: { courier, trackingId, dispatchedAt: new Date().toISOString() },
           updatedAt: new Date().toISOString()
         });
-        toast('🚫 Order cancelled');
+        toast('✅ Order dispatched with tracking info!');
+        closeModal('dispatchModal');
         loadOrders();
       } catch (err) { toast('❌ Failed: ' + err.message); }
     };
+
+    // Close modal on overlay click
+    ['dispatchModal', 'stockModal'].forEach(id => {
+      document.getElementById(id).addEventListener('click', e => {
+        if (e.target === document.getElementById(id)) closeModal(id);
+      });
+    });
 
     // ══════════════════
     // PRODUCTS
@@ -403,7 +459,7 @@
     }
 
     // ══════════════════
-    // STOCK — FIX 3: only update stock field
+    // STOCK
     // ══════════════════
     window.loadStockTable = async () => {
       try {
@@ -420,8 +476,8 @@
             <td><strong>${p.emoji || '🧼'} ${p.name}</strong></td>
             <td>${p.category || '—'}</td>
             <td>₹${p.price}</td>
-            <td><span style="${stockStyle}">${stock}</span> units</td>
-            <td><button class="btn btn-sm btn-green" onclick="openStockModal('${p.id}', '${p.name.replace(/'/g,"\\'")}', ${stock})">Adjust Stock</button></td>
+            <td><span style="${stockStyle}">${stock}</span> units${stock <= 5 ? ' ⚠️' : ''}</td>
+            <td><button class="btn btn-sm btn-green" onclick="openStockModal('${p.id}', '${p.name.replace(/'/g,"\\'")}', ${stock})">Adjust</button></td>
           </tr>`;
         }).join('');
       } catch (err) {
@@ -431,54 +487,32 @@
 
     window.openStockModal = (productId, productName, currentStock) => {
       currentStockProductId = productId;
-      currentStockValue = currentStock;
+      currentStockValue     = currentStock;
       document.getElementById('modalProductName').value = `${productName} (Current: ${currentStock})`;
-      document.getElementById('modalQty').value = 1;
+      document.getElementById('modalQty').value   = 1;
       document.getElementById('modalNotes').value = '';
       document.getElementById('modalAction').value = 'add';
       document.getElementById('stockModal').classList.add('open');
     };
 
-    window.closeModal = () => {
-      document.getElementById('stockModal').classList.remove('open');
-      currentStockProductId = null;
-    };
-
-    // FIX 3: Stock only updates stock field using correct current value
     window.saveStock = async () => {
       if (!currentStockProductId) return;
       const action = document.getElementById('modalAction').value;
-      const qty = parseInt(document.getElementById('modalQty').value) || 0;
+      const qty    = parseInt(document.getElementById('modalQty').value) || 0;
       if (qty <= 0) { toast('⚠️ Quantity must be more than 0'); return; }
-
-      const newStock = action === 'add'
-        ? currentStockValue + qty
-        : Math.max(0, currentStockValue - qty);
-
+      const newStock = action === 'add' ? currentStockValue + qty : Math.max(0, currentStockValue - qty);
       try {
-        // FIX: only update stock field, nothing else
-        await updateDoc(doc(db, 'products', currentStockProductId), {
-          stock: newStock,
-          updatedAt: new Date().toISOString()
-        });
-
-        // Log to stockHistory
+        await updateDoc(doc(db, 'products', currentStockProductId), { stock: newStock, updatedAt: new Date().toISOString() });
         await addDoc(collection(db, 'stockHistory'), {
-          productId: currentStockProductId,
-          action, qty,
-          previousStock: currentStockValue,
-          newStock,
+          productId: currentStockProductId, action, qty,
+          previousStock: currentStockValue, newStock,
           notes: document.getElementById('modalNotes').value,
           timestamp: new Date().toISOString()
         });
-
         toast(`✅ Stock updated to ${newStock}`);
-        closeModal();
+        closeModal('stockModal');
         loadStockTable();
-      } catch (err) {
-        toast('❌ Permission error — update Firestore rules');
-        console.error(err);
-      }
+      } catch (err) { toast('❌ Permission error — check Firestore rules'); }
     };
 
     // ══════════════════
@@ -513,9 +547,6 @@
       }
     };
 
-    document.getElementById('stockModal').addEventListener('click', e => {
-      if (e.target === document.getElementById('stockModal')) closeModal();
-    });
   </script>
 </body>
 </html>

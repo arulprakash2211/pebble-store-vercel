@@ -9,12 +9,12 @@
     :root{--bark:#5c3d2e;--moss:#4a5c3a;--cream:#f5f0e8;--dark:#2b1f14;--clay:#a07850;--warm-white:#faf8f3;--light-text:#7a6a58;--stone:#8a7968;--sand:#d4b896}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     body{font-family:'Jost',sans-serif;background:var(--warm-white);color:var(--dark)}
-    .sidebar{position:fixed;top:0;left:0;width:220px;height:100vh;background:var(--dark);padding:1.5rem 1.2rem;display:flex;flex-direction:column;z-index:100}
+    .sidebar{position:fixed;top:0;left:0;width:220px;height:100vh;background:var(--dark);padding:1.5rem 1.2rem;display:flex;flex-direction:column;z-index:100;overflow-y:auto}
     .sidebar-logo{font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--sand);margin-bottom:0.2rem}
     .sidebar-sub{font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.35);margin-bottom:1.8rem}
     .nav-item{display:flex;align-items:center;gap:0.7rem;padding:0.65rem 0.9rem;color:rgba(255,255,255,0.55);font-size:0.82rem;border-radius:4px;transition:all 0.2s;cursor:pointer;border:none;background:none;width:100%;text-align:left;font-family:'Jost',sans-serif;margin-bottom:2px}
     .nav-item:hover,.nav-item.active{background:rgba(255,255,255,0.08);color:white}
-    .sidebar-footer{margin-top:auto}
+    .sidebar-footer{margin-top:auto;padding-top:1rem}
     .signout-btn{display:flex;align-items:center;gap:0.7rem;padding:0.65rem 0.9rem;color:rgba(255,255,255,0.35);font-size:0.8rem;cursor:pointer;border:none;background:none;width:100%;font-family:'Jost',sans-serif;transition:color 0.2s}
     .signout-btn:hover{color:white}
     .main{margin-left:220px;padding:2rem;min-height:100vh}
@@ -37,10 +37,8 @@
     .badge-new{background:#fff3cd;color:#856404}
     .badge-confirmed{background:#cce5ff;color:#004085}
     .badge-dispatched{background:#d4edda;color:#155724}
-    .badge-delivered{background:#0d6efd22;color:#0c5460}
+    .badge-delivered{background:#d1ecf1;color:#0c5460}
     .badge-cancelled{background:#f8d7da;color:#721c24}
-    .badge-paid{background:#d4edda;color:#155724}
-    .badge-unpaid{background:#f8d7da;color:#721c24}
     .btn{padding:0.45rem 0.9rem;border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;transition:all 0.2s;border-radius:2px}
     .btn-primary{background:var(--bark);color:var(--cream)}.btn-primary:hover{background:var(--dark)}
     .btn-sm{padding:0.25rem 0.6rem;font-size:0.68rem}
@@ -50,30 +48,68 @@
     .btn-clay{background:var(--clay);color:white}.btn-clay:hover{background:#8a6640}
     .btn-blue{background:#2980b9;color:white}.btn-blue:hover{background:#2471a3}
     .action-btns{display:flex;flex-direction:column;gap:3px;min-width:90px}
-    .editor-wrap{background:var(--cream);padding:1.5rem;margin-bottom:1.5rem}
-    .editor-label{font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--stone);font-weight:500;margin-bottom:0.6rem;display:flex;justify-content:space-between;align-items:center}
-    .json-editor{width:100%;min-height:400px;font-family:'Courier New',monospace;font-size:0.82rem;padding:1rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);resize:vertical;outline:none;line-height:1.6}
-    .json-editor:focus{border-color:var(--clay)}
-    .editor-actions{display:flex;gap:0.8rem;margin-top:1rem;flex-wrap:wrap;align-items:center}
-    .editor-hint{font-size:0.75rem;color:var(--light-text);font-style:italic}
-    .editor-msg{font-size:0.8rem;padding:0.5rem 0.8rem;border-radius:2px;display:none;margin-top:0.8rem}
-    .editor-msg.success{background:#d4edda;color:#155724;display:block}
-    .editor-msg.error{background:#f8d7da;color:#721c24;display:block}
+
+    /* PRODUCT UI */
+    .products-grid-admin{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.5rem;margin-top:1.5rem}
+    .product-admin-card{background:var(--cream);padding:1.2rem;position:relative;border:1.5px solid transparent;transition:border-color 0.2s}
+    .product-admin-card:hover{border-color:rgba(92,61,46,0.2)}
+    .pac-header{display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem}
+    .pac-emoji{font-size:1.8rem;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:var(--warm-white);border-radius:4px}
+    .pac-name{font-family:'Playfair Display',serif;font-size:1rem;color:var(--dark);margin-bottom:0.2rem}
+    .pac-cat{font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--clay)}
+    .pac-price{font-size:1.1rem;font-weight:600;color:var(--moss);margin-bottom:0.5rem}
+    .pac-desc{font-size:0.78rem;color:var(--light-text);line-height:1.5;margin-bottom:0.8rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .pac-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem}
+    .pac-stock{font-size:0.78rem;font-weight:500}
+    .pac-stock.low{color:#c0392b}
+    .pac-stock.ok{color:var(--moss)}
+    .pac-actions{display:flex;gap:0.4rem}
+    .pac-tag{display:inline-block;font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;background:rgba(74,92,58,0.1);color:var(--moss);padding:0.15rem 0.5rem;border-radius:2px;margin-bottom:0.5rem}
+
+    /* FORM */
+    .form-section{background:var(--cream);padding:1.5rem;margin-bottom:1.5rem}
+    .form-section-title{font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--dark);margin-bottom:1.2rem;padding-bottom:0.8rem;border-bottom:1px solid rgba(92,61,46,0.12)}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
+    .form-row.three{grid-template-columns:1fr 1fr 1fr}
+    .form-row.full{grid-template-columns:1fr}
+    .form-group{display:flex;flex-direction:column;gap:0.35rem}
+    .form-group label{font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);font-weight:500}
+    .form-group input,.form-group select,.form-group textarea{font-family:'Jost',sans-serif;font-size:0.9rem;padding:0.7rem 0.9rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none;border-radius:0;width:100%;transition:border-color 0.2s}
+    .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--clay)}
+    .form-group textarea{resize:vertical;min-height:80px}
+    .form-actions{display:flex;gap:0.8rem;margin-top:1.2rem;flex-wrap:wrap}
+    .form-actions .btn{padding:0.7rem 1.5rem;font-size:0.78rem}
+
+    /* COLOR PICKER */
+    .color-options{display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.3rem}
+    .color-opt{width:36px;height:36px;border-radius:2px;cursor:pointer;border:2.5px solid transparent;transition:all 0.15s;position:relative}
+    .color-opt.selected{border-color:var(--dark);transform:scale(1.1)}
+    .color-opt span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:white;font-weight:700;opacity:0}
+    .color-opt.selected span{opacity:1}
+
+    /* MODAL */
     .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;padding:1rem}
     .modal-overlay.open{display:flex}
-    .modal{background:var(--warm-white);padding:2rem;width:100%;max-width:420px;border-radius:2px;position:relative}
+    .modal{background:var(--warm-white);padding:2rem;width:100%;max-width:420px;border-radius:2px;position:relative;max-height:90vh;overflow-y:auto}
     .modal-title{font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--dark);margin-bottom:1.2rem}
     .modal-close{position:absolute;top:1rem;right:1rem;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--stone)}
-    .form-group{display:flex;flex-direction:column;gap:0.35rem;margin-bottom:1rem}
-    .form-group label{font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);font-weight:500}
-    .form-group input,.form-group select{font-family:'Jost',sans-serif;font-size:0.9rem;padding:0.7rem 0.9rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0;width:100%}
-    .form-group input:focus{border-color:var(--clay)}
+
     .loading{color:var(--light-text);font-size:0.85rem;font-style:italic;padding:1.5rem;text-align:center}
     .order-items{font-size:0.78rem;color:var(--light-text);max-width:180px;line-height:1.6}
-    .tracking-info{font-size:0.75rem;color:var(--moss);margin-top:0.3rem;font-family:monospace}
     .toast{position:fixed;bottom:2rem;right:2rem;background:var(--dark);color:white;padding:0.8rem 1.3rem;font-size:0.82rem;border-radius:2px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none}
     .toast.show{opacity:1}
-    @media(max-width:768px){.sidebar{width:100%;height:auto;position:relative;flex-direction:row;flex-wrap:wrap;gap:0.4rem;padding:0.8rem}.main{margin-left:0;padding:1rem}.sidebar-logo,.sidebar-sub,.sidebar-footer{display:none}.nav-item{padding:0.4rem 0.7rem;font-size:0.75rem}}
+    .empty-state{text-align:center;padding:3rem;color:var(--light-text)}
+    .empty-state .es-icon{font-size:3rem;margin-bottom:1rem}
+    .empty-state p{font-size:0.9rem;margin-bottom:1.5rem}
+
+    @media(max-width:768px){
+      .sidebar{width:100%;height:auto;position:relative;flex-direction:row;flex-wrap:wrap;gap:0.4rem;padding:0.8rem}
+      .main{margin-left:0;padding:1rem}
+      .sidebar-logo,.sidebar-sub,.sidebar-footer{display:none}
+      .nav-item{padding:0.4rem 0.7rem;font-size:0.75rem}
+      .form-row{grid-template-columns:1fr}
+      .form-row.three{grid-template-columns:1fr}
+    }
   </style>
 </head>
 <body>
@@ -119,20 +155,105 @@
     <!-- PRODUCTS -->
     <div class="section" id="section-products">
       <div class="page-header">
-        <div><div class="page-title">Products</div><div class="page-sub">Edit as JSON → Save to publish live</div></div>
+        <div><div class="page-title">Products</div><div class="page-sub">Manage your soap catalogue</div></div>
+        <button class="btn btn-primary" onclick="showAddProductForm()">➕ Add Product</button>
       </div>
-      <div class="editor-wrap">
-        <div class="editor-label">
-          <span>Product Catalogue (JSON)</span>
-          <button class="btn btn-ghost btn-sm" onclick="loadProductsIntoEditor()">↻ Reload</button>
+
+      <!-- ADD / EDIT FORM (hidden by default) -->
+      <div id="productForm" style="display:none">
+        <div class="form-section">
+          <div class="form-section-title" id="formTitle">Add New Product</div>
+          <input type="hidden" id="editProductId" value=""/>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Product Name *</label>
+              <input type="text" id="pName" placeholder="e.g. Lavender Rose Clay Soap"/>
+            </div>
+            <div class="form-group">
+              <label>Category *</label>
+              <select id="pCategory">
+                <option value="">Select category…</option>
+                <option>Face Care</option>
+                <option>Body Care</option>
+                <option>Hair Care</option>
+                <option>Wellness</option>
+                <option>Gift Sets</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row three">
+            <div class="form-group">
+              <label>Price (₹) *</label>
+              <input type="number" id="pPrice" placeholder="180" min="0"/>
+            </div>
+            <div class="form-group">
+              <label>Stock *</label>
+              <input type="number" id="pStock" placeholder="50" min="0"/>
+            </div>
+            <div class="form-group">
+              <label>Tag / Badge</label>
+              <select id="pTag">
+                <option value="">None</option>
+                <option>Bestseller</option>
+                <option>New</option>
+                <option>Detox</option>
+                <option>Brightening</option>
+                <option>Moisturising</option>
+                <option>Exfoliating</option>
+                <option>Refreshing</option>
+                <option>Strengthening</option>
+                <option>Traditional</option>
+                <option>Therapeutic</option>
+                <option>Nourishing</option>
+                <option>Antibacterial</option>
+                <option>Gift Ready</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row full">
+            <div class="form-group">
+              <label>Description</label>
+              <textarea id="pDescription" placeholder="Short product description shown on the store…"></textarea>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Emoji Icon</label>
+              <input type="text" id="pEmoji" placeholder="🧼" maxlength="4" style="font-size:1.4rem;text-align:center"/>
+            </div>
+            <div class="form-group">
+              <label>Image Path (optional)</label>
+              <input type="text" id="pImage" placeholder="images/product-name.jpg"/>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top:0.5rem">
+            <label>Card Colour</label>
+            <div class="color-options" id="colorPicker">
+              <div class="color-opt selected" data-val="pi1" style="background:linear-gradient(135deg,#c4a0c0,#8b5e8b)" onclick="selectColor(this)"><span>✓</span></div>
+              <div class="color-opt" data-val="pi2" style="background:linear-gradient(135deg,#4a5c3a,#2e3d25)" onclick="selectColor(this)"><span>✓</span></div>
+              <div class="color-opt" data-val="pi3" style="background:linear-gradient(135deg,#c4a882,#8d6040)" onclick="selectColor(this)"><span>✓</span></div>
+              <div class="color-opt" data-val="pi4" style="background:linear-gradient(135deg,#5c7a6a,#3a5248)" onclick="selectColor(this)"><span>✓</span></div>
+              <div class="color-opt" data-val="pi5" style="background:linear-gradient(135deg,#e8c4a0,#c49070)" onclick="selectColor(this)"><span>✓</span></div>
+              <div class="color-opt" data-val="pi6" style="background:linear-gradient(135deg,#7a6a5a,#4a3a2e)" onclick="selectColor(this)"><span>✓</span></div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="saveProduct()">💾 Save Product</button>
+            <button class="btn btn-ghost" onclick="hideProductForm()">Cancel</button>
+          </div>
+          <div id="productFormMsg" style="margin-top:0.8rem;font-size:0.82rem;display:none"></div>
         </div>
-        <textarea class="json-editor" id="jsonEditor" spellcheck="false" placeholder="Loading..."></textarea>
-        <div class="editor-actions">
-          <button class="btn btn-primary" onclick="saveProducts()">💾 Save & Publish</button>
-          <button class="btn btn-ghost" onclick="formatJSON()">{ } Format</button>
-          <span class="editor-hint">Edit JSON → Save → store updates instantly</span>
-        </div>
-        <div class="editor-msg" id="editorMsg"></div>
+      </div>
+
+      <!-- PRODUCT CARDS -->
+      <div id="productsAdminGrid">
+        <div class="loading">Loading products…</div>
       </div>
     </div>
 
@@ -144,7 +265,7 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Current Stock</th><th>Actions</th></tr></thead>
           <tbody id="stockBody"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody>
         </table>
       </div>
@@ -170,16 +291,16 @@
     <div class="modal">
       <button class="modal-close" onclick="closeModal('dispatchModal')">×</button>
       <div class="modal-title">📦 Mark as Dispatched</div>
-      <p style="font-size:0.82rem;color:var(--light-text);margin-bottom:1.2rem">Enter the courier details for tracking.</p>
-      <div class="form-group">
+      <p style="font-size:0.82rem;color:var(--light-text);margin-bottom:1.2rem">Enter courier details for tracking.</p>
+      <div class="form-group" style="margin-bottom:1rem">
         <label>Courier / Vendor *</label>
-        <input type="text" id="courierName" placeholder="e.g. Delhivery, DTDC, India Post, Bluedart"/>
+        <input type="text" id="courierName" placeholder="e.g. Delhivery, DTDC, India Post"/>
       </div>
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:1.2rem">
         <label>Tracking ID *</label>
         <input type="text" id="trackingId" placeholder="e.g. 1234567890"/>
       </div>
-      <div style="display:flex;gap:0.8rem;margin-top:0.5rem">
+      <div style="display:flex;gap:0.8rem">
         <button class="btn btn-green" style="flex:1" onclick="confirmDispatch()">✓ Confirm Dispatch</button>
         <button class="btn btn-ghost" onclick="closeModal('dispatchModal')">Cancel</button>
       </div>
@@ -191,26 +312,26 @@
     <div class="modal">
       <button class="modal-close" onclick="closeModal('stockModal')">×</button>
       <div class="modal-title">Adjust Stock</div>
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:1rem">
         <label>Product</label>
         <input type="text" id="modalProductName" readonly style="opacity:0.6"/>
       </div>
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:1rem">
         <label>Action</label>
         <select id="modalAction">
           <option value="add">➕ Add Stock</option>
           <option value="reduce">➖ Reduce Stock</option>
         </select>
       </div>
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:1rem">
         <label>Quantity</label>
         <input type="number" id="modalQty" min="1" value="1"/>
       </div>
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:1.2rem">
         <label>Notes (optional)</label>
         <input type="text" id="modalNotes" placeholder="e.g. New batch received"/>
       </div>
-      <div style="display:flex;gap:0.8rem;margin-top:0.5rem">
+      <div style="display:flex;gap:0.8rem">
         <button class="btn btn-primary" style="flex:1" onclick="saveStock()">Save</button>
         <button class="btn btn-ghost" onclick="closeModal('stockModal')">Cancel</button>
       </div>
@@ -241,8 +362,9 @@
     let currentStockProductId = null;
     let currentStockValue = 0;
     let currentDispatchOrderId = null;
+    let selectedColorClass = 'pi1';
 
-    // ── Auth guard ──
+    // ── Auth ──
     onAuthStateChanged(auth, user => {
       if (!user) { window.location.href = '/admin'; return; }
       loadOrders();
@@ -256,7 +378,7 @@
       document.getElementById('section-' + name).classList.add('active');
       el.classList.add('active');
       if (name === 'orders')    loadOrders();
-      if (name === 'products')  loadProductsIntoEditor();
+      if (name === 'products')  loadProductsAdmin();
       if (name === 'stock')     loadStockTable();
       if (name === 'customers') loadCustomers();
     };
@@ -268,9 +390,7 @@
       setTimeout(() => t.classList.remove('show'), duration);
     }
 
-    window.closeModal = (id) => {
-      document.getElementById(id).classList.remove('open');
-    };
+    window.closeModal = id => document.getElementById(id).classList.remove('open');
 
     // ══════════════════
     // ORDERS
@@ -281,10 +401,9 @@
         const snap = await getDocs(q);
         const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        // Stats
-        document.getElementById('statTotal').textContent     = orders.length;
-        document.getElementById('statNew').textContent       = orders.filter(o => o.status === 'new').length;
-        document.getElementById('statConfirmed').textContent = orders.filter(o => o.status === 'confirmed').length;
+        document.getElementById('statTotal').textContent      = orders.length;
+        document.getElementById('statNew').textContent        = orders.filter(o => o.status === 'new').length;
+        document.getElementById('statConfirmed').textContent  = orders.filter(o => o.status === 'confirmed').length;
         document.getElementById('statDispatched').textContent = orders.filter(o => o.status === 'dispatched').length;
         document.getElementById('statDelivered').textContent  = orders.filter(o => o.status === 'delivered').length;
 
@@ -293,37 +412,24 @@
           return;
         }
 
-        const statusClass = {
-          new: 'badge-new', confirmed: 'badge-confirmed',
-          dispatched: 'badge-dispatched', delivered: 'badge-delivered',
-          cancelled: 'badge-cancelled'
-        };
+        const sc = { new:'badge-new', confirmed:'badge-confirmed', dispatched:'badge-dispatched', delivered:'badge-delivered', cancelled:'badge-cancelled' };
 
         document.getElementById('ordersBody').innerHTML = orders.map(o => {
-          const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+          const date  = new Date(o.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
           const items = (o.items || []).map(i => `${i.name} ×${i.qty}`).join('<br>');
-          const sc    = statusClass[o.status] || 'badge-new';
-
-          // Tracking display
           const trackingHtml = o.tracking
-            ? `<div style="font-size:0.75rem">
-                <strong>${o.tracking.courier}</strong><br>
-                <span class="tracking-info">${o.tracking.trackingId}</span>
-               </div>`
-            : `<span style="font-size:0.72rem;color:var(--stone)">—</span>`;
+            ? `<div style="font-size:0.75rem"><strong>${o.tracking.courier}</strong><br><span style="font-family:monospace;color:var(--moss)">${o.tracking.trackingId}</span></div>`
+            : `<span style="color:var(--stone);font-size:0.72rem">—</span>`;
 
-          // Action buttons based on status
           let actions = '';
           if (o.status === 'new') {
-            actions = `
-              <button class="btn btn-sm btn-ghost" onclick="updateStatus('${o.id}', 'confirmed')">Confirm</button>
-              <button class="btn btn-sm btn-red" onclick="cancelOrder('${o.id}')">Cancel</button>`;
+            actions = `<button class="btn btn-sm btn-ghost" onclick="updateStatus('${o.id}','confirmed')">Confirm</button>
+                       <button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
           } else if (o.status === 'confirmed') {
-            actions = `
-              <button class="btn btn-sm btn-green" onclick="openDispatchModal('${o.id}')">Dispatch</button>
-              <button class="btn btn-sm btn-red" onclick="cancelOrder('${o.id}')">Cancel</button>`;
+            actions = `<button class="btn btn-sm btn-green" onclick="openDispatchModal('${o.id}')">Dispatch</button>
+                       <button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
           } else if (o.status === 'dispatched') {
-            actions = `<button class="btn btn-sm btn-blue" onclick="updateStatus('${o.id}', 'delivered')">Delivered</button>`;
+            actions = `<button class="btn btn-sm btn-blue" onclick="updateStatus('${o.id}','delivered')">Delivered</button>`;
           } else if (o.status === 'delivered') {
             actions = `<span style="font-size:0.72rem;color:var(--moss)">✓ Complete</span>`;
           } else if (o.status === 'cancelled') {
@@ -332,131 +438,226 @@
 
           return `<tr>
             <td style="white-space:nowrap;font-size:0.78rem">${date}</td>
-            <td>
-              <strong>${o.name}</strong><br>
-              <span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span>
-            </td>
+            <td><strong>${o.name}</strong><br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
             <td>${o.phone}</td>
             <td class="order-items">${items}</td>
             <td><strong>₹${o.total}</strong></td>
-            <td><span class="badge ${sc}">${o.status}</span></td>
+            <td><span class="badge ${sc[o.status] || 'badge-new'}">${o.status}</span></td>
             <td>${trackingHtml}</td>
             <td><div class="action-btns">${actions}</div></td>
           </tr>`;
         }).join('');
-
       } catch (err) {
         document.getElementById('ordersBody').innerHTML = `<tr><td colspan="8" class="loading">Error: ${err.message}</td></tr>`;
       }
     };
 
-    // Update status only
     window.updateStatus = async (id, status) => {
       try {
         await updateDoc(doc(db, 'orders', id), { status, updatedAt: new Date().toISOString() });
         toast(`✅ Order marked as ${status}`);
         loadOrders();
-      } catch (err) { toast('❌ Failed: ' + err.message); }
+      } catch (err) { toast('❌ ' + err.message); }
     };
 
-    // Cancel order
     window.cancelOrder = async (id) => {
-      if (!confirm('Cancel this order? This cannot be undone.')) return;
+      if (!confirm('Cancel this order?')) return;
       try {
         await updateDoc(doc(db, 'orders', id), { status: 'cancelled', updatedAt: new Date().toISOString() });
         toast('✅ Order cancelled');
         loadOrders();
-      } catch (err) { toast('❌ Failed: ' + err.message); }
+      } catch (err) { toast('❌ ' + err.message); }
     };
 
-    // Open dispatch modal
-    window.openDispatchModal = (orderId) => {
-      currentDispatchOrderId = orderId;
+    window.openDispatchModal = (id) => {
+      currentDispatchOrderId = id;
       document.getElementById('courierName').value = '';
       document.getElementById('trackingId').value  = '';
       document.getElementById('dispatchModal').classList.add('open');
     };
 
-    // Confirm dispatch with tracking details
     window.confirmDispatch = async () => {
       const courier    = document.getElementById('courierName').value.trim();
       const trackingId = document.getElementById('trackingId').value.trim();
-      if (!courier || !trackingId) { toast('⚠️ Please enter courier name and tracking ID'); return; }
-
+      if (!courier || !trackingId) { toast('⚠️ Enter courier name and tracking ID'); return; }
       try {
         await updateDoc(doc(db, 'orders', currentDispatchOrderId), {
           status: 'dispatched',
           tracking: { courier, trackingId, dispatchedAt: new Date().toISOString() },
           updatedAt: new Date().toISOString()
         });
-        toast('✅ Order dispatched with tracking info!');
+        toast('✅ Order dispatched!');
         closeModal('dispatchModal');
         loadOrders();
-      } catch (err) { toast('❌ Failed: ' + err.message); }
+      } catch (err) { toast('❌ ' + err.message); }
     };
 
-    // Close modal on overlay click
-    ['dispatchModal', 'stockModal'].forEach(id => {
-      document.getElementById(id).addEventListener('click', e => {
-        if (e.target === document.getElementById(id)) closeModal(id);
-      });
-    });
-
     // ══════════════════
-    // PRODUCTS
+    // PRODUCTS UI
     // ══════════════════
-    window.loadProductsIntoEditor = async () => {
-      const editor = document.getElementById('jsonEditor');
-      editor.value = 'Loading…';
+    window.loadProductsAdmin = async () => {
+      const grid = document.getElementById('productsAdminGrid');
+      grid.innerHTML = '<div class="loading">Loading products…</div>';
       try {
         const snap = await getDocs(collection(db, 'products'));
         allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const forEdit = allProducts.map(p => ({
-          id: p.id, name: p.name, category: p.category || '',
-          tag: p.tag || '', price: p.price, description: p.description || '',
-          emoji: p.emoji || '🧼', colorClass: p.colorClass || 'pi1',
-          image: p.image || '', stock: p.stock || 0
-        }));
-        editor.value = JSON.stringify(forEdit, null, 2);
-      } catch (err) { editor.value = '// Error: ' + err.message; }
-    };
 
-    window.formatJSON = () => {
-      try {
-        document.getElementById('jsonEditor').value = JSON.stringify(JSON.parse(document.getElementById('jsonEditor').value), null, 2);
-      } catch (e) { showEditorMsg('Invalid JSON: ' + e.message, 'error'); }
-    };
-
-    window.saveProducts = async () => {
-      let parsed;
-      try {
-        parsed = JSON.parse(document.getElementById('jsonEditor').value);
-        if (!Array.isArray(parsed)) throw new Error('Must be a JSON array');
-      } catch (e) { showEditorMsg('Invalid JSON: ' + e.message, 'error'); return; }
-      showEditorMsg('Saving…', 'success');
-      try {
-        const snap = await getDocs(collection(db, 'products'));
-        for (const d of snap.docs) await deleteDoc(doc(db, 'products', d.id));
-        for (const p of parsed) {
-          const id = p.id || p.name.toLowerCase().replace(/\s+/g, '-');
-          await setDoc(doc(db, 'products', id), {
-            name: p.name, category: p.category || 'General', tag: p.tag || 'New',
-            price: parseFloat(p.price) || 0, description: p.description || '',
-            emoji: p.emoji || '🧼', colorClass: p.colorClass || 'pi1',
-            image: p.image || '', stock: parseInt(p.stock) || 0,
-            updatedAt: new Date().toISOString()
-          });
+        if (!allProducts.length) {
+          grid.innerHTML = `<div class="empty-state">
+            <div class="es-icon">🧼</div>
+            <p>No products yet. Add your first product!</p>
+            <button class="btn btn-primary" onclick="showAddProductForm()">➕ Add Product</button>
+          </div>`;
+          return;
         }
-        showEditorMsg(`✅ ${parsed.length} products saved and live!`, 'success');
-        toast('✅ Store updated!');
-      } catch (err) { showEditorMsg('❌ Error: ' + err.message, 'error'); }
+
+        grid.innerHTML = `<div class="products-grid-admin">` +
+          allProducts.map(p => {
+            const stock = p.stock || 0;
+            const stockClass = stock <= 5 ? 'low' : 'ok';
+            const stockLabel = stock <= 5 ? `⚠️ ${stock} left` : `${stock} in stock`;
+            return `<div class="product-admin-card">
+              <div class="pac-header">
+                <div class="pac-emoji">${p.emoji || '🧼'}</div>
+                <div>
+                  <div class="pac-name">${p.name}</div>
+                  <div class="pac-cat">${p.category || ''}</div>
+                </div>
+              </div>
+              ${p.tag ? `<span class="pac-tag">${p.tag}</span>` : ''}
+              <div class="pac-price">₹${p.price} / bar</div>
+              <div class="pac-desc">${p.description || ''}</div>
+              <div class="pac-footer">
+                <span class="pac-stock ${stockClass}">${stockLabel}</span>
+                <div class="pac-actions">
+                  <button class="btn btn-sm btn-ghost" onclick="editProduct('${p.id}')">Edit</button>
+                  <button class="btn btn-sm btn-red" onclick="deleteProduct('${p.id}', '${p.name.replace(/'/g, "\\'")}')">Delete</button>
+                </div>
+              </div>
+            </div>`;
+          }).join('') + `</div>`;
+      } catch (err) {
+        grid.innerHTML = `<div class="loading">Error: ${err.message}</div>`;
+      }
     };
 
-    function showEditorMsg(text, type) {
-      const msg = document.getElementById('editorMsg');
-      msg.textContent = text;
-      msg.className = 'editor-msg ' + type;
+    // Show add form
+    window.showAddProductForm = () => {
+      document.getElementById('formTitle').textContent = 'Add New Product';
+      document.getElementById('editProductId').value = '';
+      document.getElementById('pName').value = '';
+      document.getElementById('pCategory').value = '';
+      document.getElementById('pPrice').value = '';
+      document.getElementById('pStock').value = '';
+      document.getElementById('pTag').value = '';
+      document.getElementById('pDescription').value = '';
+      document.getElementById('pEmoji').value = '🧼';
+      document.getElementById('pImage').value = '';
+      selectColorByVal('pi1');
+      document.getElementById('productFormMsg').style.display = 'none';
+      document.getElementById('productForm').style.display = 'block';
+      document.getElementById('productForm').scrollIntoView({ behavior: 'smooth' });
+    };
+
+    // Hide form
+    window.hideProductForm = () => {
+      document.getElementById('productForm').style.display = 'none';
+    };
+
+    // Color picker
+    window.selectColor = (el) => {
+      document.querySelectorAll('.color-opt').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+      selectedColorClass = el.dataset.val;
+    };
+
+    function selectColorByVal(val) {
+      document.querySelectorAll('.color-opt').forEach(o => {
+        o.classList.toggle('selected', o.dataset.val === val);
+      });
+      selectedColorClass = val;
     }
+
+    // Save product (add or edit)
+    window.saveProduct = async () => {
+      const name     = document.getElementById('pName').value.trim();
+      const category = document.getElementById('pCategory').value;
+      const price    = parseFloat(document.getElementById('pPrice').value);
+      const stock    = parseInt(document.getElementById('pStock').value);
+      const msg      = document.getElementById('productFormMsg');
+
+      if (!name || !category || isNaN(price) || isNaN(stock)) {
+        msg.textContent = '⚠️ Please fill in name, category, price and stock.';
+        msg.style.cssText = 'display:block;color:#c0392b';
+        return;
+      }
+
+      const productData = {
+        name,
+        category,
+        price,
+        stock,
+        tag:         document.getElementById('pTag').value,
+        description: document.getElementById('pDescription').value.trim(),
+        emoji:       document.getElementById('pEmoji').value || '🧼',
+        image:       document.getElementById('pImage').value.trim(),
+        colorClass:  selectedColorClass,
+        updatedAt:   new Date().toISOString()
+      };
+
+      msg.textContent = 'Saving…';
+      msg.style.cssText = 'display:block;color:var(--moss)';
+
+      try {
+        const editId = document.getElementById('editProductId').value;
+        if (editId) {
+          // Edit existing
+          await updateDoc(doc(db, 'products', editId), productData);
+          toast('✅ Product updated!');
+        } else {
+          // Add new
+          const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          productData.createdAt = new Date().toISOString();
+          await setDoc(doc(db, 'products', id), productData);
+          toast('✅ Product added!');
+        }
+        hideProductForm();
+        loadProductsAdmin();
+      } catch (err) {
+        msg.textContent = '❌ Error: ' + err.message;
+        msg.style.cssText = 'display:block;color:#c0392b';
+      }
+    };
+
+    // Edit product — pre-fill form
+    window.editProduct = async (id) => {
+      const p = allProducts.find(x => x.id === id);
+      if (!p) return;
+      document.getElementById('formTitle').textContent = 'Edit Product';
+      document.getElementById('editProductId').value = id;
+      document.getElementById('pName').value = p.name || '';
+      document.getElementById('pCategory').value = p.category || '';
+      document.getElementById('pPrice').value = p.price || '';
+      document.getElementById('pStock').value = p.stock || '';
+      document.getElementById('pTag').value = p.tag || '';
+      document.getElementById('pDescription').value = p.description || '';
+      document.getElementById('pEmoji').value = p.emoji || '🧼';
+      document.getElementById('pImage').value = p.image || '';
+      selectColorByVal(p.colorClass || 'pi1');
+      document.getElementById('productFormMsg').style.display = 'none';
+      document.getElementById('productForm').style.display = 'block';
+      document.getElementById('productForm').scrollIntoView({ behavior: 'smooth' });
+    };
+
+    // Delete product
+    window.deleteProduct = async (id, name) => {
+      if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+      try {
+        await deleteDoc(doc(db, 'products', id));
+        toast('✅ Product deleted');
+        loadProductsAdmin();
+      } catch (err) { toast('❌ ' + err.message); }
+    };
 
     // ══════════════════
     // STOCK
@@ -471,13 +672,13 @@
         }
         document.getElementById('stockBody').innerHTML = allProducts.map(p => {
           const stock = p.stock || 0;
-          const stockStyle = stock <= 5 ? 'color:#c0392b;font-weight:bold' : 'color:var(--moss);font-weight:bold';
+          const style = stock <= 5 ? 'color:#c0392b;font-weight:bold' : 'color:var(--moss);font-weight:bold';
           return `<tr>
             <td><strong>${p.emoji || '🧼'} ${p.name}</strong></td>
             <td>${p.category || '—'}</td>
             <td>₹${p.price}</td>
-            <td><span style="${stockStyle}">${stock}</span> units${stock <= 5 ? ' ⚠️' : ''}</td>
-            <td><button class="btn btn-sm btn-green" onclick="openStockModal('${p.id}', '${p.name.replace(/'/g,"\\'")}', ${stock})">Adjust</button></td>
+            <td><span style="${style}">${stock}</span>${stock <= 5 ? ' ⚠️' : ''}</td>
+            <td><button class="btn btn-sm btn-green" onclick="openStockModal('${p.id}','${p.name.replace(/'/g,"\\'")}',${stock})">Adjust</button></td>
           </tr>`;
         }).join('');
       } catch (err) {
@@ -485,11 +686,11 @@
       }
     };
 
-    window.openStockModal = (productId, productName, currentStock) => {
-      currentStockProductId = productId;
-      currentStockValue     = currentStock;
-      document.getElementById('modalProductName').value = `${productName} (Current: ${currentStock})`;
-      document.getElementById('modalQty').value   = 1;
+    window.openStockModal = (id, name, current) => {
+      currentStockProductId = id;
+      currentStockValue = current;
+      document.getElementById('modalProductName').value = `${name} (Current: ${current})`;
+      document.getElementById('modalQty').value = 1;
       document.getElementById('modalNotes').value = '';
       document.getElementById('modalAction').value = 'add';
       document.getElementById('stockModal').classList.add('open');
@@ -512,7 +713,7 @@
         toast(`✅ Stock updated to ${newStock}`);
         closeModal('stockModal');
         loadStockTable();
-      } catch (err) { toast('❌ Permission error — check Firestore rules'); }
+      } catch (err) { toast('❌ Check Firestore rules: ' + err.message); }
     };
 
     // ══════════════════
@@ -521,13 +722,12 @@
     window.loadCustomers = async () => {
       try {
         const snap = await getDocs(collection(db, 'orders'));
-        const orders = snap.docs.map(d => d.data());
-        const map = {};
-        orders.forEach(o => {
-          const key = o.phone;
-          if (!map[key]) map[key] = { name: o.name, phone: o.phone, email: o.email || '—', address: o.address || '—', orders: 0, spent: 0 };
-          map[key].orders++;
-          map[key].spent += o.total || 0;
+        const map  = {};
+        snap.docs.forEach(d => {
+          const o = d.data();
+          if (!map[o.phone]) map[o.phone] = { name: o.name, phone: o.phone, email: o.email || '—', address: o.address || '—', orders: 0, spent: 0 };
+          map[o.phone].orders++;
+          map[o.phone].spent += o.total || 0;
         });
         const customers = Object.values(map).sort((a, b) => b.spent - a.spent);
         if (!customers.length) {
@@ -546,6 +746,13 @@
         document.getElementById('customersBody').innerHTML = `<tr><td colspan="6" class="loading">Error: ${err.message}</td></tr>`;
       }
     };
+
+    // Close modals on overlay click
+    ['dispatchModal', 'stockModal'].forEach(id => {
+      document.getElementById(id).addEventListener('click', e => {
+        if (e.target === document.getElementById(id)) closeModal(id);
+      });
+    });
 
   </script>
 </body>

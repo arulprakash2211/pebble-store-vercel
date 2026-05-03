@@ -1,6 +1,5 @@
 /* ═══════════════════════════════════════
    PEBBLE STORE – app.js
-   Firebase + UPI Payment + Cancel order
    ═══════════════════════════════════════ */
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -19,27 +18,12 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const WHATSAPP_NUMBER = '919659451260';
-const UPI_ID = '9659451260@ybl';
-const UPI_NAME = 'Pebble Store';
-
 let allProducts = [];
 const cart = {};
-const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
 
-// ── Boot ──
+// ── Init ──
 async function init() {
-  initDevice();
   await loadProducts();
-}
-
-// ── Device detection ──
-function initDevice() {
-  if (isMobile) {
-    document.getElementById('mobileActions').style.display = 'block';
-  } else {
-    document.getElementById('desktopActions').style.display = 'block';
-    generateQR();
-  }
 }
 
 // ── Load products from Firestore ──
@@ -120,9 +104,11 @@ window.changeQty = function(id, delta) {
   const qtyEl = document.getElementById('qty-' + id);
   const btnEl = document.getElementById('btn-' + id);
   if (qtyEl) qtyEl.textContent = newQty;
-  if (btnEl) { btnEl.textContent = newQty > 0 ? '✓ Added' : 'Add to Order'; btnEl.classList.toggle('selected', newQty > 0); }
+  if (btnEl) {
+    btnEl.textContent = newQty > 0 ? '✓ Added' : 'Add to Order';
+    btnEl.classList.toggle('selected', newQty > 0);
+  }
   updateSummary();
-  if (!isMobile) refreshQR();
 };
 
 window.addToOrder = function(id) {
@@ -134,7 +120,6 @@ window.addToOrder = function(id) {
     if (btnEl) { btnEl.textContent = '✓ Added'; btnEl.classList.add('selected'); }
   }
   updateSummary();
-  if (!isMobile) refreshQR();
   document.getElementById('order').scrollIntoView({ behavior: 'smooth' });
 };
 
@@ -145,7 +130,6 @@ window.removeFromCart = function(id) {
   if (qtyEl) qtyEl.textContent = 0;
   if (btnEl) { btnEl.textContent = 'Add to Order'; btnEl.classList.remove('selected'); }
   updateSummary();
-  if (!isMobile) refreshQR();
 };
 
 // ── Order summary ──
@@ -193,8 +177,8 @@ function updateSummary() {
     </table>`;
 }
 
-// ── Build order payload ──
-function buildOrder(orderVia, paymentMethod, utrNumber) {
+// ── Build order ──
+function buildOrder() {
   const items = Object.entries(cart)
     .filter(([, q]) => q > 0)
     .map(([id, qty]) => {
@@ -202,185 +186,53 @@ function buildOrder(orderVia, paymentMethod, utrNumber) {
       return p ? { id, name: p.name, price: p.price, qty, subtotal: p.price * qty } : null;
     }).filter(Boolean);
   return {
-    name: document.getElementById('custName').value.trim(),
-    phone: document.getElementById('phone').value.trim(),
-    email: document.getElementById('email').value.trim(),
+    name:    document.getElementById('custName').value.trim(),
+    phone:   document.getElementById('phone').value.trim(),
+    email:   document.getElementById('email').value.trim(),
     address: document.getElementById('address').value.trim(),
-    notes: document.getElementById('notes').value.trim(),
+    notes:   document.getElementById('notes').value.trim(),
     items,
-    total: items.reduce((s, i) => s + i.subtotal, 0),
-    orderVia,
-    paymentMethod: paymentMethod || 'pay_later',
-    utrNumber: utrNumber || '',
-    status: paymentMethod === 'upi' ? 'payment_pending' : 'new',
-    paid: false,
-    createdAt: new Date().toISOString()
+    total:   items.reduce((s, i) => s + i.subtotal, 0),
+    status:  'new',
+    paid:    false,
+    tracking: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
 }
 
 // ── Save order to Firestore ──
-async function saveOrder(orderVia, paymentMethod, utrNumber) {
-  const order = buildOrder(orderVia, paymentMethod, utrNumber);
-  await addDoc(collection(db, 'orders'), order);
-  return order;
-}
-
-// ── Send email via Formspree ──
-async function sendEmailViaFormspree(order) {
-  const itemsList = order.items.map(i => `${i.name} x${i.qty} = Rs.${i.subtotal}`).join(', ');
-  const formData = new FormData();
-  formData.append('name', order.name);
-  formData.append('phone', order.phone);
-  formData.append('email', order.email);
-  formData.append('address', order.address);
-  formData.append('order_details', itemsList);
-  formData.append('order_total', 'Rs.' + order.total);
-  formData.append('payment_method', order.paymentMethod === 'upi' ? 'UPI (Online)' : 'Pay Later / Cash');
-  formData.append('utr_number', order.utrNumber || 'N/A');
-  formData.append('order_via', order.orderVia);
-  formData.append('notes', order.notes || '');
-  await fetch('https://formspree.io/f/xdabogzl', {
-    method: 'POST', body: formData,
-    headers: { 'Accept': 'application/json' }
-  });
-}
-
-// ── Build UPI URL ──
-function buildUPIUrl(total) {
-  const params = new URLSearchParams({
-    pa: UPI_ID,
-    pn: UPI_NAME,
-    am: total.toString(),
-    cu: 'INR',
-    tn: 'Pebble Store Order'
-  });
-  return `upi://pay?${params.toString()}`;
-}
-
-// ── Build UPI QR data URL ──
-function getUPIQRText(total) {
-  return buildUPIUrl(total);
-}
-
-// ── WhatsApp URL ──
-function buildWhatsAppUrl() {
-  const name    = document.getElementById('custName').value.trim();
-  const phone   = document.getElementById('phone').value.trim();
-  const address = document.getElementById('address').value.trim();
-  const notes   = document.getElementById('notes').value.trim();
-  let total = 0;
-  const lines = Object.entries(cart).filter(([, q]) => q > 0).map(([id, qty]) => {
-    const p = allProducts.find(x => x.id === id);
-    if (!p) return '';
-    total += p.price * qty;
-    return `• ${p.name} x${qty} = ₹${p.price * qty}`;
-  }).filter(Boolean).join('\n');
-  let msg = `🛒 *New Order – Pebble Store*\n\n`;
-  if (name)    msg += `*Name:* ${name}\n`;
-  if (phone)   msg += `*Phone:* ${phone}\n`;
-  if (address) msg += `*Address:* ${address}\n`;
-  msg += `\n*Order:*\n${lines}\n\n*Total: ₹${total}*`;
-  if (notes)   msg += `\n\n*Notes:* ${notes}`;
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
-}
-
-// ── QR Code (WhatsApp) ──
-function generateQR() {
-  if (typeof QRCode === 'undefined') return;
-  const container = document.getElementById('qrCode');
-  if (!container) return;
-  container.innerHTML = '';
-  new QRCode(container, { text: `https://wa.me/${WHATSAPP_NUMBER}`, width: 180, height: 180, colorDark: '#2b1f14', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
-}
-
-function refreshQR() {
-  if (typeof QRCode === 'undefined') return;
-  const container = document.getElementById('qrCode');
-  if (!container) return;
-  container.innerHTML = '';
-  new QRCode(container, { text: buildWhatsAppUrl(), width: 180, height: 180, colorDark: '#2b1f14', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+async function saveOrder() {
+  const order = buildOrder();
+  const docRef = await addDoc(collection(db, 'orders'), order);
+  return { ...order, id: docRef.id };
 }
 
 // ── Validate ──
 function validateOrder() {
   const hasItems = Object.values(cart).some(q => q > 0);
   const err = document.getElementById('errorMsg');
-  const name = document.getElementById('custName').value.trim();
-  const phone = document.getElementById('phone').value.trim();
+  const name    = document.getElementById('custName').value.trim();
+  const phone   = document.getElementById('phone').value.trim();
   const address = document.getElementById('address').value.trim();
-  if (!hasItems) { err.textContent = '⚠️ Please add at least one product.'; err.style.display = 'block'; err.scrollIntoView({ behavior: 'smooth', block: 'center' }); return false; }
-  if (!name || !phone || !address) { err.textContent = '⚠️ Please fill in your name, phone and address.'; err.style.display = 'block'; err.scrollIntoView({ behavior: 'smooth', block: 'center' }); return false; }
+  if (!hasItems) {
+    err.textContent = '⚠️ Please add at least one product to your order.';
+    err.style.display = 'block';
+    err.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return false;
+  }
+  if (!name || !phone || !address) {
+    err.textContent = '⚠️ Please fill in your name, phone and address.';
+    err.style.display = 'block';
+    err.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return false;
+  }
   err.style.display = 'none';
   return true;
 }
 
-// ── Show UPI Payment Modal ──
-window.showUPIPayment = function() {
-  if (!validateOrder()) return;
-  const total = getCartTotal();
-
-  // Build UPI QR modal
-  const modal = document.getElementById('upiModal');
-  const upiUrl = getUPIQRText(total);
-
-  // Generate QR for UPI
-  const qrContainer = document.getElementById('upiQrCode');
-  qrContainer.innerHTML = '';
-  if (typeof QRCode !== 'undefined') {
-    new QRCode(qrContainer, {
-      text: upiUrl,
-      width: 200, height: 200,
-      colorDark: '#2b1f14', colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M
-    });
-  }
-
-  // Update total display
-  document.getElementById('upiTotal').textContent = `₹${total}`;
-  document.getElementById('upiIdDisplay').textContent = UPI_ID;
-
-  // Show mobile UPI button or desktop QR
-  const mobilePayBtn = document.getElementById('mobileUpiBtn');
-  if (isMobile) {
-    mobilePayBtn.href = upiUrl;
-    mobilePayBtn.style.display = 'flex';
-    qrContainer.style.display = 'none';
-    document.getElementById('upiQrLabel').style.display = 'none';
-  } else {
-    mobilePayBtn.style.display = 'none';
-    qrContainer.style.display = 'block';
-    document.getElementById('upiQrLabel').style.display = 'block';
-  }
-
-  modal.classList.add('open');
-};
-
-window.closeUPIModal = function() {
-  document.getElementById('upiModal').classList.remove('open');
-};
-
-// ── Confirm UPI Payment (after customer pays) ──
-window.confirmUPIPayment = async function() {
-  const utr = document.getElementById('utrInput').value.trim();
-  const btn = document.getElementById('confirmUpiBtn');
-
-  btn.textContent = 'Saving order…';
-  btn.disabled = true;
-
-  try {
-    const order = await saveOrder('UPI', 'upi', utr);
-    sendEmailViaFormspree(order).catch(e => console.warn('Email error', e));
-    closeUPIModal();
-    showSuccessPage('upi', utr);
-  } catch (err) {
-    btn.textContent = 'Confirm Payment';
-    btn.disabled = false;
-    alert('Something went wrong. Please try again or use WhatsApp to order.');
-  }
-};
-
 // ── Show success page ──
-function showSuccessPage(paymentMethod, utr) {
+function showSuccessPage() {
   const items = Object.entries(cart).filter(([, q]) => q > 0);
   let total = 0;
   const rows = items.map(([id, qty]) => {
@@ -388,25 +240,14 @@ function showSuccessPage(paymentMethod, utr) {
     if (!p) return '';
     const sub = p.price * qty;
     total += sub;
-    return `<div class="success-order-row"><span>${p.emoji || '🧼'} ${p.name} × ${qty}</span><span>₹${sub}</span></div>`;
+    return `<div class="success-order-row">
+      <span>${p.emoji || '🧼'} ${p.name} × ${qty}</span>
+      <span>₹${sub}</span>
+    </div>`;
   }).filter(Boolean).join('');
 
   document.getElementById('successOrderDetails').innerHTML = rows;
   document.getElementById('successTotal').innerHTML = `<span>Total</span><span>₹${total}</span>`;
-
-  // Show payment status
-  const paymentStatus = document.getElementById('successPaymentStatus');
-  if (paymentMethod === 'upi') {
-    paymentStatus.innerHTML = `
-      <div class="success-payment-badge paid">✓ Payment Submitted</div>
-      ${utr ? `<div class="success-utr">UTR: ${utr}</div>` : ''}
-      <p style="font-size:0.82rem;color:var(--light-text);margin-top:0.5rem">We will verify your payment and confirm your order shortly.</p>`;
-  } else {
-    paymentStatus.innerHTML = `
-      <div class="success-payment-badge pending">⏳ Pay on Delivery / Offline</div>
-      <p style="font-size:0.82rem;color:var(--light-text);margin-top:0.5rem">We will confirm your order and share payment details shortly.</p>`;
-  }
-
   document.getElementById('orderFormView').style.display = 'none';
   document.getElementById('orderSuccessView').style.display = 'block';
   document.getElementById('order').scrollIntoView({ behavior: 'smooth' });
@@ -425,50 +266,58 @@ window.resetOrder = function() {
   document.getElementById('orderForm').reset();
   document.getElementById('orderSuccessView').style.display = 'none';
   document.getElementById('orderFormView').style.display = 'block';
-  if (!isMobile) generateQR();
   document.getElementById('products').scrollIntoView({ behavior: 'smooth' });
 };
 
-// ── Email / Pay Later form submit ──
+// ── Build WhatsApp query message ──
+function buildWhatsAppQueryUrl() {
+  const name  = document.getElementById('custName').value.trim();
+  const items = Object.entries(cart).filter(([, q]) => q > 0);
+  let msg = `Hi Pebble Store! 👋 I have a query about my order.\n\n`;
+  if (name) msg += `*Name:* ${name}\n`;
+  if (items.length) {
+    msg += `\n*Products I'm interested in:*\n`;
+    items.forEach(([id, qty]) => {
+      const p = allProducts.find(x => x.id === id);
+      if (p) msg += `• ${p.name} × ${qty} = ₹${p.price * qty}\n`;
+    });
+    msg += `\n*Total: ₹${getCartTotal()}*\n`;
+  }
+  msg += `\nCould you please help me?`;
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+}
+
+// ── Place Order form submit ──
 document.getElementById('orderForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   if (!validateOrder()) return;
-  const btn = this.querySelector('button[type="submit"]');
-  btn.textContent = 'Saving…'; btn.disabled = true;
+  const btn = document.getElementById('placeOrderBtn');
+  btn.textContent = 'Placing order…';
+  btn.disabled = true;
   try {
-    const order = await saveOrder('Website', 'pay_later', '');
-    sendEmailViaFormspree(order).catch(err => console.warn('Email error:', err));
-    showSuccessPage('pay_later', '');
+    await saveOrder();
+    showSuccessPage();
   } catch (err) {
-    document.getElementById('errorMsg').textContent = '⚠️ Something went wrong. Please try WhatsApp.';
-    document.getElementById('errorMsg').style.display = 'block';
-    btn.textContent = '📦 Place Order (Pay Later)'; btn.disabled = false;
+    const errEl = document.getElementById('errorMsg');
+    errEl.textContent = '⚠️ Something went wrong. Please try again.';
+    errEl.style.display = 'block';
+    btn.textContent = 'Place Order →';
+    btn.disabled = false;
   }
 });
 
-// ── WhatsApp button ──
-const waBtn = document.getElementById('whatsappBtn');
-if (waBtn) {
-  waBtn.addEventListener('click', async function() {
-    if (!validateOrder()) return;
-    try { await saveOrder('WhatsApp', 'pay_later', ''); } catch (err) { console.warn('Save failed', err); }
-    window.open(buildWhatsAppUrl(), '_blank');
-    setTimeout(() => showSuccessPage('pay_later', ''), 800);
-  });
-}
+// ── WhatsApp query button ──
+document.getElementById('whatsappBtn').addEventListener('click', function() {
+  window.open(buildWhatsAppQueryUrl(), '_blank');
+});
 
-// ── Nav scroll ──
+// ── Nav scroll highlight ──
 const navSections = document.querySelectorAll('section[id]');
-const navLinks = document.querySelectorAll('.nav-links a');
+const navLinks    = document.querySelectorAll('.nav-links a');
 window.addEventListener('scroll', () => {
   let current = '';
   navSections.forEach(s => { if (window.scrollY >= s.offsetTop - 120) current = s.id; });
   navLinks.forEach(a => { a.style.color = a.getAttribute('href') === '#' + current ? 'var(--bark)' : ''; });
-});
-
-// ── Close UPI modal on overlay click ──
-document.getElementById('upiModal')?.addEventListener('click', e => {
-  if (e.target === document.getElementById('upiModal')) closeUPIModal();
 });
 
 init();

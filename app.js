@@ -52,28 +52,49 @@ window.switchTrackTab = function(tab) {
   document.getElementById('trackResultInline').style.display = 'none';
 };
 
-function showTrackResult(order) {
+async function showTrackResult(order) {
   const el = document.getElementById('trackResultInline');
   const date = new Date(order.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
   const items = (order.items || []).map(i => `${i.name} ×${i.qty}`).join(', ');
-  const statusLabel = STATUS_LABEL[order.status] || order.status;
+  let statusLabel = STATUS_LABEL[order.status] || order.status;
+
+  // Auto-fetch ST Courier status on demand
+  const SUPPORTED_COURIERS = ['ST Courier', 'DTDC', 'Professional Courier', 'India Post'];
+  if (SUPPORTED_COURIERS.includes(order.tracking?.courier) && order.tracking?.trackingId && order.status !== 'delivered') {
+    el.innerHTML = '<p style="color:var(--light-text);font-style:italic;font-size:0.85rem">Fetching live status from ST Courier…</p>';
+    el.style.display = 'block';
+    try {
+      const trackRes = await fetch('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id, trackingId: order.tracking.trackingId, courier: order.tracking.courier })
+      });
+      const trackData = await trackRes.json();
+      if (trackData.success) {
+        order.tracking.rawStatus = trackData.rawStatus;
+        order.tracking.details   = trackData.details;
+        order.tracking.fetchedAt = trackData.fetchedAt;
+        if (trackData.mappedStatus) order.status = trackData.mappedStatus;
+        statusLabel = trackData.rawStatus || STATUS_LABEL[order.status] || order.status;
+      }
+    } catch (err) {
+      console.warn('Live tracking fetch failed:', err);
+    }
+  }
 
   let trackingHtml = '';
   if (order.tracking) {
-    const { courier, trackingId } = order.tracking;
+    const { courier, trackingId, rawStatus, details, fetchedAt } = order.tracking;
     const url = COURIER_URLS[courier] ? COURIER_URLS[courier](trackingId) : null;
     const isManual = COURIER_MANUAL && COURIER_MANUAL.includes(courier);
+    const fetchedTime = fetchedAt ? `<div style="font-size:0.7rem;color:var(--stone);margin-top:0.3rem">Last checked: ${new Date(fetchedAt).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'})}</div>` : '';
+    const liveStatus = rawStatus ? `<div style="font-size:0.85rem;color:var(--moss);font-weight:600;margin-top:0.4rem">📍 ${rawStatus}</div>${details ? `<div style="font-size:0.75rem;color:var(--light-text);margin-top:0.2rem">${details}</div>` : ''}${fetchedTime}` : '';
     trackingHtml = `
       <div style="margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid rgba(92,61,46,0.1)">
         <div style="font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--stone);margin-bottom:0.4rem">Courier Details</div>
-        <div style="font-size:0.88rem;color:var(--dark);margin-bottom:0.6rem"><strong>${courier}</strong></div>
-        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
-          <span style="font-family:monospace;font-size:1rem;font-weight:600;color:var(--dark);background:var(--cream);padding:0.4rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2)">${trackingId}</span>
-          <button onclick="navigator.clipboard.writeText('${trackingId}').then(()=>this.textContent='✓ Copied!').catch(()=>{})" style="padding:0.4rem 0.8rem;background:var(--bark);color:white;border:none;cursor:pointer;font-size:0.72rem;font-family:'Jost',sans-serif;letter-spacing:0.08em;text-transform:uppercase">Copy ID</button>
-        </div>
-        ${isManual
-          ? `<button onclick="navigator.clipboard.writeText('${trackingId}').then(()=>{}).catch(()=>{}); window.open('${url}','_blank')" style="display:inline-flex;align-items:center;gap:0.5rem;margin-top:0.8rem;padding:0.6rem 1.2rem;background:var(--moss);color:white;border:none;cursor:pointer;font-size:0.78rem;font-family:'Jost',sans-serif;letter-spacing:0.08em;text-transform:uppercase;font-weight:500">🔍 Open ${courier} Site <span style="opacity:0.8;font-size:0.68rem">(ID auto-copied)</span></button>`
-          : url ? `<a href="${url}" target="_blank" style="display:inline-flex;align-items:center;gap:0.4rem;margin-top:0.8rem;padding:0.5rem 1rem;background:var(--moss);color:white;text-decoration:none;font-size:0.75rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;border-radius:2px">🔍 Track on ${courier} website →</a>` : ''}
+        <div style="font-size:0.88rem;color:var(--dark);margin-bottom:0.4rem"><strong>${courier}</strong> · <span style="font-family:monospace;color:var(--stone)">${trackingId}</span></div>
+        ${liveStatus}
+        ${url ? `<a href="${url}" target="_blank" style="display:inline-flex;align-items:center;gap:0.4rem;margin-top:0.8rem;padding:0.45rem 0.9rem;background:transparent;border:1px solid rgba(92,61,46,0.3);color:var(--bark);text-decoration:none;font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:500">↗ Open ${courier} site</a>` : ''}
       </div>`;
   }
 

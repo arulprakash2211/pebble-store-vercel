@@ -294,7 +294,15 @@
       <p style="font-size:0.82rem;color:var(--light-text);margin-bottom:1.2rem">Enter courier details for tracking.</p>
       <div class="form-group" style="margin-bottom:1rem">
         <label>Courier / Vendor *</label>
-        <input type="text" id="courierName" placeholder="e.g. Delhivery, DTDC, India Post"/>
+        <select id="courierSelect" onchange="toggleOtherCourier()" style="font-family:'Jost',sans-serif;font-size:0.9rem;padding:0.7rem 0.9rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0;width:100%">
+          <option value="">Select courier…</option>
+          <option value="ST Courier">ST Courier</option>
+          <option value="Professional Courier">Professional Courier</option>
+          <option value="DTDC">DTDC</option>
+          <option value="India Post">India Post</option>
+          <option value="other">Other…</option>
+        </select>
+        <input type="text" id="courierOther" placeholder="Enter courier name" style="display:none;margin-top:0.5rem;font-family:'Jost',sans-serif;font-size:0.9rem;padding:0.7rem 0.9rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0;width:100%"/>
       </div>
       <div class="form-group" style="margin-bottom:1.2rem">
         <label>Tracking ID *</label>
@@ -471,15 +479,23 @@
 
     window.openDispatchModal = (id) => {
       currentDispatchOrderId = id;
-      document.getElementById('courierName').value = '';
-      document.getElementById('trackingId').value  = '';
+      document.getElementById('courierSelect').value = '';
+      document.getElementById('courierOther').value  = '';
+      document.getElementById('courierOther').style.display = 'none';
+      document.getElementById('trackingId').value    = '';
       document.getElementById('dispatchModal').classList.add('open');
     };
 
+    window.toggleOtherCourier = () => {
+      const sel = document.getElementById('courierSelect').value;
+      document.getElementById('courierOther').style.display = sel === 'other' ? 'block' : 'none';
+    };
+
     window.confirmDispatch = async () => {
-      const courier    = document.getElementById('courierName').value.trim();
+      const sel        = document.getElementById('courierSelect').value;
+      const courier    = sel === 'other' ? document.getElementById('courierOther').value.trim() : sel;
       const trackingId = document.getElementById('trackingId').value.trim();
-      if (!courier || !trackingId) { toast('⚠️ Enter courier name and tracking ID'); return; }
+      if (!courier || !trackingId) { toast('⚠️ Select courier and enter tracking ID'); return; }
       try {
         await updateDoc(doc(db, 'orders', currentDispatchOrderId), {
           status: 'dispatched',

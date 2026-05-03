@@ -7,16 +7,31 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="style.css" />
   <style>
+    /* CHECKOUT */
     .checkout-actions{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.8rem}
-    .checkout-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5rem;padding:1.3rem 1rem;border:none;cursor:pointer;font-family:'Jost',sans-serif;transition:all 0.25s;text-decoration:none;border-radius:2px}
-    .checkout-btn .btn-icon{font-size:1.6rem}
+    .checkout-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5rem;padding:1.3rem 1rem;border:none;cursor:pointer;font-family:'Jost',sans-serif;transition:all 0.25s;text-decoration:none;border-radius:2px;width:100%}
+    .checkout-btn .btn-icon{font-size:1.6rem;line-height:1}
     .checkout-btn .btn-title{font-size:0.85rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase}
     .checkout-btn .btn-sub{font-size:0.72rem;opacity:0.8;text-align:center;line-height:1.4}
     .btn-payment{background:var(--bark);color:var(--cream)}
     .btn-payment:hover{background:var(--dark);transform:translateY(-2px);box-shadow:0 8px 24px rgba(92,61,46,0.2)}
     .btn-whatsapp-checkout{background:#25D366;color:white}
     .btn-whatsapp-checkout:hover{background:#1da851;transform:translateY(-2px);box-shadow:0 8px 24px rgba(37,211,102,0.25)}
-    @media(max-width:480px){.checkout-actions{grid-template-columns:1fr}.checkout-btn{flex-direction:row;text-align:left;gap:1rem;padding:1rem 1.2rem}.checkout-btn .btn-icon{font-size:1.4rem}}
+
+    /* WHATSAPP QR PANEL (desktop only) */
+    .wa-qr-panel{display:none;margin-top:1rem;background:var(--warm-white);border:1.5px solid rgba(92,61,46,0.15);padding:1.5rem;text-align:center}
+    .wa-qr-panel.visible{display:block}
+    .wa-qr-title{font-size:0.78rem;color:var(--light-text);margin-bottom:1rem}
+    #waQrCode{display:inline-block;padding:0.8rem;background:white;border:1px solid rgba(92,61,46,0.1)}
+    #waQrCode img,#waQrCode canvas{display:block}
+    .wa-qr-hint{font-size:0.72rem;color:var(--stone);margin-top:0.8rem}
+    .wa-qr-id{font-size:0.82rem;color:var(--bark);font-weight:600;margin-top:0.5rem}
+
+    @media(max-width:480px){
+      .checkout-actions{grid-template-columns:1fr}
+      .checkout-btn{flex-direction:row;text-align:left;gap:1rem;padding:1rem 1.2rem}
+      .checkout-btn .btn-icon{font-size:1.4rem}
+    }
   </style>
 </head>
 <body>
@@ -128,9 +143,9 @@
 
           <div class="error-msg" id="errorMsg"></div>
 
+          <!-- TWO CHECKOUT BUTTONS -->
           <div class="checkout-actions">
 
-            <!-- Payment -->
             <button type="submit" class="checkout-btn btn-payment" id="placeOrderBtn">
               <span class="btn-icon">💳</span>
               <div>
@@ -139,18 +154,26 @@
               </div>
             </button>
 
-            <!-- WhatsApp query -->
             <button type="button" class="checkout-btn btn-whatsapp-checkout" id="whatsappBtn">
               <span class="btn-icon">
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
               </span>
               <div>
-                <div class="btn-title">Chat on WhatsApp</div>
-                <div class="btn-sub">Questions? We'll reply instantly</div>
+                <div class="btn-title" id="waBtnTitle">Chat on WhatsApp</div>
+                <div class="btn-sub" id="waBtnSub">Questions? We'll reply instantly</div>
               </div>
             </button>
 
           </div>
+
+          <!-- DESKTOP: WhatsApp QR panel (shown after clicking button) -->
+          <div class="wa-qr-panel" id="waQrPanel">
+            <div class="wa-qr-title">Scan with your phone camera to open WhatsApp</div>
+            <div id="waQrCode"></div>
+            <div class="wa-qr-id">+91 96594 51260</div>
+            <div class="wa-qr-hint">Works with iPhone & Android · No app download needed</div>
+          </div>
+
         </form>
       </div>
 
@@ -160,13 +183,11 @@
           <div class="success-icon">🌿</div>
           <h2 class="success-title">Order Placed!</h2>
           <p class="success-subtitle">Thank you! We'll confirm and get back to you within 24 hours.</p>
-
           <div class="success-order-box">
             <div class="success-order-title">Your Order</div>
             <div id="successOrderDetails"></div>
             <div class="success-total" id="successTotal"></div>
           </div>
-
           <div class="success-next">
             <p class="success-next-title">What happens next?</p>
             <div class="success-steps">
@@ -175,7 +196,6 @@
               <div class="success-step"><span class="step-num">3</span><span>Your soaps are freshly made and dispatched 🧼</span></div>
             </div>
           </div>
-
           <button class="btn" onclick="resetOrder()">← Browse More Soaps</button>
         </div>
       </div>
@@ -193,6 +213,8 @@
     <p class="footer-copy">© 2025 Pebble Store · Made with 🌿 and lots of love</p>
   </footer>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

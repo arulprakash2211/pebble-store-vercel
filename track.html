@@ -128,8 +128,9 @@
     const db  = getFirestore(app);
 
     // Courier tracking URLs
+    const COURIER_MANUAL = ['ST Courier', 'India Post'];
     const COURIER_URLS = {
-      'ST Courier':             id => `https://www.stcourier.com/tracking.php?trackid=${id}`,
+      'ST Courier':             id => `https://www.stcourier.com/`,
       'Professional Courier':   id => `https://www.tpcindia.com/tracking.php?id=${id}&type=0&service=0`,
       'DTDC':                   id => `https://www.dtdc.in/tracking/tracking_results.asp?Ttype=awb&strCNno=${id}`,
       'India Post':             id => `https://www.indiapost.gov.in/VAS/Pages/trackconsignment.aspx`,
@@ -231,6 +232,7 @@
       if (order.tracking) {
         const { courier, trackingId } = order.tracking;
         const courierUrl = COURIER_URLS[courier] ? COURIER_URLS[courier](trackingId) : null;
+        const isManual = COURIER_MANUAL && COURIER_MANUAL.includes(courier);
         trackingSection = `
           <div class="result-row">
             <span class="result-label">Courier</span>
@@ -238,11 +240,17 @@
           </div>
           <div class="result-row">
             <span class="result-label">Tracking ID</span>
-            <span class="result-val" style="font-family:monospace">${trackingId}</span>
+            <span class="result-val">
+              <span style="font-family:monospace;font-weight:600">${trackingId}</span>
+              <button onclick="navigator.clipboard.writeText('${trackingId}').then(()=>this.textContent='✓ Copied!').catch(()=>{})" style="margin-left:0.5rem;padding:0.2rem 0.6rem;background:var(--bark);color:white;border:none;cursor:pointer;font-size:0.68rem;font-family:'Jost',sans-serif">Copy</button>
+            </span>
           </div>
-          ${courierUrl ? `<a class="courier-track-btn" href="${courierUrl}" target="_blank">
-            🔍 Track on ${courier} →
-          </a>` : `<p style="font-size:0.82rem;color:var(--light-text);margin-top:0.8rem">Visit ${courier} website and enter tracking ID: <strong>${trackingId}</strong></p>`}`;
+          ${isManual
+            ? `<p style="font-size:0.82rem;color:var(--light-text);margin-top:0.8rem">Copy the tracking ID and paste it on the <a href="${courierUrl}" target="_blank" style="color:var(--bark)">${courier} website</a> to track your shipment.</p>`
+            : courierUrl
+              ? `<a class="courier-track-btn" href="${courierUrl}" target="_blank">🔍 Track on ${courier} →</a>`
+              : `<p style="font-size:0.82rem;color:var(--light-text);margin-top:0.8rem">Visit ${courier} website and enter tracking ID: <strong>${trackingId}</strong></p>`
+          }`;
       } else if (order.status === 'dispatched') {
         trackingSection = `<p style="font-size:0.82rem;color:var(--light-text);margin-top:0.8rem">Tracking details will be updated shortly.</p>`;
       }

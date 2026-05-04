@@ -1,198 +1,101 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Pebble Store – Artisan Soaps</title>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="style.css" />
+  <title>Pebble Store – Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet"/>
   <style>
-    .checkout-actions{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.8rem}
-    .checkout-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5rem;padding:1.3rem 1rem;border:none;cursor:pointer;font-family:'Jost',sans-serif;transition:all 0.25s;text-decoration:none;border-radius:2px}
-    .checkout-btn .btn-icon{font-size:1.6rem}
-    .checkout-btn .btn-title{font-size:0.85rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase}
-    .checkout-btn .btn-sub{font-size:0.72rem;opacity:0.8;text-align:center;line-height:1.4}
-    .btn-payment{background:var(--bark);color:var(--cream)}
-    .btn-payment:hover{background:var(--dark);transform:translateY(-2px);box-shadow:0 8px 24px rgba(92,61,46,0.2)}
-    .btn-whatsapp-checkout{background:#25D366;color:white}
-    .btn-whatsapp-checkout:hover{background:#1da851;transform:translateY(-2px);box-shadow:0 8px 24px rgba(37,211,102,0.25)}
-    @media(max-width:480px){.checkout-actions{grid-template-columns:1fr}.checkout-btn{flex-direction:row;text-align:left;gap:1rem;padding:1rem 1.2rem}.checkout-btn .btn-icon{font-size:1.4rem}}
+    :root { --bark:#5c3d2e; --moss:#4a5c3a; --cream:#f5f0e8; --dark:#2b1f14; --clay:#a07850; --warm-white:#faf8f3; --light-text:#7a6a58; }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Jost',sans-serif;background:var(--cream);min-height:100vh;display:flex;align-items:center;justify-content:center}
+    .login-box{background:var(--warm-white);padding:3rem;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(43,31,20,0.15)}
+    .login-logo{font-family:'Playfair Display',serif;font-size:1.8rem;color:var(--bark);text-align:center;margin-bottom:0.3rem}
+    .login-sub{text-align:center;font-size:0.78rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--clay);margin-bottom:2rem}
+    .form-group{display:flex;flex-direction:column;gap:0.4rem;margin-bottom:1.2rem}
+    label{font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--light-text);font-weight:500}
+    input{font-family:'Jost',sans-serif;font-size:0.95rem;padding:0.8rem 1rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;transition:border-color 0.2s;border-radius:0}
+    input:focus{border-color:var(--clay)}
+    .btn{width:100%;padding:1rem;background:var(--bark);color:var(--cream);border:none;font-family:'Jost',sans-serif;font-size:0.85rem;letter-spacing:0.12em;text-transform:uppercase;font-weight:500;cursor:pointer;transition:background 0.2s;margin-top:0.5rem}
+    .btn:hover{background:var(--dark)}
+    .btn:disabled{opacity:0.6;cursor:not-allowed}
+    .error{display:none;background:#fde8e8;color:#c0392b;padding:0.7rem 1rem;font-size:0.82rem;margin-bottom:1rem;border-left:3px solid #c0392b}
+    .back-link{display:block;text-align:center;margin-top:1.5rem;font-size:0.78rem;color:var(--light-text);text-decoration:none}
+    .back-link:hover{color:var(--bark)}
   </style>
 </head>
 <body>
+  <div class="login-box">
+    <div class="login-logo">Pebble Store</div>
+    <div class="login-sub">Admin Panel</div>
 
-  <nav>
-    <a class="nav-logo" href="#">Pebble Store</a>
-    <ul class="nav-links">
-      <li><a href="#products">Soaps</a></li>
-      <li><a href="#about">Our Story</a></li>
-      <li><a href="#order">Order</a></li>
-    </ul>
-  </nav>
+    <div class="error" id="errorMsg"></div>
 
-  <section class="hero">
-    <div class="hero-text">
-      <p class="hero-eyebrow">Small batch · All natural</p>
-      <h1>Soaps crafted by<br/><em>nature's touch</em></h1>
-      <p class="hero-desc">Every bar is handmade with love using plant-based oils, botanicals, and zero harsh chemicals. Good for your skin, gentle on the earth.</p>
-      <div>
-        <a href="#order" class="btn">Place an Order</a>
-        <a href="#products" class="btn btn-outline">See Soaps</a>
-      </div>
+    <div class="form-group">
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="admin@pebblestore.com" autocomplete="email"/>
     </div>
-    <div class="hero-visual">
-      <div class="soap-card-visual sv1"><div class="soap-pattern"></div><span class="soap-label">Face Care</span></div>
-      <div class="soap-card-visual sv2"><div class="soap-pattern"></div><span class="soap-label">Hair Care</span></div>
-      <div class="soap-card-visual sv3"><div class="soap-pattern"></div><span class="soap-label">Body Care</span></div>
-      <div class="soap-card-visual sv4"><div class="soap-pattern"></div><span class="soap-label">Gift Sets</span></div>
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password"/>
     </div>
-  </section>
-
-  <div class="about-strip">
-    <div class="strip-item"><div class="strip-icon">🌿</div><div class="strip-title">100% Natural</div><div class="strip-desc">No parabens or synthetics</div></div>
-    <div class="strip-item"><div class="strip-icon">🤲</div><div class="strip-title">Handcrafted</div><div class="strip-desc">Every bar made by hand</div></div>
-    <div class="strip-item"><div class="strip-icon">🐰</div><div class="strip-title">Cruelty Free</div><div class="strip-desc">Never tested on animals</div></div>
-    <div class="strip-item"><div class="strip-icon">📦</div><div class="strip-title">Made to Order</div><div class="strip-desc">Fresh, never mass produced</div></div>
+    <button class="btn" id="loginBtn" onclick="login()">Sign In</button>
+    <a class="back-link" href="/">← Back to store</a>
   </div>
 
-  <section class="products" id="products">
-    <div class="section-header">
-      <p class="section-eyebrow">Our Collection</p>
-      <h2 class="section-title">Handcrafted Soaps</h2>
-      <p class="section-sub">Each bar is cold-process made, cured for 4 weeks, and packed with skin-loving ingredients.</p>
-    </div>
-    <div class="category-filters" id="categoryFilters"></div>
-    <div class="products-grid" id="productsGrid">
-      <p style="color:var(--light-text);font-size:0.9rem;grid-column:1/-1">Loading products…</p>
-    </div>
-  </section>
+  <!-- Firebase Auth -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
-  <section id="about" class="about-wrap">
-    <div class="about">
-      <div class="about-visual">
-        <div class="about-block ab1">🌿</div>
-        <div class="about-block ab2">🧼</div>
-        <div class="about-block ab3">🌸</div>
-        <div class="about-block ab4">🍯</div>
-      </div>
-      <div class="about-text">
-        <h2>Made with<br/><em style="font-style:italic;color:var(--moss)">patience & purpose</em></h2>
-        <p>We started making soap in our kitchen, frustrated by store-bought bars full of chemicals we couldn't pronounce. What began as an experiment became a passion.</p>
-        <p>Every bar is cold-process made in small batches, cured for a full 4 weeks, and packed only with ingredients we'd happily put on our own family's skin.</p>
-        <p>No shortcuts. No fillers. Just honest soap.</p>
-      </div>
-    </div>
-  </section>
+    const firebaseConfig = {
+      apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
+      authDomain: "pebble-store-70889.firebaseapp.com",
+      projectId: "pebble-store-70889",
+      storageBucket: "pebble-store-70889.firebasestorage.app",
+      messagingSenderId: "611731436877",
+      appId: "1:611731436877:web:eee0ef64cd8b4b86467304"
+    };
 
-  <section class="order-section" id="order">
-    <div class="order-inner">
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
 
-      <!-- FORM VIEW -->
-      <div id="orderFormView">
-        <div class="section-header">
-          <p class="section-eyebrow">Place an Order</p>
-          <h2 class="section-title">Order Your Soaps</h2>
-          <p class="section-sub">Set quantities above and fill in your details below.</p>
-        </div>
+    // If already logged in → go to dashboard
+    onAuthStateChanged(auth, user => {
+      if (user) window.location.href = '/admin/dashboard.html';
+    });
 
-        <div class="order-summary">
-          <div class="order-summary-title">Your Order Summary</div>
-          <div id="summaryContent">
-            <span class="empty-selection">No products added yet — browse above, set quantity and click "Add to Order"</span>
-          </div>
-        </div>
+    window.login = async function() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const btn = document.getElementById('loginBtn');
+      const err = document.getElementById('errorMsg');
 
-        <form id="orderForm">
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="custName">Full Name *</label>
-              <input type="text" id="custName" placeholder="Your name" required />
-            </div>
-            <div class="form-group">
-              <label for="phone">Phone Number *</label>
-              <input type="tel" id="phone" placeholder="+91 00000 00000" required />
-            </div>
-            <div class="form-group full">
-              <label for="email">Email Address</label>
-              <input type="email" id="email" placeholder="your@email.com" />
-            </div>
-            <div class="form-group full">
-              <label for="address">Delivery Address *</label>
-              <textarea id="address" placeholder="Full address including city, state and pincode" required></textarea>
-            </div>
-            <div class="form-group full">
-              <label for="notes">Special Notes</label>
-              <textarea id="notes" placeholder="Gifting notes, allergies, special requests…"></textarea>
-            </div>
-          </div>
+      if (!email || !password) {
+        err.textContent = 'Please enter your email and password.';
+        err.style.display = 'block';
+        return;
+      }
 
-          <div class="error-msg" id="errorMsg"></div>
+      btn.textContent = 'Signing in…';
+      btn.disabled = true;
+      err.style.display = 'none';
 
-          <div class="checkout-actions">
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        window.location.href = '/admin/dashboard.html';
+      } catch (e) {
+        err.textContent = 'Invalid email or password. Please try again.';
+        err.style.display = 'block';
+        btn.textContent = 'Sign In';
+        btn.disabled = false;
+      }
+    };
 
-            <!-- Payment -->
-            <button type="submit" class="checkout-btn btn-payment" id="placeOrderBtn">
-              <span class="btn-icon">💳</span>
-              <div>
-                <div class="btn-title">Proceed to Payment</div>
-                <div class="btn-sub">Secure checkout · Cards, UPI & more</div>
-              </div>
-            </button>
-
-            <!-- WhatsApp query -->
-            <button type="button" class="checkout-btn btn-whatsapp-checkout" id="whatsappBtn">
-              <span class="btn-icon">
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-              </span>
-              <div>
-                <div class="btn-title">Chat on WhatsApp</div>
-                <div class="btn-sub">Questions? We'll reply instantly</div>
-              </div>
-            </button>
-
-          </div>
-        </form>
-      </div>
-
-      <!-- SUCCESS VIEW -->
-      <div id="orderSuccessView" style="display:none">
-        <div class="success-page">
-          <div class="success-icon">🌿</div>
-          <h2 class="success-title">Order Placed!</h2>
-          <p class="success-subtitle">Thank you! We'll confirm and get back to you within 24 hours.</p>
-
-          <div class="success-order-box">
-            <div class="success-order-title">Your Order</div>
-            <div id="successOrderDetails"></div>
-            <div class="success-total" id="successTotal"></div>
-          </div>
-
-          <div class="success-next">
-            <p class="success-next-title">What happens next?</p>
-            <div class="success-steps">
-              <div class="success-step"><span class="step-num">1</span><span>We confirm your order and prepare it</span></div>
-              <div class="success-step"><span class="step-num">2</span><span>We contact you via WhatsApp with updates</span></div>
-              <div class="success-step"><span class="step-num">3</span><span>Your soaps are freshly made and dispatched 🧼</span></div>
-            </div>
-          </div>
-
-          <button class="btn" onclick="resetOrder()">← Browse More Soaps</button>
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <footer>
-    <div class="footer-logo">Pebble Store</div>
-    <div class="footer-links">
-      <a href="#products">Soaps</a>
-      <a href="#about">Our Story</a>
-      <a href="#order">Order</a>
-    </div>
-    <p class="footer-copy">© 2025 Pebble Store · Made with 🌿 and lots of love</p>
-  </footer>
-
-  <script type="module" src="app.js"></script>
+    // Allow Enter key to submit
+    document.getElementById('password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') window.login();
+    });
+  </script>
 </body>
 </html>

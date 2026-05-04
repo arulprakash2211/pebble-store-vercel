@@ -829,23 +829,19 @@
     // Download blank CSV template
     window.downloadCSVTemplate = () => {
       const header = CSV_HEADERS.join(',');
-      const sample = [
-        'coconut-oil-soap,"Coconut Oil Soap",Body Care,180,Bestseller,"Rich moisturising soap with coconut oil",🥥,images/coconut-oil-soap.jpg,pi3',
-        'charcoal-soap,"Activated Charcoal Soap",Face Care,200,Detox,"Deep cleansing charcoal soap",🖤,images/charcoal-soap.jpg,pi2'
-      ].join('
-');
-      const blob = new Blob([header + '
-' + sample], { type: 'text/csv' });
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
+      const nl = String.fromCharCode(10);
+      const r1 = 'coconut-oil-soap,Coconut Oil Soap,Body Care,180,Bestseller,Rich soap,🥥,images/coconut-oil-soap.jpg,pi3';
+      const r2 = 'charcoal-soap,Charcoal Soap,Face Care,200,Detox,Charcoal soap,🖤,images/charcoal-soap.jpg,pi2';
+      const blob = new Blob([header + nl + r1 + nl + r2], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
       a.href = url; a.download = 'pebble-store-products.csv';
       a.click(); URL.revokeObjectURL(url);
     };
 
     // Parse CSV text into array of objects
     function parseCSV(text) {
-      const lines = text.trim().split('
-');
+      const lines = text.trim().split(String.fromCharCode(10));
       if (lines.length < 2) return [];
       const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
       return lines.slice(1).map(line => {

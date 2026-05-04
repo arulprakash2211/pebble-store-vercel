@@ -254,8 +254,14 @@
         <div class="bulk-toolbar">
           <button class="btn btn-primary" onclick="saveBulkEdits()">💾 Save All Changes</button>
           <button class="btn btn-ghost" onclick="loadBulkTable()">↻ Reload</button>
+          <label class="btn btn-clay" style="cursor:pointer;margin:0">
+            📂 Upload CSV
+            <input type="file" id="csvUpload" accept=".csv" style="display:none" onchange="handleCSVUpload(event)"/>
+          </label>
+          <button class="btn btn-ghost btn-sm" onclick="downloadCSVTemplate()">⬇ Download Template</button>
           <span style="font-size:0.75rem;color:var(--light-text);font-style:italic">Click any cell to edit · Changes highlighted in amber</span>
         </div>
+        <div id="csvMsg" style="display:none;margin-bottom:1rem;padding:0.8rem 1rem;font-size:0.82rem;border-radius:2px"></div>
         <div class="bulk-table-wrap">
           <table class="bulk-table">
             <thead><tr>
@@ -813,6 +819,141 @@
           <td>${c.orders}</td><td><strong>₹${c.spent.toLocaleString('en-IN')}</strong></td>
         </tr>`).join('');
       } catch (err) { document.getElementById('customersBody').innerHTML = `<tr><td colspan="6" class="loading">Error: ${err.message}</td></tr>`; }
+    };
+
+    // ══════════════════════════════
+    // CSV UPLOAD
+    // ══════════════════════════════
+    const CSV_HEADERS = ['id','name','category','price','tag','description','emoji','image','colorClass'];
+
+    // Download blank CSV template
+    window.downloadCSVTemplate = () => {
+      const header = CSV_HEADERS.join(',');
+      const sample = [
+        'coconut-oil-soap,"Coconut Oil Soap",Body Care,180,Bestseller,"Rich moisturising soap with coconut oil",🥥,images/coconut-oil-soap.jpg,pi3',
+        'charcoal-soap,"Activated Charcoal Soap",Face Care,200,Detox,"Deep cleansing charcoal soap",🖤,images/charcoal-soap.jpg,pi2'
+      ].join('
+');
+      const blob = new Blob([header + '
+' + sample], { type: 'text/csv' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = 'pebble-store-products.csv';
+      a.click(); URL.revokeObjectURL(url);
+    };
+
+    // Parse CSV text into array of objects
+    function parseCSV(text) {
+      const lines = text.trim().split('
+');
+      if (lines.length < 2) return [];
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
+      return lines.slice(1).map(line => {
+        // Handle quoted fields with commas inside
+        const fields = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') { inQuotes = !inQuotes; }
+          else if (ch === ',' && !inQuotes) { fields.push(current.trim()); current = ''; }
+          else { current += ch; }
+        }
+        fields.push(current.trim());
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = (fields[i] || '').replace(/^"|"$/g, '').trim(); });
+        return obj;
+      }).filter(row => row.name); // skip empty rows
+    }
+
+    // Handle CSV file upload
+    window.handleCSVUpload = async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      const msgEl = document.getElementById('csvMsg');
+      msgEl.style.display = 'block';
+      msgEl.style.background = '#fff3cd'; msgEl.style.color = '#856404';
+      msgEl.textContent = `📂 Reading ${file.name}…`;
+
+      const text = await file.text();
+      const rows = parseCSV(text);
+
+      if (!rows.length) {
+        msgEl.style.background = '#f8d7da'; msgEl.style.color = '#721c24';
+        msgEl.textContent = '❌ No valid rows found. Check your CSV format.';
+        return;
+      }
+
+      msgEl.textContent = `Found ${rows.length} products. Uploading…`;
+
+      // Get existing products from Firestore
+      const snap = await getDocs(collection(db, 'products'));
+      const existing = {};
+      snap.docs.forEach(d => { existing[d.id] = d.data(); });
+
+      let added = 0, updated = 0, skipped = 0, errors = 0;
+
+      for (const row of rows) {
+        // Generate ID from row.id or name
+        const id = (row.id || row.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')).trim();
+        if (!id || !row.name || !row.price) { skipped++; continue; }
+
+        const price = parseFloat(row.price);
+        if (isNaN(price)) { skipped++; continue; }
+
+        try {
+          if (existing[id]) {
+            // ── UPDATE existing product (never touch stock) ──
+            const updates = {
+              name:        row.name,
+              category:    row.category    || existing[id].category || '',
+              price,
+              tag:         row.tag         || existing[id].tag || '',
+              description: row.description || existing[id].description || '',
+              emoji:       row.emoji       || existing[id].emoji || '🧼',
+              image:       row.image       || existing[id].image || '',
+              colorClass:  row.colorClass  || existing[id].colorClass || 'pi1',
+              updatedAt:   new Date().toISOString()
+              // stock is intentionally NOT included — never overwrite
+            };
+            await updateDoc(doc(db, 'products', id), updates);
+            updated++;
+          } else {
+            // ── ADD new product ──
+            await setDoc(doc(db, 'products', id), {
+              name:        row.name,
+              category:    row.category    || '',
+              price,
+              tag:         row.tag         || '',
+              description: row.description || '',
+              emoji:       row.emoji       || '🧼',
+              image:       row.image       || '',
+              colorClass:  row.colorClass  || 'pi1',
+              stock:       0,  // new products start with 0 stock
+              createdAt:   new Date().toISOString(),
+              updatedAt:   new Date().toISOString()
+            });
+            added++;
+          }
+        } catch (err) { console.error('Row error:', id, err); errors++; }
+      }
+
+      // Show result
+      const parts = [];
+      if (added)   parts.push(`✅ ${added} added`);
+      if (updated) parts.push(`✏️ ${updated} updated`);
+      if (skipped) parts.push(`⏭ ${skipped} skipped (missing name/price)`);
+      if (errors)  parts.push(`❌ ${errors} errors`);
+
+      msgEl.style.background = errors ? '#f8d7da' : '#d4edda';
+      msgEl.style.color      = errors ? '#721c24' : '#155724';
+      msgEl.textContent      = parts.join(' · ') + ' · Products in DB not in CSV were left untouched.';
+
+      // Reload tables
+      loadProductsList();
+      loadBulkTable();
+      event.target.value = ''; // reset file input
+      toast(`✅ CSV imported: ${added} added, ${updated} updated`);
     };
 
     ['dispatchModal','stockModal'].forEach(id => {

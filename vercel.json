@@ -1,11 +1,15 @@
 {
   "version": 2,
-  "rewrites": [
-    { "source": "/api/products", "destination": "/api/products.js" },
-    { "source": "/api/orders",   "destination": "/api/orders.js" },
-    { "source": "/api/track",    "destination": "/api/track.js" },
-    { "source": "/admin",        "destination": "/admin/index.html" },
-    { "source": "/admin/dashboard", "destination": "/admin/dashboard.html" },
-    { "source": "/track",        "destination": "/track.html" }
+  "cleanUrls": true,
+  "routes": [
+    { "src": "/api/track",       "dest": "/api/track.js" },
+    { "src": "/api/products",    "dest": "/api/products.js" },
+    { "src": "/api/orders",      "dest": "/api/orders.js" },
+    { "src": "/admin",           "dest": "/admin/index.html" },
+    { "src": "/admin/dashboard", "dest": "/admin/dashboard.html" },
+    { "src": "/track",           "dest": "/track.html" },
+    { "src": "/style.css",       "dest": "/style.css" },
+    { "src": "/app.js",          "dest": "/app.js" },
+    { "src": "/",                "dest": "/index.html" }
   ]
 }

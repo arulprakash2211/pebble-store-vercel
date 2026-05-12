@@ -80,7 +80,7 @@
     .fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--clay)}
     .fg textarea{resize:vertical;min-height:70px}
     .color-opts{display:flex;gap:0.4rem;margin-top:0.3rem;flex-wrap:wrap}
-    .color-opt{width:32px;height:32px;border-radius:2px;cursor:pointer;border:2.5px solid transparent;transition:all 0.15s;display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:transparent;font-weight:700}
+    .color-opt{width:32px;height:60px;border-radius:2px;cursor:pointer;border:2.5px solid transparent;transition:all 0.15s;display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:transparent;font-weight:700}
     .color-opt.selected{border-color:var(--dark);color:white}
     .form-msg{font-size:0.78rem;padding:0.5rem 0.8rem;border-radius:2px;margin-top:0.6rem;display:none}
     .form-msg.ok{background:#d4edda;color:#155724;display:block}
@@ -133,7 +133,7 @@
 <body>
 
   <div class="sidebar">
-    <div class="sidebar-logo"><img src="/images/logo.png" alt="Pebble Store" style="height:32px;object-fit:contain;filter:brightness(0) invert(1);opacity:0.85"/></div>
+    <div class="sidebar-logo"><img src="/images/logo.png" alt="Pebble Store" style="height:60px;object-fit:contain;filter:brightness(0) invert(1);opacity:0.85"/></div>
     <div class="sidebar-sub">Admin Panel</div>
     <button class="nav-item active" onclick="showSection('orders',this)"><span>📦</span> Orders</button>
     <button class="nav-item" onclick="showSection('products',this)"><span>🧼</span> Products</button>

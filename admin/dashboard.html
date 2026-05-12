@@ -631,7 +631,6 @@
 
     function bulkRow(p, isNew = false) {
       const id = p.id || ('new-' + Date.now() + Math.random());
-      const catOpts = CATEGORIES.map(c => `<option ${p.category === c ? 'selected' : ''}>${c}</option>`).join('');
       const tagOpts = TAGS.map(t => `<option ${p.tag === t ? 'selected' : ''} value="${t}">${t || '—'}</option>`).join('');
       const colorOpts = COLORS.map(c =>
         `<option value="${c}" ${p.colorClass === c ? 'selected' : ''}>${c}</option>`
@@ -639,7 +638,7 @@
       return `<tr data-id="${id}" data-isnew="${isNew}" data-changed="false">
         <td><input class="bulk-input" data-field="emoji" value="${p.emoji || '🧼'}" style="width:60px;text-align:center;font-size:1.2rem" oninput="markChanged(this)"/></td>
         <td><input class="bulk-input" data-field="name" value="${(p.name || '').replace(/"/g,'&quot;')}" oninput="markChanged(this)"/></td>
-        <td><select class="bulk-select" data-field="category" onchange="markChanged(this)"><option value="">Select…</option>${catOpts}</select></td>
+        <td><input class="bulk-input" data-field="category" value="${p.category || ''}" placeholder="e.g. Soaps" oninput="markChanged(this)"/></td>
         <td><input class="bulk-input" data-field="price" type="number" value="${p.price || ''}" style="width:80px" oninput="markChanged(this)"/></td>
         <td><select class="bulk-select" data-field="tag" onchange="markChanged(this)">${tagOpts}</select></td>
         <td><input class="bulk-input" data-field="description" value="${(p.description || '').replace(/"/g,'&quot;')}" oninput="markChanged(this)"/></td>

@@ -31,7 +31,7 @@ html { scroll-behavior: smooth; }
 body { font-family: var(--font-body); background: var(--warm-white); color: var(--text); overflow-x: hidden; }
 
 /* ── NAV ── */
-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; padding: 1.2rem 3rem; background: rgba(245,240,232,0.93); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(92,61,46,0.12); }
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 3rem; background: rgba(245,240,232,0.93); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(92,61,46,0.12); }
 .nav-logo { font-family: var(--font-display); font-size: 1.4rem; color: var(--bark); text-decoration: none; }
 .nav-links { display: flex; gap: 2rem; list-style: none; }
 .nav-links a { text-decoration: none; font-size: 0.85rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--stone); font-weight: 500; transition: color 0.2s; }

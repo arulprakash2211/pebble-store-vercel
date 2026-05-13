@@ -18,7 +18,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 
-const WHATSAPP_NUMBER = '919659451260';
+const WHATSAPP_NUMBER = '918925401892';
 let allProducts = [];
 const cart = {};
 

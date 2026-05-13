@@ -178,8 +178,24 @@ window.doTrackById = async function() {
   } catch (err) { showTrackError('Something went wrong. Please try again.'); }
 };
 
+// ── Sync cart from sessionStorage (shared with product page) ──
+function syncCartFromSession() {
+  const saved = sessionStorage.getItem('pebble_cart');
+  if (saved) {
+    const saved_cart = JSON.parse(saved);
+    Object.entries(saved_cart).forEach(([id, qty]) => {
+      if (qty > 0) cart[id] = qty;
+    });
+  }
+}
+
+function saveCartToSession() {
+  sessionStorage.setItem('pebble_cart', JSON.stringify(cart));
+}
+
 // ── Init ──
 async function init() {
+  syncCartFromSession();
   await loadProducts();
 }
 
@@ -225,8 +241,9 @@ function renderProducts(products) {
   }
   grid.innerHTML = products.map(p => {
     const qty = cart[p.id] || 0;
+    const slug = p.variantGroup || p.id;
     return `
-      <div class="product-card" data-id="${p.id}">
+      <div class="product-card" data-id="${p.id}" style="cursor:pointer" onclick="window.location.href='/product/${slug}'">
         <div class="product-img ${p.colorClass || 'pi1'}">
           <div class="pat"></div>
           ${p.image ? `<img src="${p.image}" alt="${p.name}" onerror="this.style.display='none'" />` : ''}
@@ -239,14 +256,14 @@ function renderProducts(products) {
           </div>
           <div class="product-name">${p.name}</div>
           <div class="product-desc">${p.description || ''}</div>
-          <div class="product-price">₹${p.price} / bar</div>
+          <div class="product-price">₹${p.price}</div>
           <div class="card-bottom">
-            <div class="qty-control">
-              <button class="qty-btn" onclick="changeQty('${p.id}', -1)">−</button>
+            <div class="qty-control" onclick="event.stopPropagation()">
+              <button class="qty-btn" onclick="event.stopPropagation();changeQty('${p.id}', -1)">−</button>
               <span class="qty-num" id="qty-${p.id}">${qty}</span>
-              <button class="qty-btn" onclick="changeQty('${p.id}', 1)">+</button>
+              <button class="qty-btn" onclick="event.stopPropagation();changeQty('${p.id}', 1)">+</button>
             </div>
-            <button class="add-to-order-btn ${qty > 0 ? 'selected' : ''}" id="btn-${p.id}" onclick="addToOrder('${p.id}')">
+            <button class="add-to-order-btn ${qty > 0 ? 'selected' : ''}" id="btn-${p.id}" onclick="event.stopPropagation();addToOrder('${p.id}')">
               ${qty > 0 ? '✓ Added' : 'Add to Order'}
             </button>
           </div>

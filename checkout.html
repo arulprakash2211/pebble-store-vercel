@@ -333,52 +333,20 @@
           customerEmail: data.email
         })
       });
-      const paytmData = await res.json();
-      if (!paytmData.success || !paytmData.txnToken) {
-        throw new Error(paytmData.error || 'Payment initiation failed. Please try another payment method.');
+      if (!paytmData.success || !paytmData.params) {
+        throw new Error(paytmData.error || 'Payment initiation failed.');
       }
-
-      // Open Paytm checkout
-      const config = {
-        root: '',
-        flow: 'DEFAULT',
-        data: {
-          orderId:   orderId,
-          token:     paytmData.txnToken,
-          tokenType: 'TXN_TOKEN',
-          amount:    cartTotal.toString()
-        },
-        merchant: { redirect: false },
-        handler: {
-          notifyMerchant: function(eventName, data) {
-            console.log('Paytm event:', eventName, data);
-            if (eventName === 'SESSION_EXPIRED') {
-              alert('Payment session expired. Please try again.');
-              window.location.reload();
-            }
-          },
-          transactionStatus: function(data) {
-            console.log('Transaction status:', data);
-            if (data.STATUS === 'TXN_SUCCESS') {
-              localStorage.removeItem('pebble_cart');
-              showSuccess(getFormData(), 'paytm', true);
-            } else {
-              document.getElementById('errorMsg').textContent = '⚠️ Payment failed or cancelled. Please try again.';
-              document.getElementById('errorMsg').style.display = 'block';
-              document.getElementById('placeOrderBtn').disabled = false;
-              document.getElementById('placeOrderBtn').textContent = 'Pay Now →';
-            }
-          }
-        }
-      };
-
-      if (window.Paytm && window.Paytm.CheckoutJS) {
-        window.Paytm.CheckoutJS.init(config).then(() => {
-          window.Paytm.CheckoutJS.invoke();
-        }).catch(err => { throw new Error('Paytm SDK error: ' + err); });
-      } else {
-        throw new Error('Paytm SDK not loaded. Please refresh and try again.');
-      }
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = paytmData.paytmUrl;
+      form.style.display = 'none';
+      Object.entries(paytmData.params).forEach(([key, value]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden'; input.name = key; input.value = value;
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
     }
 
     function handlePaytmCallback(params) {

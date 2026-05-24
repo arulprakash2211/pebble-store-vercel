@@ -296,15 +296,25 @@
 
       try {
         if (method === 'paytm') {
-          // Save order first as pending
-          console.log('Step 1: saving order to Firestore...');
-          const orderId = await saveOrderToFirestore(data, 'paytm', 'payment_pending', false);
-          console.log('Step 2: order saved, orderId =', orderId);
+          let orderId;
+          try {
+            console.log('Step 1: saving to Firestore');
+            orderId = await saveOrderToFirestore(data, 'paytm', 'payment_pending', false);
+            console.log('Step 2: saved, orderId=', orderId);
+          } catch(e) {
+            alert('FIRESTORE ERROR: ' + e.message);
+            throw e;
+          }
           localStorage.setItem('pebble_order_id', orderId);
           localStorage.setItem('pebble_customer', JSON.stringify(data));
-          console.log('Step 3: initiating Paytm...');
-          await initiatePaytm(data, orderId);
-          console.log('Step 4: Paytm form submitted');
+          try {
+            console.log('Step 3: calling Paytm API');
+            await initiatePaytm(data, orderId);
+            console.log('Step 4: form submitted');
+          } catch(e) {
+            alert('PAYTM API ERROR: ' + e.message);
+            throw e;
+          }
 
         } else if (method === 'whatsapp') {
           await saveOrderToFirestore(data, 'whatsapp', 'new', false);

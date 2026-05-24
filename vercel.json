@@ -5,6 +5,10 @@
     { "src": "/api/products", "dest": "/api/products.js" },
     { "src": "/api/orders",   "dest": "/api/orders.js" },
     { "src": "/track",        "dest": "/track.html" },
+    { "src": "/privacy",      "dest": "/privacy.html" },
+    { "src": "/terms",        "dest": "/terms.html" },
+    { "src": "/shipping",     "dest": "/shipping.html" },
+    { "src": "/refund",       "dest": "/refund.html" },
     { "src": "/",             "dest": "/index.html" }
   ]
 }

@@ -6,12 +6,14 @@ const PAYTM_WEBSITE      = 'WEBSTAGING';
 const PAYTM_INDUSTRY     = 'Retail';
 const PAYTM_CHANNEL      = 'WEB';
 
-// Official Paytm v1 checksum (non-HMAC version)
+// Paytm classic checksum — SHA256(params|salt) + salt
 function generateChecksum(params, key) {
-  const sortedKeys = Object.keys(params).sort();
-  const str = sortedKeys.map(k => params[k] ?? '').join('|');
-  const salt = crypto.randomBytes(4).toString('hex');
-  const hash = crypto.createHash('sha256').update(str + '|' + salt).digest('hex');
+  const str = Object.keys(params)
+    .sort()
+    .map(k => (params[k] === null || params[k] === undefined) ? '' : params[k])
+    .join('|');
+  const salt  = crypto.randomBytes(4).toString('hex'); // 8 hex chars
+  const hash  = crypto.createHash('sha256').update(str + '|' + salt).digest('hex');
   return hash + salt;
 }
 
@@ -26,37 +28,38 @@ export default async function handler(req, res) {
     const { orderId, amount, customerPhone, customerEmail } = req.body;
     if (!orderId || !amount) return res.status(400).json({ error: 'orderId and amount required' });
 
-    const txnAmt = parseFloat(amount).toFixed(2);
-    const phone  = (customerPhone || '').replace(/\D/g, '').slice(-10);
-    const custId = 'CUST' + (phone || Date.now().toString().slice(-10));
-    const origin = req.headers.origin || 'https://pebble-store-vercel.vercel.app';
+    const txnAmt  = parseFloat(amount).toFixed(2);
+    const phone   = (customerPhone || '').replace(/\D/g, '').slice(-10);
+    const custId  = 'CUST' + (phone || Date.now().toString().slice(-10));
+    const origin  = req.headers.origin || 'https://pebble-store-vercel.vercel.app';
+    const callback = `${origin}/checkout.html?callback=1&orderId=${orderId}`;
 
+    // Only include params Paytm expects — no extras
     const params = {
-      MID:              PAYTM_MID,
-      WEBSITE:          PAYTM_WEBSITE,
+      CALLBACK_URL:     callback,
       CHANNEL_ID:       PAYTM_CHANNEL,
-      INDUSTRY_TYPE_ID: PAYTM_INDUSTRY,
-      ORDER_ID:         orderId,
       CUST_ID:          custId,
+      INDUSTRY_TYPE_ID: PAYTM_INDUSTRY,
+      MID:              PAYTM_MID,
+      ORDER_ID:         orderId,
       TXN_AMOUNT:       txnAmt,
-      CURRENCY:         'INR',
-      CALLBACK_URL:     `${origin}/checkout.html?callback=1&orderId=${orderId}`,
-      ...(phone && { MOBILE_NO: phone }),
-      ...(customerEmail && { EMAIL: customerEmail })
+      WEBSITE:          PAYTM_WEBSITE,
     };
 
-    const checksum = generateChecksum(params, PAYTM_MERCHANT_KEY);
+    if (phone)          params.MOBILE_NO = phone;
+    if (customerEmail)  params.EMAIL     = customerEmail;
 
-    console.log('Params:', JSON.stringify({ ...params }));
+    const checksum = generateChecksum(params, PAYTM_MERCHANT_KEY);
+    console.log('Params sent:', JSON.stringify(params));
     console.log('Checksum:', checksum);
 
+    // Return to browser — browser submits form directly to Paytm
     return res.status(200).json({
       success:  true,
       params:   { ...params, CHECKSUMHASH: checksum },
-      mid:      PAYTM_MID,
+      paytmUrl: 'https://securegw-stage.paytm.in/order/process',
       orderId,
-      amount:   txnAmt,
-      paytmUrl: 'https://securegw-stage.paytm.in/order/process'
+      amount:   txnAmt
     });
 
   } catch (err) {

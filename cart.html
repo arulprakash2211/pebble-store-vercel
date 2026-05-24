@@ -102,10 +102,10 @@
     const db  = getFirestore(app);
 
     const WHATSAPP = '918925401892';
-    let cart = JSON.parse(sessionStorage.getItem('pebble_cart') || '{}');
+    let cart = JSON.parse(localStorage.getItem('pebble_cart') || '{}');
     let allProducts = [];
 
-    function saveCart() { sessionStorage.setItem('pebble_cart', JSON.stringify(cart)); }
+    function saveCart() { localStorage.setItem('pebble_cart', JSON.stringify(cart)); }
 
     async function init() {
       const snap = await getDocs(collection(db, 'products'));

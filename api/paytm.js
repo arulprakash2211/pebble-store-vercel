@@ -3,6 +3,17 @@ import crypto from 'crypto';
 const PAYTM_MID          = 'LkRexl51254337266716';
 const PAYTM_MERCHANT_KEY = process.env.PAYTM_MERCHANT_KEY || '4&s3ImHMGm6nco8Z';
 const PAYTM_WEBSITE      = 'WEBSTAGING';
+const PAYTM_INDUSTRY     = 'Retail';
+const PAYTM_CHANNEL      = 'WEB';
+
+// Official Paytm v1 checksum (non-HMAC version)
+function generateChecksum(params, key) {
+  const sortedKeys = Object.keys(params).sort();
+  const str = sortedKeys.map(k => params[k] ?? '').join('|');
+  const salt = crypto.randomBytes(4).toString('hex');
+  const hash = crypto.createHash('sha256').update(str + '|' + salt).digest('hex');
+  return hash + salt;
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -18,49 +29,35 @@ export default async function handler(req, res) {
     const txnAmt = parseFloat(amount).toFixed(2);
     const phone  = (customerPhone || '').replace(/\D/g, '').slice(-10);
     const custId = 'CUST' + (phone || Date.now().toString().slice(-10));
+    const origin = req.headers.origin || 'https://pebble-store-vercel.vercel.app';
 
-    const paytmBody = {
-      requestType: 'Payment',
-      mid:         PAYTM_MID,
-      websiteName: PAYTM_WEBSITE,
-      orderId:     orderId,
-      txnAmount:   { value: txnAmt, currency: 'INR' },
-      userInfo:    { custId, mobile: phone, email: customerEmail || '' }
+    const params = {
+      MID:              PAYTM_MID,
+      WEBSITE:          PAYTM_WEBSITE,
+      CHANNEL_ID:       PAYTM_CHANNEL,
+      INDUSTRY_TYPE_ID: PAYTM_INDUSTRY,
+      ORDER_ID:         orderId,
+      CUST_ID:          custId,
+      TXN_AMOUNT:       txnAmt,
+      CURRENCY:         'INR',
+      CALLBACK_URL:     `${origin}/checkout.html?callback=1&orderId=${orderId}`,
+      ...(phone && { MOBILE_NO: phone }),
+      ...(customerEmail && { EMAIL: customerEmail })
     };
 
-    // ── Correct signature: HMAC-SHA256 of JSON body string ──
-    const bodyString  = JSON.stringify(paytmBody);
-    const signature   = crypto.createHmac('sha256', PAYTM_MERCHANT_KEY)
-                              .update(bodyString)
-                              .digest('base64');
+    const checksum = generateChecksum(params, PAYTM_MERCHANT_KEY);
 
-    console.log('Body string:', bodyString);
-    console.log('Signature:', signature);
+    console.log('Params:', JSON.stringify({ ...params }));
+    console.log('Checksum:', checksum);
 
-    const response = await fetch(
-      `https://securegw-stage.paytm.in/theia/api/v1/initiateTransaction?mid=${PAYTM_MID}&orderId=${orderId}`,
-      {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          body: paytmBody,
-          head: { signature }
-        })
-      }
-    );
-
-    const data = await response.json();
-    console.log('Paytm response:', JSON.stringify(data));
-
-    const txnToken = data?.body?.txnToken;
-    if (!txnToken) {
-      return res.status(200).json({
-        success: false,
-        error:   data?.body?.resultInfo?.resultMsg || 'Failed to get token'
-      });
-    }
-
-    return res.status(200).json({ success: true, txnToken, orderId, mid: PAYTM_MID, amount: txnAmt });
+    return res.status(200).json({
+      success:  true,
+      params:   { ...params, CHECKSUMHASH: checksum },
+      mid:      PAYTM_MID,
+      orderId,
+      amount:   txnAmt,
+      paytmUrl: 'https://securegw-stage.paytm.in/order/process'
+    });
 
   } catch (err) {
     console.error('Paytm error:', err);

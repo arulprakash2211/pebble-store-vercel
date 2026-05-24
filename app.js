@@ -180,7 +180,7 @@ window.doTrackById = async function() {
 
 // ── Sync cart from sessionStorage (shared with product page) ──
 function syncCartFromSession() {
-  const saved = sessionStorage.getItem('pebble_cart');
+  const saved = localStorage.getItem('pebble_cart');
   if (saved) {
     const saved_cart = JSON.parse(saved);
     Object.entries(saved_cart).forEach(([id, qty]) => {
@@ -190,7 +190,7 @@ function syncCartFromSession() {
 }
 
 function saveCartToSession() {
-  sessionStorage.setItem('pebble_cart', JSON.stringify(cart));
+  localStorage.setItem('pebble_cart', JSON.stringify(cart));
   updateCartNav();
 }
 
@@ -320,18 +320,17 @@ window.changeQty = function(id, delta) {
   if (qtyEl) qtyEl.textContent = newQty;
   if (btnEl) { btnEl.textContent = newQty > 0 ? '✓ Added' : 'Add to Order'; btnEl.classList.toggle('selected', newQty > 0); }
   updateSummary();
+  saveCartToSession();
 };
 
 window.addToOrder = function(id) {
-  if (!cart[id]) {
-    cart[id] = 1;
-    const qtyEl = document.getElementById('qty-' + id);
-    const btnEl = document.getElementById('btn-' + id);
-    if (qtyEl) qtyEl.textContent = 1;
-    if (btnEl) { btnEl.textContent = '✓ Added'; btnEl.classList.add('selected'); }
-  }
-  updateSummary();
-  document.getElementById('order').scrollIntoView({ behavior: 'smooth' });
+  if (!cart[id]) cart[id] = 0;
+  cart[id] = (cart[id] || 0) + 1;
+  const qtyEl = document.getElementById('qty-' + id);
+  const btnEl = document.getElementById('btn-' + id);
+  if (qtyEl) qtyEl.textContent = cart[id];
+  if (btnEl) { btnEl.textContent = '✓ Added'; btnEl.classList.add('selected'); }
+  saveCartToSession();
 };
 
 window.removeFromCart = function(id) {
@@ -341,6 +340,7 @@ window.removeFromCart = function(id) {
   if (qtyEl) qtyEl.textContent = 0;
   if (btnEl) { btnEl.textContent = 'Add to Order'; btnEl.classList.remove('selected'); }
   updateSummary();
+  saveCartToSession();
 };
 
 // ── Cart total ──
@@ -462,8 +462,8 @@ function showSuccessPage() {
   document.getElementById('successTotal').innerHTML = `<span>Total</span><span>₹${total}</span>`;
   document.getElementById('orderFormView').style.display  = 'none';
   document.getElementById('orderSuccessView').style.display = 'block';
-  document.getElementById('order').scrollIntoView({ behavior: 'smooth' });
 }
+
 
 // ── Reset order ──
 window.resetOrder = function() {

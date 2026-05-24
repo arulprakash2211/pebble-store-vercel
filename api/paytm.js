@@ -1,22 +1,15 @@
-// api/paytm.js — Generate Paytm checksum server-side
-// Merchant key stays secret on the server
-
+// api/paytm.js — Paytm payment initiation
 import crypto from 'crypto';
 
-const PAYTM_MID         = 'LkRexl51254337266716';
+const PAYTM_MID          = 'LkRexl51254337266716';
 const PAYTM_MERCHANT_KEY = process.env.PAYTM_MERCHANT_KEY || '4&s3ImHMGm6nco8Z';
 const PAYTM_WEBSITE      = 'WEBSTAGING';
-const PAYTM_INDUSTRY     = 'Retail';
-const PAYTM_CHANNEL      = 'WEB';
 const PAYTM_TXN_URL      = 'https://securegw-stage.paytm.in/theia/api/v1/initiateTransaction';
 
-// ── Generate checksum ──
-function generateChecksum(params, key) {
-  const sortedKeys = Object.keys(params).sort();
-  const paramStr = sortedKeys.map(k => `${k}=${params[k]}`).join('|');
-  const salt = crypto.randomBytes(4).toString('hex');
-  const hashed = crypto.createHmac('sha256', key).update(paramStr + '|' + salt).digest('hex');
-  return hashed + salt;
+// ── Paytm checksum generation (official algorithm) ──
+function generateSignature(body, key) {
+  const data = JSON.stringify(body);
+  return crypto.createHmac('sha256', key).update(data).digest('base64');
 }
 
 export default async function handler(req, res) {
@@ -26,61 +19,68 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { orderId, amount, customerId, customerPhone, customerEmail } = req.body;
-  if (!orderId || !amount) {
-    return res.status(400).json({ error: 'orderId and amount required' });
-  }
-
-  const params = {
-    MID:         PAYTM_MID,
-    WEBSITE:     PAYTM_WEBSITE,
-    INDUSTRY_TYPE_ID: PAYTM_INDUSTRY,
-    CHANNEL_ID:  PAYTM_CHANNEL,
-    ORDER_ID:    orderId,
-    CUST_ID:     customerId || customerPhone || 'CUST_' + Date.now(),
-    MOBILE_NO:   customerPhone || '',
-    EMAIL:       customerEmail || '',
-    TXN_AMOUNT:  amount.toString(),
-    CALLBACK_URL: `${req.headers.origin || 'https://pebble-store-vercel.vercel.app'}/checkout.html?status=callback`,
-  };
-
-  const checksum = generateChecksum(params, PAYTM_MERCHANT_KEY);
-  params.CHECKSUMHASH = checksum;
-
   try {
-    // Initiate transaction with Paytm
-    const response = await fetch(PAYTM_TXN_URL + `?mid=${PAYTM_MID}&orderId=${orderId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        body: {
-          requestType:   'Payment',
-          mid:           PAYTM_MID,
-          websiteName:   PAYTM_WEBSITE,
-          orderId,
-          txnAmount: { value: amount.toString(), currency: 'INR' },
-          userInfo: {
-            custId:    customerId || 'CUST_' + Date.now(),
-            mobile:    customerPhone || '',
-            email:     customerEmail || ''
-          },
-          callbackUrl: params.CALLBACK_URL
-        },
-        head: { signature: checksum }
-      })
-    });
+    const { orderId, amount, customerPhone, customerEmail } = req.body;
+    if (!orderId || !amount) {
+      return res.status(400).json({ error: 'orderId and amount required' });
+    }
+
+    const paytmBody = {
+      requestType: 'Payment',
+      mid:         PAYTM_MID,
+      websiteName: PAYTM_WEBSITE,
+      orderId:     orderId,
+      txnAmount: {
+        value:    parseFloat(amount).toFixed(2),
+        currency: 'INR'
+      },
+      userInfo: {
+        custId: customerPhone || 'CUST_' + Date.now(),
+        mobile: customerPhone || '',
+        email:  customerEmail || ''
+      }
+    };
+
+    const signature = generateSignature(paytmBody, PAYTM_MERCHANT_KEY);
+
+    const response = await fetch(
+      `${PAYTM_TXN_URL}?mid=${PAYTM_MID}&orderId=${orderId}`,
+      {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          body: paytmBody,
+          head: {
+            version:       '2.0',
+            timestamp:     Date.now().toString(),
+            channelId:     'WEB',
+            signature
+          }
+        })
+      }
+    );
 
     const data = await response.json();
+    console.log('Paytm response:', JSON.stringify(data));
+
+    const txnToken = data?.body?.txnToken;
+    if (!txnToken) {
+      return res.status(200).json({
+        success: false,
+        error: data?.body?.resultInfo?.resultMsg || 'Could not get transaction token from Paytm'
+      });
+    }
+
     return res.status(200).json({
-      success: true,
-      txnToken: data?.body?.txnToken,
+      success:  true,
+      txnToken,
       orderId,
       mid:    PAYTM_MID,
-      amount: amount.toString(),
-      params
+      amount: parseFloat(amount).toFixed(2)
     });
+
   } catch (err) {
-    console.error('Paytm init error:', err);
-    return res.status(500).json({ error: 'Failed to initiate payment: ' + err.message });
+    console.error('Paytm error:', err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 }

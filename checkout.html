@@ -129,7 +129,7 @@
     const app = initializeApp(firebaseConfig);
     const db  = getFirestore(app);
 
-    let cart = JSON.parse(sessionStorage.getItem('pebble_cart') || '{}');
+    let cart = JSON.parse(localStorage.getItem('pebble_cart') || '{}');
     let allProducts = [];
     let cartItems = [];
     let cartTotal = 0;
@@ -295,8 +295,8 @@
         if (method === 'paytm') {
           // Save order first as pending
           const orderId = await saveOrderToFirestore(data, 'paytm', 'payment_pending', false);
-          sessionStorage.setItem('pebble_order_id', orderId);
-          sessionStorage.setItem('pebble_customer', JSON.stringify(data));
+          localStorage.setItem('pebble_order_id', orderId);
+          localStorage.setItem('pebble_customer', JSON.stringify(data));
           await initiatePaytm(data, orderId);
 
         } else if (method === 'whatsapp') {
@@ -306,20 +306,21 @@
           cartItems.forEach(i => { msg += `• ${i.name} × ${i.qty} = ₹${i.subtotal}\n`; });
           msg += `\n*Total: ₹${cartTotal}*`;
           if (data.notes) msg += `\n*Notes:* ${data.notes}`;
-          sessionStorage.removeItem('pebble_cart');
+          localStorage.removeItem('pebble_cart');
           window.open(`https://wa.me/918925401892?text=${encodeURIComponent(msg)}`, '_blank');
           showSuccess(data, 'whatsapp');
 
         } else {
           await saveOrderToFirestore(data, 'pay_later', 'new', false);
-          sessionStorage.removeItem('pebble_cart');
+          localStorage.removeItem('pebble_cart');
           showSuccess(data, 'later');
         }
       } catch (err) {
-        document.getElementById('errorMsg').textContent = '⚠️ Something went wrong. Please try again.';
+        console.error('Order error:', err);
+        document.getElementById('errorMsg').textContent = '⚠️ ' + (err.message || 'Something went wrong. Please try again.');
         document.getElementById('errorMsg').style.display = 'block';
         btn.disabled = false;
-        btn.textContent = 'Place Order →';
+        btn.textContent = method === 'paytm' ? 'Pay Now →' : 'Place Order →';
       }
     };
 
@@ -337,7 +338,7 @@
       });
       const paytmData = await res.json();
       if (!paytmData.success || !paytmData.txnToken) {
-        throw new Error('Payment initiation failed: ' + (paytmData.error || 'Unknown error'));
+        throw new Error(paytmData.error || 'Payment initiation failed. Please try another payment method.');
       }
 
       // Open Paytm checkout
@@ -362,7 +363,7 @@
           transactionStatus: function(data) {
             console.log('Transaction status:', data);
             if (data.STATUS === 'TXN_SUCCESS') {
-              sessionStorage.removeItem('pebble_cart');
+              localStorage.removeItem('pebble_cart');
               showSuccess(getFormData(), 'paytm', true);
             } else {
               document.getElementById('errorMsg').textContent = '⚠️ Payment failed or cancelled. Please try again.';
@@ -387,7 +388,7 @@
       // Called after Paytm redirect callback
       const status = params.get('STATUS') || params.get('status');
       if (status === 'TXN_SUCCESS') {
-        sessionStorage.removeItem('pebble_cart');
+        localStorage.removeItem('pebble_cart');
         showSuccess({}, 'paytm', true);
       } else {
         document.getElementById('checkoutContent').innerHTML = `

@@ -212,8 +212,14 @@ async function loadProducts() {
       return;
     }
 
-    const categories = ['All', ...new Set(allProducts.map(p => p.category).filter(Boolean))];
-    filtersEl.innerHTML = categories.map((cat, i) =>
+    // Categories only — no "All" tab, start with Soaps
+    const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))];
+    // Put Soaps first if it exists
+    const sorted = categories.includes('Soaps')
+      ? ['Soaps', ...categories.filter(c => c !== 'Soaps')]
+      : categories;
+
+    filtersEl.innerHTML = sorted.map((cat, i) =>
       `<button class="filter-btn ${i === 0 ? 'active' : ''}" data-cat="${cat}">${cat}</button>`
     ).join('');
 
@@ -221,11 +227,12 @@ async function loadProducts() {
       btn.addEventListener('click', () => {
         filtersEl.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        renderProducts(btn.dataset.cat === 'All' ? allProducts : allProducts.filter(p => p.category === btn.dataset.cat));
+        renderProducts(allProducts.filter(p => p.category === btn.dataset.cat));
       });
     });
 
-    renderProducts(allProducts);
+    // Start with first category (Soaps)
+    renderProducts(allProducts.filter(p => p.category === sorted[0]));
   } catch (err) {
     grid.innerHTML = `<p style="color:var(--clay);grid-column:1/-1">⚠️ Could not load products. Please refresh.</p>`;
     console.error(err);

@@ -6,10 +6,10 @@ const PAYTM_MERCHANT_KEY = process.env.PAYTM_MERCHANT_KEY || '4&s3ImHMGm6nco8Z';
 const PAYTM_WEBSITE      = 'WEBSTAGING';
 const PAYTM_TXN_URL      = 'https://securegw-stage.paytm.in/theia/api/v1/initiateTransaction';
 
-// ── Paytm checksum generation (official algorithm) ──
+// ── Paytm official checksum ──
 function generateSignature(body, key) {
-  const data = JSON.stringify(body);
-  return crypto.createHmac('sha256', key).update(data).digest('base64');
+  const sortedBody = JSON.stringify(body);
+  return crypto.createHmac('sha256', key).update(sortedBody).digest('base64');
 }
 
 export default async function handler(req, res) {
@@ -25,49 +25,60 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'orderId and amount required' });
     }
 
+    // Paytm requires amount as string with 2 decimal places
+    const txnAmount = parseFloat(amount).toFixed(2);
+    const custId    = 'CUST_' + (customerPhone || Date.now()).toString().replace(/\D/g, '').slice(-10);
+
     const paytmBody = {
       requestType: 'Payment',
       mid:         PAYTM_MID,
       websiteName: PAYTM_WEBSITE,
       orderId:     orderId,
       txnAmount: {
-        value:    parseFloat(amount).toFixed(2),
+        value:    txnAmount,
         currency: 'INR'
       },
       userInfo: {
-        custId: customerPhone || 'CUST_' + Date.now(),
-        mobile: customerPhone || '',
-        email:  customerEmail || ''
-      }
+        custId:  custId,
+        mobile:  (customerPhone || '').replace(/\D/g, '').slice(-10),
+        email:   customerEmail || ''
+      },
+      enablePaymentMode: [
+        { mode: 'UPI' },
+        { mode: 'CREDIT_CARD' },
+        { mode: 'DEBIT_CARD' },
+        { mode: 'NET_BANKING' }
+      ]
     };
 
-    const signature = generateSignature(paytmBody, PAYTM_MERCHANT_KEY);
+    const head = {
+      version:   '2.0',
+      timestamp: Date.now().toString(),
+      channelId: 'WEB',
+      signature: generateSignature(paytmBody, PAYTM_MERCHANT_KEY)
+    };
+
+    console.log('Paytm request body:', JSON.stringify(paytmBody));
 
     const response = await fetch(
       `${PAYTM_TXN_URL}?mid=${PAYTM_MID}&orderId=${orderId}`,
       {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          body: paytmBody,
-          head: {
-            version:       '2.0',
-            timestamp:     Date.now().toString(),
-            channelId:     'WEB',
-            signature
-          }
-        })
+        body:    JSON.stringify({ body: paytmBody, head })
       }
     );
 
     const data = await response.json();
     console.log('Paytm response:', JSON.stringify(data));
 
-    const txnToken = data?.body?.txnToken;
+    const resultInfo = data?.body?.resultInfo;
+    const txnToken   = data?.body?.txnToken;
+
     if (!txnToken) {
       return res.status(200).json({
         success: false,
-        error: data?.body?.resultInfo?.resultMsg || 'Could not get transaction token from Paytm'
+        error:   resultInfo?.resultMsg || 'Could not get transaction token'
       });
     }
 
@@ -76,7 +87,7 @@ export default async function handler(req, res) {
       txnToken,
       orderId,
       mid:    PAYTM_MID,
-      amount: parseFloat(amount).toFixed(2)
+      amount: txnAmount
     });
 
   } catch (err) {

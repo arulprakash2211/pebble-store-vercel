@@ -110,9 +110,6 @@
     <p class="footer-copy" style="margin-top:1rem">© 2025 Pebble Store · Made with 🌿 and lots of love</p>
   </footer>
 
-  <!-- Paytm JS SDK -->
-  <script type="text/javascript" src="https://securegw-stage.paytm.in/merchantpgpui/checkoutjs/merchants/LkRexl51254337266716.js" crossorigin="anonymous"></script>
-
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
     import { getFirestore, collection, getDocs, addDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -135,9 +132,9 @@
     let cartTotal = 0;
 
     async function init() {
-      // Check for Paytm callback
+      // Check for Paytm callback redirect
       const params = new URLSearchParams(window.location.search);
-      if (params.get('status') === 'callback') {
+      if (params.get('callback') === '1') {
         handlePaytmCallback(params);
         return;
       }

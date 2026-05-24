@@ -324,8 +324,10 @@
         }
       } catch (err) {
         console.error('Order error:', err);
-        document.getElementById('errorMsg').textContent = '⚠️ ' + (err.message || 'Something went wrong. Please try again.');
-        document.getElementById('errorMsg').style.display = 'block';
+        const errMsg = err?.message || JSON.stringify(err) || 'Unknown error';
+        alert('DEBUG ERROR: ' + errMsg);
+        const errEl = document.getElementById('errorMsg');
+        if (errEl) { errEl.textContent = '⚠️ ' + errMsg; errEl.style.display = 'block'; }
         btn.disabled = false;
         btn.textContent = method === 'paytm' ? 'Pay Now →' : 'Place Order →';
       }

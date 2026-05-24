@@ -150,7 +150,10 @@
     <div class="section active" id="section-orders">
       <div class="page-header">
         <div><div class="page-title">Orders</div><div class="page-sub">All customer orders</div></div>
-        <button class="btn btn-primary" onclick="loadOrders()">↻ Refresh</button>
+        <div style="display:flex;gap:0.6rem">
+          <button class="btn btn-green" onclick="openNewOrderModal()">➕ New Order</button>
+          <button class="btn btn-primary" onclick="loadOrders()">↻ Refresh</button>
+        </div>
       </div>
       <div class="stats-grid">
         <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value" id="statTotal">—</div></div>
@@ -351,6 +354,63 @@
 
   <div class="toast" id="toast"></div>
 
+  <!-- NEW ORDER MODAL -->
+  <div class="modal-overlay" id="newOrderModal">
+    <div class="modal" style="max-width:600px;width:100%">
+      <button class="modal-close" onclick="closeModal('newOrderModal')">×</button>
+      <div class="modal-title">➕ New Manual Order</div>
+
+      <!-- Customer Details -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:1rem">
+        <div class="mfg"><label>Customer Name *</label><input id="noName" placeholder="Full name"/></div>
+        <div class="mfg"><label>Phone *</label><input id="noPhone" placeholder="+91 00000 00000"/></div>
+        <div class="mfg" style="grid-column:1/-1"><label>Address</label><input id="noAddress" placeholder="Delivery address"/></div>
+        <div class="mfg"><label>Email</label><input id="noEmail" type="email" placeholder="email@example.com"/></div>
+        <div class="mfg"><label>Notes</label><input id="noNotes" placeholder="Special instructions"/></div>
+      </div>
+
+      <!-- Product Selection -->
+      <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--stone);font-weight:500;margin-bottom:0.6rem">Products</div>
+      <div id="noProductRows" style="margin-bottom:0.8rem"></div>
+      <button class="btn btn-ghost btn-sm" onclick="addOrderProductRow()" style="margin-bottom:1rem;width:100%">➕ Add Product</button>
+
+      <!-- Order Summary -->
+      <div style="background:var(--cream);padding:0.8rem 1rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:0.82rem;color:var(--stone)">Order Total</span>
+        <span id="noTotal" style="font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--moss);font-weight:600">₹0</span>
+      </div>
+
+      <!-- Payment & Discount -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.8rem;margin-bottom:1rem">
+        <div class="mfg">
+          <label>Discount (₹)</label>
+          <input id="noDiscount" type="number" value="0" min="0" oninput="recalcNewOrder()"/>
+        </div>
+        <div class="mfg">
+          <label>Payment Status</label>
+          <select id="noPaid">
+            <option value="false">Unpaid</option>
+            <option value="true">Paid</option>
+          </select>
+        </div>
+        <div class="mfg">
+          <label>Order Status</label>
+          <select id="noStatus">
+            <option value="confirmed">Confirmed</option>
+            <option value="new">New</option>
+            <option value="dispatched">Dispatched</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="noMsg" style="font-size:0.8rem;margin-bottom:0.8rem;display:none"></div>
+      <div style="display:flex;gap:0.8rem">
+        <button class="btn btn-primary" style="flex:1" onclick="saveNewOrder()">💾 Save Order</button>
+        <button class="btn btn-ghost" onclick="closeModal('newOrderModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
@@ -446,7 +506,7 @@
           }
           return `<tr>
             <td style="white-space:nowrap;font-size:0.78rem">${date}</td>
-            <td><strong>${o.name}</strong><br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
+            <td><strong>${o.name}</strong>${isAdmin ? ' <span style="font-size:0.62rem;background:#e8d5ff;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">ADMIN</span>' : ''}<br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
             <td>${o.phone}</td>
             <td class="order-items">${items}</td>
             <td><strong>₹${o.total}</strong></td>
@@ -951,7 +1011,127 @@
       toast(`✅ CSV imported: ${added} added, ${updated} updated`);
     };
 
-    ['dispatchModal','stockModal'].forEach(id => {
+    // ══════════════════════════════
+    // MANUAL ORDER
+    // ══════════════════════════════
+    let noProducts = []; // products for new order rows
+
+    window.openNewOrderModal = async () => {
+      // Load products if not loaded
+      if (!allProducts.length) {
+        const snap = await getDocs(collection(db, 'products'));
+        allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+      noProducts = allProducts;
+      // Reset form
+      ['noName','noPhone','noAddress','noEmail','noNotes'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('noDiscount').value = 0;
+      document.getElementById('noPaid').value = 'false';
+      document.getElementById('noStatus').value = 'confirmed';
+      document.getElementById('noProductRows').innerHTML = '';
+      document.getElementById('noTotal').textContent = '₹0';
+      document.getElementById('noMsg').style.display = 'none';
+      addOrderProductRow();
+      document.getElementById('newOrderModal').classList.add('open');
+    };
+
+    window.addOrderProductRow = () => {
+      const container = document.getElementById('noProductRows');
+      const idx = container.children.length;
+      const opts = noProducts.map(p =>
+        `<option value="${p.id}" data-price="${p.price}">${p.name} — ₹${p.price}</option>`
+      ).join('');
+      const row = document.createElement('div');
+      row.style.cssText = 'display:grid;grid-template-columns:1fr 80px 80px 32px;gap:0.5rem;margin-bottom:0.5rem;align-items:center';
+      row.innerHTML = `
+        <select class="no-product-select" onchange="recalcNewOrder()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0;width:100%">
+          ${opts}
+        </select>
+        <input type="number" class="no-qty-input" value="1" min="1" oninput="recalcNewOrder()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;text-align:center;width:100%"/>
+        <span class="no-row-total" style="font-size:0.85rem;font-weight:600;color:var(--moss);text-align:right">₹0</span>
+        <button onclick="this.parentElement.remove();recalcNewOrder()" style="background:#c0392b;color:white;border:none;cursor:pointer;width:28px;height:28px;font-size:1rem;display:flex;align-items:center;justify-content:center">×</button>`;
+      container.appendChild(row);
+      recalcNewOrder();
+    };
+
+    window.recalcNewOrder = () => {
+      let subtotal = 0;
+      document.querySelectorAll('#noProductRows > div').forEach(row => {
+        const sel = row.querySelector('.no-product-select');
+        const qty = parseInt(row.querySelector('.no-qty-input').value) || 0;
+        const price = parseFloat(sel.selectedOptions[0]?.dataset.price) || 0;
+        const lineTotal = price * qty;
+        row.querySelector('.no-row-total').textContent = `₹${lineTotal}`;
+        subtotal += lineTotal;
+      });
+      const discount = parseFloat(document.getElementById('noDiscount').value) || 0;
+      const total = Math.max(0, subtotal - discount);
+      document.getElementById('noTotal').textContent = `₹${total}`;
+    };
+
+    window.saveNewOrder = async () => {
+      const name    = document.getElementById('noName').value.trim();
+      const phone   = document.getElementById('noPhone').value.trim();
+      const msg     = document.getElementById('noMsg');
+
+      if (!name || !phone) {
+        msg.textContent = '⚠️ Name and phone are required.';
+        msg.style.cssText = 'display:block;color:#c0392b;font-size:0.8rem';
+        return;
+      }
+
+      const rows = document.querySelectorAll('#noProductRows > div');
+      if (!rows.length) {
+        msg.textContent = '⚠️ Add at least one product.';
+        msg.style.cssText = 'display:block;color:#c0392b;font-size:0.8rem';
+        return;
+      }
+
+      const items = [];
+      rows.forEach(row => {
+        const sel   = row.querySelector('.no-product-select');
+        const qty   = parseInt(row.querySelector('.no-qty-input').value) || 0;
+        const price = parseFloat(sel.selectedOptions[0]?.dataset.price) || 0;
+        const id    = sel.value;
+        const name  = sel.selectedOptions[0]?.text.split(' — ')[0] || '';
+        if (qty > 0) items.push({ id, name, price, qty, subtotal: price * qty });
+      });
+
+      const discount = parseFloat(document.getElementById('noDiscount').value) || 0;
+      const subtotal = items.reduce((s, i) => s + i.subtotal, 0);
+      const total    = Math.max(0, subtotal - discount);
+
+      msg.textContent = 'Saving…';
+      msg.style.cssText = 'display:block;color:var(--moss);font-size:0.8rem';
+
+      try {
+        await addDoc(collection(db, 'orders'), {
+          name,
+          phone,
+          email:     document.getElementById('noEmail').value.trim(),
+          address:   document.getElementById('noAddress').value.trim(),
+          notes:     document.getElementById('noNotes').value.trim(),
+          items,
+          subtotal,
+          discount,
+          total,
+          status:    document.getElementById('noStatus').value,
+          paid:      document.getElementById('noPaid').value === 'true',
+          source:    'admin',   // marks as manual/admin order
+          tracking:  null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+        toast('✅ Order saved!');
+        closeModal('newOrderModal');
+        loadOrders();
+      } catch (err) {
+        msg.textContent = '❌ Error: ' + err.message;
+        msg.style.cssText = 'display:block;color:#c0392b;font-size:0.8rem';
+      }
+    };
+
+    ['dispatchModal','stockModal','newOrderModal'].forEach(id => {
       document.getElementById(id).addEventListener('click', e => { if (e.target === document.getElementById(id)) closeModal(id); });
     });
   </script>

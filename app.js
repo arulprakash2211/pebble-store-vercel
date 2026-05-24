@@ -282,7 +282,7 @@ function renderProducts(products) {
     const qty = cart[p.id] || 0;
     const slug = p.variantGroup || p.id;
     return `
-      <div class="product-card" data-id="${p.id}" style="cursor:pointer" onclick="window.location.href='/product/${slug}'">
+      <div class="product-card" data-id="${p.id}">
         <div class="product-img ${p.colorClass || 'pi1'}">
           <div class="pat"></div>
           ${p.image ? `<img src="${p.image}" alt="${p.name}" onerror="this.style.display='none'" />` : ''}

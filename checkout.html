@@ -297,10 +297,14 @@
       try {
         if (method === 'paytm') {
           // Save order first as pending
+          console.log('Step 1: saving order to Firestore...');
           const orderId = await saveOrderToFirestore(data, 'paytm', 'payment_pending', false);
+          console.log('Step 2: order saved, orderId =', orderId);
           localStorage.setItem('pebble_order_id', orderId);
           localStorage.setItem('pebble_customer', JSON.stringify(data));
+          console.log('Step 3: initiating Paytm...');
           await initiatePaytm(data, orderId);
+          console.log('Step 4: Paytm form submitted');
 
         } else if (method === 'whatsapp') {
           await saveOrderToFirestore(data, 'whatsapp', 'new', false);

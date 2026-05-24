@@ -134,8 +134,14 @@
     async function init() {
       // Check for Paytm callback redirect
       const params = new URLSearchParams(window.location.search);
-      if (params.get('callback') === '1') {
-        handlePaytmCallback(params);
+      const cbStatus = params.get('status');
+      if (cbStatus === 'success') {
+        localStorage.removeItem('pebble_cart');
+        showSuccess({}, 'paytm', true);
+        return;
+      }
+      if (cbStatus === 'failed') {
+        showPaymentFailed();
         return;
       }
 

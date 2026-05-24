@@ -381,7 +381,11 @@
       </div>
 
       <!-- Payment & Discount -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.8rem;margin-bottom:1rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0.8rem;margin-bottom:1rem">
+        <div class="mfg">
+          <label>Shipping (₹)</label>
+          <input id="noShipping" type="number" value="0" min="0" oninput="recalcNewOrder()"/>
+        </div>
         <div class="mfg">
           <label>Discount (₹)</label>
           <input id="noDiscount" type="number" value="0" min="0" oninput="recalcNewOrder()"/>
@@ -506,7 +510,7 @@
           }
           return `<tr>
             <td style="white-space:nowrap;font-size:0.78rem">${date}</td>
-            <td><strong>${o.name}</strong>${isAdmin ? ' <span style="font-size:0.62rem;background:#e8d5ff;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">ADMIN</span>' : ''}<br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
+            <td><strong>${o.name}</strong>${o.source === 'admin' ? ' <span style="font-size:0.62rem;background:#e8d5ff;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">ADMIN</span>' : ''}<br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
             <td>${o.phone}</td>
             <td class="order-items">${items}</td>
             <td><strong>₹${o.total}</strong></td>
@@ -1025,6 +1029,7 @@
       noProducts = allProducts;
       // Reset form
       ['noName','noPhone','noAddress','noEmail','noNotes'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('noShipping').value = 0;
       document.getElementById('noDiscount').value = 0;
       document.getElementById('noPaid').value = 'false';
       document.getElementById('noStatus').value = 'confirmed';
@@ -1064,8 +1069,9 @@
         row.querySelector('.no-row-total').textContent = `₹${lineTotal}`;
         subtotal += lineTotal;
       });
-      const discount = parseFloat(document.getElementById('noDiscount').value) || 0;
-      const total = Math.max(0, subtotal - discount);
+      const shipping  = parseFloat(document.getElementById('noShipping').value) || 0;
+      const discount  = parseFloat(document.getElementById('noDiscount').value) || 0;
+      const total     = Math.max(0, subtotal + shipping - discount);
       document.getElementById('noTotal').textContent = `₹${total}`;
     };
 
@@ -1113,6 +1119,7 @@
           notes:     document.getElementById('noNotes').value.trim(),
           items,
           subtotal,
+          shipping,
           discount,
           total,
           status:    document.getElementById('noStatus').value,

@@ -479,11 +479,13 @@ function buildWhatsAppQueryUrl() {
 
 // ── Payment button (order form submit) ──
 // TODO: Replace saveOrder() with Razorpay payment initiation when ready
-document.getElementById('orderForm').addEventListener('submit', async function(e) {
+const orderFormEl = document.getElementById('orderForm');
+if (orderFormEl) orderFormEl.addEventListener('submit', async function(e) {
   e.preventDefault();
   if (!validateOrder()) return;
 
   const btn = document.getElementById('placeOrderBtn');
+  if (!btn) return;
   btn.style.opacity = '0.7';
   btn.style.pointerEvents = 'none';
   btn.querySelector('.btn-sub').textContent = 'Placing order…';
@@ -510,7 +512,8 @@ document.getElementById('orderForm').addEventListener('submit', async function(e
 const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
 let waQrGenerated = false;
 
-document.getElementById('whatsappBtn').addEventListener('click', function() {
+const whatsappBtnEl = document.getElementById('whatsappBtn');
+if (whatsappBtnEl) whatsappBtnEl.addEventListener('click', function() {
   if (isMobile) {
     // Mobile → open WhatsApp directly
     window.open(buildWhatsAppQueryUrl(), '_blank');

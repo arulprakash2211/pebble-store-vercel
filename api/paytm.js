@@ -1,16 +1,8 @@
-// api/paytm.js — Paytm payment initiation
 import crypto from 'crypto';
 
 const PAYTM_MID          = 'LkRexl51254337266716';
 const PAYTM_MERCHANT_KEY = process.env.PAYTM_MERCHANT_KEY || '4&s3ImHMGm6nco8Z';
 const PAYTM_WEBSITE      = 'WEBSTAGING';
-const PAYTM_TXN_URL      = 'https://securegw-stage.paytm.in/theia/api/v1/initiateTransaction';
-
-// ── Paytm official checksum ──
-function generateSignature(body, key) {
-  const sortedBody = JSON.stringify(body);
-  return crypto.createHmac('sha256', key).update(sortedBody).digest('base64');
-}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -21,74 +13,54 @@ export default async function handler(req, res) {
 
   try {
     const { orderId, amount, customerPhone, customerEmail } = req.body;
-    if (!orderId || !amount) {
-      return res.status(400).json({ error: 'orderId and amount required' });
-    }
+    if (!orderId || !amount) return res.status(400).json({ error: 'orderId and amount required' });
 
-    // Paytm requires amount as string with 2 decimal places
-    const txnAmount = parseFloat(amount).toFixed(2);
-    const custId    = 'CUST_' + (customerPhone || Date.now()).toString().replace(/\D/g, '').slice(-10);
+    const txnAmt = parseFloat(amount).toFixed(2);
+    const phone  = (customerPhone || '').replace(/\D/g, '').slice(-10);
+    const custId = 'CUST' + (phone || Date.now().toString().slice(-10));
 
     const paytmBody = {
       requestType: 'Payment',
       mid:         PAYTM_MID,
       websiteName: PAYTM_WEBSITE,
       orderId:     orderId,
-      txnAmount: {
-        value:    txnAmount,
-        currency: 'INR'
-      },
-      userInfo: {
-        custId:  custId,
-        mobile:  (customerPhone || '').replace(/\D/g, '').slice(-10),
-        email:   customerEmail || ''
-      },
-      enablePaymentMode: [
-        { mode: 'UPI' },
-        { mode: 'CREDIT_CARD' },
-        { mode: 'DEBIT_CARD' },
-        { mode: 'NET_BANKING' }
-      ]
+      txnAmount:   { value: txnAmt, currency: 'INR' },
+      userInfo:    { custId, mobile: phone, email: customerEmail || '' }
     };
 
-    const head = {
-      version:   '2.0',
-      timestamp: Date.now().toString(),
-      channelId: 'WEB',
-      signature: generateSignature(paytmBody, PAYTM_MERCHANT_KEY)
-    };
+    // ── Correct signature: HMAC-SHA256 of JSON body string ──
+    const bodyString  = JSON.stringify(paytmBody);
+    const signature   = crypto.createHmac('sha256', PAYTM_MERCHANT_KEY)
+                              .update(bodyString)
+                              .digest('base64');
 
-    console.log('Paytm request body:', JSON.stringify(paytmBody));
+    console.log('Body string:', bodyString);
+    console.log('Signature:', signature);
 
     const response = await fetch(
-      `${PAYTM_TXN_URL}?mid=${PAYTM_MID}&orderId=${orderId}`,
+      `https://securegw-stage.paytm.in/theia/api/v1/initiateTransaction?mid=${PAYTM_MID}&orderId=${orderId}`,
       {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ body: paytmBody, head })
+        body:    JSON.stringify({
+          body: paytmBody,
+          head: { signature }
+        })
       }
     );
 
     const data = await response.json();
     console.log('Paytm response:', JSON.stringify(data));
 
-    const resultInfo = data?.body?.resultInfo;
-    const txnToken   = data?.body?.txnToken;
-
+    const txnToken = data?.body?.txnToken;
     if (!txnToken) {
       return res.status(200).json({
         success: false,
-        error:   resultInfo?.resultMsg || 'Could not get transaction token'
+        error:   data?.body?.resultInfo?.resultMsg || 'Failed to get token'
       });
     }
 
-    return res.status(200).json({
-      success:  true,
-      txnToken,
-      orderId,
-      mid:    PAYTM_MID,
-      amount: txnAmount
-    });
+    return res.status(200).json({ success: true, txnToken, orderId, mid: PAYTM_MID, amount: txnAmt });
 
   } catch (err) {
     console.error('Paytm error:', err);

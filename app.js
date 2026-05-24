@@ -195,11 +195,32 @@ function saveCartToSession() {
 }
 
 function updateCartNav() {
-  const count = Object.values(cart).filter(q => q > 0).reduce((s, q) => s + q, 0);
+  const items = Object.entries(cart).filter(([, q]) => q > 0);
+  const count = items.reduce((s, [, q]) => s + q, 0);
+  const total = items.reduce((sum, [id, qty]) => {
+    const p = allProducts.find(x => x.id === id);
+    return sum + (p ? p.price * qty : 0);
+  }, 0);
+
+  // Nav badge
   const el = document.getElementById('cartNavCount');
   if (el) {
     el.textContent = count;
     el.style.display = count > 0 ? 'inline-flex' : 'none';
+  }
+
+  // Sticky cart bar
+  const bar = document.getElementById('cartBar');
+  if (bar) {
+    if (count > 0) {
+      bar.style.display = 'flex';
+      const infoEl = document.getElementById('cartBarInfo');
+      const totalEl = document.getElementById('cartBarTotal');
+      if (infoEl) infoEl.textContent = `${count} item${count > 1 ? 's' : ''} in cart`;
+      if (totalEl) totalEl.textContent = `₹${total}`;
+    } else {
+      bar.style.display = 'none';
+    }
   }
 }
 
@@ -243,6 +264,7 @@ async function loadProducts() {
 
     // Start with first category (Soaps)
     renderProducts(allProducts.filter(p => p.category === sorted[0]));
+    updateCartNav();
   } catch (err) {
     grid.innerHTML = `<p style="color:var(--clay);grid-column:1/-1">⚠️ Could not load products. Please refresh.</p>`;
     console.error(err);

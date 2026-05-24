@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Your Cart – Pebble Store</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/style.css"/>
+  <style>
+    .cart-page{min-height:100vh;padding:7rem 2rem 4rem;background:var(--cream)}
+    .cart-inner{max-width:860px;margin:0 auto}
+    .cart-title{font-family:'Playfair Display',serif;font-size:2rem;color:var(--dark);margin-bottom:0.3rem}
+    .cart-sub{font-size:0.85rem;color:var(--light-text);margin-bottom:2rem}
+    .cart-layout{display:grid;grid-template-columns:1fr 320px;gap:2rem;align-items:start}
+    /* CART ITEMS */
+    .cart-items{background:var(--warm-white)}
+    .cart-item{display:grid;grid-template-columns:64px 1fr auto;gap:1rem;padding:1.2rem;border-bottom:1px solid rgba(92,61,46,0.08);align-items:center}
+    .cart-item:last-child{border-bottom:none}
+    .cart-item-img{width:64px;height:64px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0;position:relative;overflow:hidden}
+    .cart-item-img img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
+    .cart-item-img .emoji{position:relative;z-index:1}
+    .cart-item-name{font-family:'Playfair Display',serif;font-size:0.95rem;color:var(--dark);margin-bottom:0.2rem}
+    .cart-item-cat{font-size:0.72rem;color:var(--clay);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:0.5rem}
+    .cart-item-price{font-size:0.88rem;color:var(--moss);font-weight:500}
+    .cart-item-actions{display:flex;align-items:center;gap:0.5rem;flex-direction:column;align-items:flex-end}
+    .qty-control-cart{display:flex;align-items:center;border:1.5px solid rgba(92,61,46,0.2)}
+    .qty-btn-cart{width:28px;height:28px;background:transparent;border:none;color:var(--bark);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s}
+    .qty-btn-cart:hover{background:var(--bark);color:var(--cream)}
+    .qty-num-cart{width:32px;text-align:center;font-size:0.85rem;font-weight:500;border-left:1px solid rgba(92,61,46,0.15);border-right:1px solid rgba(92,61,46,0.15);height:28px;line-height:28px}
+    .item-total{font-size:0.9rem;font-weight:600;color:var(--dark)}
+    .remove-btn{background:none;border:none;color:var(--light-text);cursor:pointer;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;transition:color 0.2s}
+    .remove-btn:hover{color:#c0392b}
+    /* ORDER SUMMARY */
+    .order-summary-cart{background:var(--warm-white);padding:1.5rem;position:sticky;top:7rem}
+    .summary-title{font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--dark);margin-bottom:1.2rem}
+    .summary-row{display:flex;justify-content:space-between;font-size:0.88rem;color:var(--light-text);margin-bottom:0.7rem}
+    .summary-row.total{font-size:1rem;font-weight:600;color:var(--dark);padding-top:0.8rem;border-top:1.5px solid rgba(92,61,46,0.15);margin-top:0.5rem}
+    .summary-row.total span:last-child{color:var(--moss);font-family:'Playfair Display',serif;font-size:1.1rem}
+    .checkout-btn-main{width:100%;padding:1rem;background:var(--bark);color:var(--cream);border:none;font-family:'Jost',sans-serif;font-size:0.85rem;letter-spacing:0.12em;text-transform:uppercase;font-weight:500;cursor:pointer;transition:background 0.2s;margin-top:1rem}
+    .checkout-btn-main:hover{background:var(--dark)}
+    .whatsapp-btn-cart{width:100%;padding:0.8rem;background:#25D366;color:white;border:none;font-family:'Jost',sans-serif;font-size:0.82rem;letter-spacing:0.1em;text-transform:uppercase;font-weight:500;cursor:pointer;transition:background 0.2s;margin-top:0.6rem;display:flex;align-items:center;justify-content:center;gap:0.5rem}
+    .whatsapp-btn-cart:hover{background:#1da851}
+    .continue-link{display:block;text-align:center;margin-top:1rem;font-size:0.78rem;color:var(--stone);text-decoration:none;transition:color 0.2s}
+    .continue-link:hover{color:var(--bark)}
+    .empty-cart{text-align:center;padding:4rem 2rem;color:var(--light-text)}
+    .empty-cart-icon{font-size:4rem;margin-bottom:1rem}
+    .empty-cart p{font-size:0.95rem;margin-bottom:1.5rem}
+    @media(max-width:768px){
+      .cart-layout{grid-template-columns:1fr}
+      .order-summary-cart{position:static}
+      .cart-page{padding:6rem 1rem 5rem}
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a class="nav-logo" href="/"><img src="/images/logo.png" alt="Pebble Store" style="height:80px;object-fit:contain;vertical-align:middle"/></a>
+    <ul class="nav-links">
+      <li><a href="/">Shop</a></li>
+      <li><a href="/cart.html" style="color:var(--bark)">Cart <span id="navCartCount" style="background:var(--bark);color:white;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:0.65rem;margin-left:2px">0</span></a></li>
+      <li><a href="/track.html">Track</a></li>
+    </ul>
+  </nav>
+
+  <div class="cart-page">
+    <div class="cart-inner">
+      <h1 class="cart-title">Your Cart</h1>
+      <p class="cart-sub" id="cartSubtitle">Loading…</p>
+
+      <div id="cartContent"></div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-logo"><img src="/images/logo.png" alt="Pebble Store" style="height:70px;object-fit:contain;filter:brightness(0) invert(1);opacity:0.85"/></div>
+    <div class="footer-links">
+      <a href="/">Shop</a><a href="/cart.html">Cart</a><a href="/track.html">Track</a>
+    </div>
+    <div class="footer-links" style="margin-top:0.8rem;font-size:0.72rem;opacity:0.7">
+      <a href="/privacy.html">Privacy Policy</a>
+      <a href="/terms.html">Terms & Conditions</a>
+      <a href="/shipping.html">Shipping Policy</a>
+      <a href="/refund.html">Refund Policy</a>
+    </div>
+    <p class="footer-copy" style="margin-top:1rem">© 2025 Pebble Store · Made with 🌿 and lots of love</p>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
+      authDomain: "pebble-store-70889.firebaseapp.com",
+      projectId: "pebble-store-70889",
+      storageBucket: "pebble-store-70889.firebasestorage.app",
+      messagingSenderId: "611731436877",
+      appId: "1:611731436877:web:eee0ef64cd8b4b86467304"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+
+    const WHATSAPP = '918925401892';
+    let cart = JSON.parse(sessionStorage.getItem('pebble_cart') || '{}');
+    let allProducts = [];
+
+    function saveCart() { sessionStorage.setItem('pebble_cart', JSON.stringify(cart)); }
+
+    async function init() {
+      const snap = await getDocs(collection(db, 'products'));
+      allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      render();
+    }
+
+    function render() {
+      const items = Object.entries(cart).filter(([, q]) => q > 0);
+      const count = items.reduce((s, [, q]) => s + q, 0);
+      document.getElementById('navCartCount').textContent = count;
+
+      if (!items.length) {
+        document.getElementById('cartSubtitle').textContent = 'Your cart is empty';
+        document.getElementById('cartContent').innerHTML = `
+          <div class="empty-cart">
+            <div class="empty-cart-icon">🛒</div>
+            <p>You haven't added anything yet.</p>
+            <a href="/" class="btn btn-primary" style="display:inline-block;text-decoration:none">← Continue Shopping</a>
+          </div>`;
+        return;
+      }
+
+      document.getElementById('cartSubtitle').textContent = `${count} item${count > 1 ? 's' : ''} in your cart`;
+
+      let subtotal = 0;
+      const rows = items.map(([id, qty]) => {
+        const p = allProducts.find(x => x.id === id);
+        if (!p) return '';
+        const lineTotal = p.price * qty;
+        subtotal += lineTotal;
+        return `<div class="cart-item">
+          <div class="cart-item-img ${p.colorClass || 'pi1'}">
+            ${p.image ? `<img src="${p.image}" onerror="this.style.display='none'"/>` : ''}
+            <span class="emoji">${p.emoji || '🧼'}</span>
+          </div>
+          <div>
+            <div class="cart-item-name">${p.name}</div>
+            <div class="cart-item-cat">${p.category || ''}</div>
+            <div class="cart-item-price">₹${p.price} each</div>
+          </div>
+          <div class="cart-item-actions">
+            <div class="qty-control-cart">
+              <button class="qty-btn-cart" onclick="changeQty('${id}', -1)">−</button>
+              <span class="qty-num-cart" id="qty-${id}">${qty}</span>
+              <button class="qty-btn-cart" onclick="changeQty('${id}', 1)">+</button>
+            </div>
+            <div class="item-total">₹${lineTotal}</div>
+            <button class="remove-btn" onclick="removeItem('${id}')">Remove</button>
+          </div>
+        </div>`;
+      }).join('');
+
+      document.getElementById('cartContent').innerHTML = `
+        <div class="cart-layout">
+          <div class="cart-items">${rows}</div>
+          <div class="order-summary-cart">
+            <div class="summary-title">Order Summary</div>
+            <div class="summary-row"><span>${count} item${count > 1 ? 's' : ''}</span><span>₹${subtotal}</span></div>
+            <div class="summary-row"><span>Shipping</span><span>Calculated at checkout</span></div>
+            <div class="summary-row total"><span>Total</span><span>₹${subtotal}</span></div>
+            <button class="checkout-btn-main" onclick="goCheckout()">Proceed to Checkout →</button>
+            <button class="whatsapp-btn-cart" onclick="whatsappOrder()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              Order via WhatsApp
+            </button>
+            <a class="continue-link" href="/">← Continue Shopping</a>
+          </div>
+        </div>`;
+    }
+
+    window.changeQty = (id, delta) => {
+      const newQty = Math.max(0, (cart[id] || 0) + delta);
+      if (newQty === 0) delete cart[id]; else cart[id] = newQty;
+      saveCart(); render();
+    };
+
+    window.removeItem = (id) => { delete cart[id]; saveCart(); render(); };
+
+    window.goCheckout = () => { window.location.href = '/checkout.html'; };
+
+    window.whatsappOrder = () => {
+      const items = Object.entries(cart).filter(([, q]) => q > 0);
+      let total = 0;
+      let msg = '🛒 *New Order – Pebble Store*\n\n*Items:*\n';
+      items.forEach(([id, qty]) => {
+        const p = allProducts.find(x => x.id === id);
+        if (p) { msg += `• ${p.name} × ${qty} = ₹${p.price * qty}\n`; total += p.price * qty; }
+      });
+      msg += `\n*Total: ₹${total}*\n\nPlease confirm my order!`;
+      window.open(`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(msg)}`, '_blank');
+    };
+
+    init();
+  </script>
+</body>
+</html>

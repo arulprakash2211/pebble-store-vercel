@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     const phone   = (customerPhone || '').replace(/\D/g, '').slice(-10);
     const custId  = 'CUST' + (phone || Date.now().toString().slice(-10));
     const origin  = req.headers.origin || 'https://pebble-store-vercel.vercel.app';
-    const callback = `${origin}/checkout.html?callback=1&orderId=${orderId}`;
+    const callback = `${origin}/api/paytm-callback?orderId=${orderId}`;
 
     // Only include params Paytm expects — no extras
     const params = {

@@ -191,6 +191,16 @@ function syncCartFromSession() {
 
 function saveCartToSession() {
   sessionStorage.setItem('pebble_cart', JSON.stringify(cart));
+  updateCartNav();
+}
+
+function updateCartNav() {
+  const count = Object.values(cart).filter(q => q > 0).reduce((s, q) => s + q, 0);
+  const el = document.getElementById('cartNavCount');
+  if (el) {
+    el.textContent = count;
+    el.style.display = count > 0 ? 'inline-flex' : 'none';
+  }
 }
 
 // ── Init ──

@@ -798,12 +798,60 @@
 
     window.loadBulkTable = async () => {
       const tbody = document.getElementById('bulkTableBody');
-      tbody.innerHTML = '<tr><td colspan="9" class="loading">Loading…</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="11" class="loading">Loading…</td></tr>';
       try {
-        const snap = await getDocs(collection(db, 'products'));
+        const snap  = await getDocs(collection(db, 'products'));
         allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        tbody.innerHTML = allProducts.map(p => bulkRow(p)).join('');
-      } catch (err) { tbody.innerHTML = `<tr><td colspan="9" class="loading">Error: ${err.message}</td></tr>`; }
+
+        // Populate category dropdown
+        const cats   = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
+        const catSel = document.getElementById('bulkFilterCat');
+        if (catSel) {
+          const current = catSel.value;
+          catSel.innerHTML = '<option value="">All Categories</option>' +
+            cats.map(c => `<option value="${c}" ${c === current ? 'selected' : ''}>${c}</option>`).join('');
+        }
+
+        applyBulkFilter();
+      } catch (err) {
+        document.getElementById('bulkTableBody').innerHTML =
+          `<tr><td colspan="11" class="loading">Error: ${err.message}</td></tr>`;
+      }
+    };
+
+    window.applyBulkFilter = () => {
+      const search    = (document.getElementById('bulkSearch')?.value || '').toLowerCase().trim();
+      const filterCat = document.getElementById('bulkFilterCat')?.value || '';
+      const filterVis = document.getElementById('bulkFilterHidden')?.value || '';
+      const sortField = document.getElementById('bulkSort')?.value || 'name';
+
+      let filtered = [...allProducts];
+
+      if (search) filtered = filtered.filter(p =>
+        (p.name     || '').toLowerCase().includes(search) ||
+        (p.category || '').toLowerCase().includes(search) ||
+        (p.tag      || '').toLowerCase().includes(search)
+      );
+      if (filterCat)             filtered = filtered.filter(p => p.category === filterCat);
+      if (filterVis === 'visible') filtered = filtered.filter(p => !p.hidden);
+      if (filterVis === 'hidden')  filtered = filtered.filter(p =>  p.hidden);
+
+      filtered.sort((a, b) => {
+        if (sortField === 'name')       return (a.name || '').localeCompare(b.name || '');
+        if (sortField === 'name-desc')  return (b.name || '').localeCompare(a.name || '');
+        if (sortField === 'price-asc')  return (a.price || 0) - (b.price || 0);
+        if (sortField === 'price-desc') return (b.price || 0) - (a.price || 0);
+        if (sortField === 'cat')        return (a.category || '').localeCompare(b.category || '');
+        return 0;
+      });
+
+      const tbody = document.getElementById('bulkTableBody');
+      tbody.innerHTML = filtered.length
+        ? filtered.map(p => bulkRow(p)).join('')
+        : '<tr><td colspan="11" style="text-align:center;padding:1.5rem;color:var(--stone);font-style:italic">No products match.</td></tr>';
+
+      const countEl = document.getElementById('bulkCount');
+      if (countEl) countEl.textContent = `${filtered.length} of ${allProducts.length} products`;
     };
 
     window.markChanged = (el) => {

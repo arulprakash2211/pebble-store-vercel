@@ -295,14 +295,11 @@
     }
 
     window.placeOrder = async () => {
-      alert('placeOrder called');
       const data   = getFormData();
-      alert('data: ' + JSON.stringify(data));
-      if (!validate(data)) { alert('validation failed'); return; }
+      if (!validate(data)) return;
       const method = document.querySelector('input[name="payment"]:checked')?.value;
-      alert('method: ' + method);
       const btn    = document.getElementById('placeOrderBtn');
-      if (!btn) { alert('btn not found'); return; }
+      if (!btn) return;
       btn.disabled = true;
       btn.textContent = 'Processing…';
 
@@ -311,7 +308,7 @@
           let orderId;
           try {
             console.log('Step 1: saving to Firestore');
-            orderId = await saveOrderToFirestore(data, 'paytm', 'payment_pending', false);
+            orderId = await saveOrderToFirestore(data, 'razorpay', 'payment_pending', false);
             console.log('Step 2: saved, orderId=', orderId);
           } catch(e) {
             alert('FIRESTORE ERROR: ' + e.message);
@@ -321,7 +318,7 @@
           localStorage.setItem('pebble_customer', JSON.stringify(data));
           try {
             console.log('Step 3: calling Paytm API');
-            await initiatePaytm(data, orderId);
+            await initiateRazorpay(data, orderId);
             console.log('Step 4: form submitted');
           } catch(e) {
             alert('PAYTM API ERROR: ' + e.message);
@@ -355,33 +352,48 @@
       }
     };
 
-    async function initiatePaytm(data, orderId) {
-      const res = await fetch('/api/paytm', {
-        method: 'POST',
+    async function initiateRazorpay(data, orderId) {
+      const res = await fetch('/api/razorpay', {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId,
-          amount:        cartTotal.toString(),
-          customerPhone: data.phone,
-          customerEmail: data.email
-        })
+        body:    JSON.stringify({ orderId, amount: cartTotal.toString() })
       });
-      const paytmData = await res.json();
-      console.log('Paytm data:', paytmData);
-      if (!paytmData.success || !paytmData.params) {
-        throw new Error(paytmData.error || 'Payment initiation failed.');
+      const rzData = await res.json();
+      console.log('Razorpay order:', rzData);
+      if (!rzData.success || !rzData.razorpayOrderId) {
+        throw new Error(rzData.error || 'Payment initiation failed. Please try again.');
       }
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = paytmData.paytmUrl;
-      form.style.display = 'none';
-      Object.entries(paytmData.params).forEach(([key, value]) => {
-        const input = document.createElement('input');
-        input.type = 'hidden'; input.name = key; input.value = value;
-        form.appendChild(input);
+      return new Promise((resolve, reject) => {
+        const options = {
+          key:         rzData.keyId,
+          amount:      rzData.amount,
+          currency:    rzData.currency,
+          name:        'Pebble Store',
+          description: 'Handmade Natural Products',
+          order_id:    rzData.razorpayOrderId,
+          prefill:     { name: data.name, contact: data.phone, email: data.email || '' },
+          theme:       { color: '#5c3d2e' },
+          handler: function(response) {
+            console.log('Payment success:', response);
+            localStorage.removeItem('pebble_cart');
+            showSuccess(data, 'razorpay', true);
+            resolve();
+          },
+          modal: {
+            ondismiss: function() {
+              const btn = document.getElementById('placeOrderBtn');
+              if (btn) { btn.disabled = false; btn.textContent = 'Pay Now →'; }
+              reject(new Error('Payment cancelled by user.'));
+            }
+          }
+        };
+        if (!window.Razorpay) { reject(new Error('Razorpay SDK not loaded. Please refresh.')); return; }
+        const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', function(resp) {
+          reject(new Error(resp.error?.description || 'Payment failed. Please try again.'));
+        });
+        rzp.open();
       });
-      document.body.appendChild(form);
-      form.submit();
     }
 
     function handlePaytmCallback(params) {

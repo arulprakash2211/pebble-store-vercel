@@ -169,7 +169,7 @@
         <table>
           <thead><tr>
             <th>Date</th><th>Customer</th><th>Phone</th><th>Items</th>
-            <th>Total</th><th>Status</th><th>Tracking</th><th>Actions</th>
+            <th>Total</th><th>Payment</th><th>Status</th><th>Tracking</th><th>Actions</th>
           </tr></thead>
           <tbody id="ordersBody"><tr><td colspan="8" class="loading">Loading orders…</td></tr></tbody>
         </table>
@@ -537,12 +537,24 @@
             <td>${o.phone}</td>
             <td class="order-items">${items}</td>
             <td><strong>₹${o.total}</strong></td>
+            <td>${o.paid
+              ? '<span style="font-size:0.72rem;color:var(--moss);font-weight:600">✓ Paid</span>'
+              : `<button class="btn btn-sm btn-green" onclick="markAsPaid('${o.id}')" style="font-size:0.65rem;padding:0.2rem 0.5rem">Mark Paid</button>`
+            }</td>
             <td><span class="badge ${sc[o.status] || 'badge-new'}">${o.status}</span></td>
             <td>${trackingHtml}</td>
             <td><div class="action-btns">${actions}</div></td>
           </tr>`;
         }).join('');
     }
+
+    window.markAsPaid = async (id) => {
+      try {
+        await updateDoc(doc(db, 'orders', id), { paid: true, updatedAt: new Date().toISOString() });
+        toast('✅ Order marked as paid');
+        loadOrders();
+      } catch (err) { toast('❌ ' + err.message); }
+    };
 
     window.updateStatus = async (id, status) => {
       try { await updateDoc(doc(db, 'orders', id), { status, updatedAt: new Date().toISOString() }); toast(`✅ Order marked as ${status}`); loadOrders(); }

@@ -1117,17 +1117,18 @@
 
       const items = [];
       rows.forEach(row => {
-        const sel   = row.querySelector('.no-product-select');
-        const qty   = parseInt(row.querySelector('.no-qty-input').value) || 0;
-        const price = parseFloat(sel.selectedOptions[0]?.dataset.price) || 0;
-        const id    = sel.value;
-        const name  = sel.selectedOptions[0]?.text.split(' — ')[0] || '';
-        if (qty > 0) items.push({ id, name, price, qty, subtotal: price * qty });
+        const sel      = row.querySelector('.no-product-select');
+        const qty      = parseInt(row.querySelector('.no-qty-input').value) || 0;
+        const price    = parseFloat(sel.selectedOptions[0]?.dataset.price) || 0;
+        const prodId   = sel.value;
+        const prodName = sel.selectedOptions[0]?.text.split(' — ')[0] || '';
+        if (qty > 0) items.push({ id: prodId, name: prodName, price, qty, subtotal: price * qty });
       });
 
-      const discount = parseFloat(document.getElementById('noDiscount').value) || 0;
-      const subtotal = items.reduce((s, i) => s + i.subtotal, 0);
-      const total    = Math.max(0, subtotal - discount);
+      const shippingVal = parseFloat(document.getElementById('noShipping').value) || 0;
+      const discountVal  = parseFloat(document.getElementById('noDiscount').value) || 0;
+      const subtotal     = items.reduce((s, i) => s + i.subtotal, 0);
+      const total        = Math.max(0, subtotal + shippingVal - discountVal);
 
       msg.textContent = 'Saving…';
       msg.style.cssText = 'display:block;color:var(--moss);font-size:0.8rem';
@@ -1141,8 +1142,8 @@
           notes:     document.getElementById('noNotes').value.trim(),
           items,
           subtotal,
-          shipping:  shippingCharge,
-          discount:  discountAmt,
+          shipping:  shippingVal,
+          discount:  discountVal,
           total,
           status:    document.getElementById('noStatus').value,
           paid:      document.getElementById('noPaid').value === 'true',

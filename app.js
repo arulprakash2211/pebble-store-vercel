@@ -236,7 +236,8 @@ async function loadProducts() {
   const filtersEl = document.getElementById('categoryFilters');
   try {
     const snap  = await getDocs(collection(db, 'products'));
-    allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => !p.hidden);  // hide products marked as hidden in admin
 
     if (!allProducts.length) {
       grid.innerHTML = '<p style="color:var(--light-text);grid-column:1/-1;font-style:italic">No products yet. Check back soon!</p>';

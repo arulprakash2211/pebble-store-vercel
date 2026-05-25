@@ -110,6 +110,9 @@
     <p class="footer-copy" style="margin-top:1rem">© 2025 Pebble Store · Made with 🌿 and lots of love</p>
   </footer>
 
+  <!-- Razorpay SDK -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
     import { getFirestore, collection, getDocs, addDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -132,16 +135,21 @@
     let cartTotal = 0;
 
     async function init() {
-      // Check for Paytm callback redirect
-      const params = new URLSearchParams(window.location.search);
-      const cbStatus = params.get('status');
+      // Handle Paytm callback FIRST before anything else
+      const urlParams = new URLSearchParams(window.location.search);
+      const cbStatus  = urlParams.get('status');
+      const cbMsg     = decodeURIComponent(urlParams.get('msg') || '');
+
       if (cbStatus === 'success') {
         localStorage.removeItem('pebble_cart');
+        document.getElementById('checkoutMain').innerHTML = '';
         showSuccess({}, 'paytm', true);
         return;
       }
+
       if (cbStatus === 'failed') {
-        showPaymentFailed();
+        document.getElementById('checkoutMain').innerHTML = '';
+        showPaymentFailed(cbMsg);
         return;
       }
 
@@ -191,10 +199,10 @@
               <div class="form-section-title">Payment Method</div>
 
               <div class="payment-options">
-                <label class="payment-option selected" id="opt-paytm">
-                  <input type="radio" name="payment" value="paytm" checked onchange="selectPayment(this)"/>
+                <label class="payment-option selected" id="opt-razorpay">
+                  <input type="radio" name="payment" value="razorpay" checked onchange="selectPayment(this)"/>
                   <div>
-                    <div class="payment-option-label">Pay Online <span class="paytm-logo">Paytm</span></div>
+                    <div class="payment-option-label">Pay Online <span style="font-size:0.72rem;font-weight:700;color:#2D6DEB;background:#EEF3FF;padding:0.15rem 0.5rem;border-radius:2px;margin-left:0.3rem">Razorpay</span></div>
                     <div class="payment-option-desc">UPI, Cards, Net Banking, Wallets</div>
                   </div>
                 </label>
@@ -237,7 +245,7 @@
       radio.closest('.payment-option').classList.add('selected');
       const method = radio.value;
       const btn = document.getElementById('placeOrderBtn');
-      if (method === 'paytm') btn.textContent = 'Pay Now →';
+      if (method === 'razorpay') btn.textContent = 'Pay Now →';
       else if (method === 'whatsapp') btn.textContent = 'Order via WhatsApp →';
       else btn.textContent = 'Place Order →';
     };
@@ -287,15 +295,19 @@
     }
 
     window.placeOrder = async () => {
+      alert('placeOrder called');
       const data   = getFormData();
-      if (!validate(data)) return;
-      const method = document.querySelector('input[name="payment"]:checked').value;
+      alert('data: ' + JSON.stringify(data));
+      if (!validate(data)) { alert('validation failed'); return; }
+      const method = document.querySelector('input[name="payment"]:checked')?.value;
+      alert('method: ' + method);
       const btn    = document.getElementById('placeOrderBtn');
+      if (!btn) { alert('btn not found'); return; }
       btn.disabled = true;
       btn.textContent = 'Processing…';
 
       try {
-        if (method === 'paytm') {
+        if (method === 'razorpay') {
           let orderId;
           try {
             console.log('Step 1: saving to Firestore');
@@ -339,7 +351,7 @@
         const errEl = document.getElementById('errorMsg');
         if (errEl) { errEl.textContent = '⚠️ ' + errMsg; errEl.style.display = 'block'; }
         btn.disabled = false;
-        btn.textContent = method === 'paytm' ? 'Pay Now →' : 'Place Order →';
+        btn.textContent = method === 'razorpay' ? 'Pay Now →' : 'Place Order →';
       }
     };
 

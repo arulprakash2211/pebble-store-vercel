@@ -274,7 +274,7 @@
               <th>Emoji</th><th style="min-width:180px">Name</th><th style="min-width:130px">Category</th>
               <th style="min-width:80px">Price ₹</th><th style="min-width:120px">Tag</th>
               <th style="min-width:250px">Description</th><th style="min-width:150px">Image Path</th>
-              <th style="min-width:80px">Colour</th><th>Action</th>
+              <th style="min-width:80px">Colour</th><th style="min-width:70px">Hidden</th><th>Action</th>
             </tr></thead>
             <tbody id="bulkTableBody"><tr><td colspan="9" class="loading">Loading…</td></tr></tbody>
           </table>
@@ -595,6 +595,14 @@
     // ══════════════════════════════
     // PRODUCTS — LIST VIEW
     // ══════════════════════════════
+    window.toggleHideProduct = async (id, hide) => {
+      try {
+        await updateDoc(doc(db, 'products', id), { hidden: hide, updatedAt: new Date().toISOString() });
+        toast(hide ? '🚫 Product hidden from store' : '✅ Product visible in store');
+        loadProductsList();
+      } catch (err) { toast('❌ ' + err.message); }
+    };
+
     window.loadProductsList = async () => {
       const grid = document.getElementById('productsAdminGrid');
       grid.innerHTML = '<div class="loading">Loading products…</div>';
@@ -742,6 +750,10 @@
         <td><input class="bulk-input" data-field="description" value="${(p.description || '').replace(/"/g,'&quot;')}" oninput="markChanged(this)"/></td>
         <td><input class="bulk-input" data-field="image" value="${p.image || ''}" placeholder="images/name.jpg" oninput="markChanged(this)"/></td>
         <td><select class="bulk-select" data-field="colorClass" onchange="markChanged(this);updateColorPreview(this)">${colorOpts}</select></td>
+        <td><select class="bulk-select" data-field="hidden" onchange="markChanged(this)" style="min-width:60px">
+          <option value="false" ${!p.hidden ? 'selected' : ''}>Visible</option>
+          <option value="true" ${p.hidden ? 'selected' : ''}>Hidden</option>
+        </select></td>
         <td><button class="btn btn-sm btn-red" onclick="deleteBulkRow(this,'${id}')">✕</button></td>
       </tr>`;
     }

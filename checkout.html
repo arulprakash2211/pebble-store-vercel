@@ -317,7 +317,7 @@
           localStorage.setItem('pebble_order_id', orderId);
           localStorage.setItem('pebble_customer', JSON.stringify(data));
           try {
-            console.log('Step 3: calling Paytm API');
+            console.log('Step 3: calling Razorpay API');
             await initiateRazorpay(data, orderId);
             console.log('Step 4: form submitted');
           } catch(e) {

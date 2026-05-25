@@ -6,6 +6,7 @@
     { "src": "/api/orders",          "dest": "/api/orders.js" },
     { "src": "/api/paytm",           "dest": "/api/paytm.js" },
     { "src": "/api/paytm-callback",  "dest": "/api/paytm-callback.js" },
+    { "src": "/api/razorpay",        "dest": "/api/razorpay.js" },
     { "src": "/cart",                "dest": "/cart.html" },
     { "src": "/checkout",            "dest": "/checkout.html" },
     { "src": "/track",               "dest": "/track.html" },

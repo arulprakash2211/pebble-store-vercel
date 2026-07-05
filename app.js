@@ -1,663 +1,1873 @@
-/* ═══════════════════════════════════════
-   PEBBLE STORE – app.js
-   2 options: Payment | WhatsApp query
-   ═══════════════════════════════════════ */
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pebble Store – Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root{--bark:#5c3d2e;--moss:#4a5c3a;--cream:#f5f0e8;--dark:#2b1f14;--clay:#a07850;--warm-white:#faf8f3;--light-text:#7a6a58;--stone:#8a7968;--sand:#d4b896}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Jost',sans-serif;background:var(--warm-white);color:var(--dark)}
+    .sidebar{position:fixed;top:0;left:0;width:220px;height:100vh;background:var(--dark);padding:1.5rem 1.2rem;display:flex;flex-direction:column;z-index:100;overflow-y:auto}
+    .sidebar-logo{font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--sand);margin-bottom:0.2rem}
+    .sidebar-sub{font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.35);margin-bottom:1.8rem}
+    .nav-item{display:flex;align-items:center;gap:0.7rem;padding:0.65rem 0.9rem;color:rgba(255,255,255,0.55);font-size:0.82rem;border-radius:4px;transition:all 0.2s;cursor:pointer;border:none;background:none;width:100%;text-align:left;font-family:'Jost',sans-serif;margin-bottom:2px}
+    .nav-item:hover,.nav-item.active{background:rgba(255,255,255,0.08);color:white}
+    .sidebar-footer{margin-top:auto;padding-top:1rem}
+    .signout-btn{display:flex;align-items:center;gap:0.7rem;padding:0.65rem 0.9rem;color:rgba(255,255,255,0.35);font-size:0.8rem;cursor:pointer;border:none;background:none;width:100%;font-family:'Jost',sans-serif;transition:color 0.2s}
+    .signout-btn:hover{color:white}
+    .main{margin-left:220px;padding:2rem;min-height:100vh}
+    .page-header{margin-bottom:1.8rem;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem}
+    .page-title{font-family:'Playfair Display',serif;font-size:1.6rem;color:var(--dark);margin-bottom:0.2rem}
+    .page-sub{font-size:0.82rem;color:var(--light-text)}
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:1rem;margin-bottom:2rem}
+    .stat-card{background:var(--cream);padding:1.1rem 1.3rem;border-left:3px solid var(--bark)}
+    .stat-label{font-size:0.65rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--stone);margin-bottom:0.4rem}
+    .stat-value{font-family:'Playfair Display',serif;font-size:1.6rem;color:var(--dark)}
+    .stat-value.green{color:var(--moss)}.stat-value.clay{color:var(--clay)}
+    .section{display:none}.section.active{display:block}
+    .table-wrap{background:var(--cream);overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:0.83rem}
+    th{text-align:left;font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);font-weight:500;padding:0.75rem 1rem;border-bottom:1px solid rgba(92,61,46,0.15);white-space:nowrap;background:var(--cream)}
+    td{padding:0.75rem 1rem;border-bottom:1px solid rgba(92,61,46,0.06);vertical-align:middle;color:var(--dark)}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:rgba(92,61,46,0.02)}
+    .badge{display:inline-block;padding:0.18rem 0.55rem;font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;border-radius:2px}
+    .badge-new{background:#fff3cd;color:#856404}
+    .badge-confirmed{background:#cce5ff;color:#004085}
+    .badge-ready{background:#ffe0b2;color:#8a4b00}
+    .badge-dispatched{background:#d4edda;color:#155724}
+    .badge-delivered{background:#d1ecf1;color:#0c5460}
+    .badge-cancelled{background:#f8d7da;color:#721c24}
+    .btn{padding:0.45rem 0.9rem;border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;transition:all 0.2s;border-radius:2px}
+    .btn-primary{background:var(--bark);color:var(--cream)}.btn-primary:hover{background:var(--dark)}
+    .btn-sm{padding:0.25rem 0.6rem;font-size:0.68rem}
+    .btn-ghost{background:transparent;border:1px solid rgba(92,61,46,0.3);color:var(--bark)}.btn-ghost:hover{background:var(--bark);color:var(--cream)}
+    .btn-green{background:var(--moss);color:white}.btn-green:hover{background:#3a4a2e}
+    .btn-red{background:#c0392b;color:white}.btn-red:hover{background:#a93226}
+    .btn-clay{background:var(--clay);color:white}.btn-clay:hover{background:#8a6640}
+    .btn-blue{background:#2980b9;color:white}.btn-blue:hover{background:#2471a3}
+    .action-btns{display:flex;flex-direction:column;gap:3px;min-width:90px}
+    .filter-btn{padding:0.35rem 0.9rem;border:1.5px solid rgba(92,61,46,0.25);background:transparent;color:var(--stone);font-family:'Jost',sans-serif;font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;transition:all 0.2s;font-weight:500;border-radius:2px}
+    .filter-btn:hover{border-color:var(--bark);color:var(--bark)}
+    .filter-btn.active{background:var(--bark);color:var(--cream);border-color:var(--bark)}
 
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, getDocs, addDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    /* PRODUCT TABS */
+    .prod-tabs{display:flex;gap:0;margin-bottom:1.5rem;border:1.5px solid rgba(92,61,46,0.2)}
+    .prod-tab{flex:1;padding:0.7rem;text-align:center;cursor:pointer;font-size:0.75rem;letter-spacing:0.1em;text-transform:uppercase;font-weight:500;color:var(--stone);background:var(--warm-white);border:none;font-family:'Jost',sans-serif;transition:all 0.2s}
+    .prod-tab.active{background:var(--bark);color:var(--cream)}
+    .prod-tab-content{display:none}.prod-tab-content.active{display:block}
 
-const firebaseConfig = {
-  apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
-  authDomain: "pebble-store-70889.firebaseapp.com",
-  projectId: "pebble-store-70889",
-  storageBucket: "pebble-store-70889.firebasestorage.app",
-  messagingSenderId: "611731436877",
-  appId: "1:611731436877:web:eee0ef64cd8b4b86467304"
-};
+    /* PRODUCT GRID */
+    .products-grid-admin{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.2rem}
+    .pac{background:var(--cream);padding:1.2rem;border:1.5px solid transparent;transition:border-color 0.2s;position:relative}
+    .pac:hover{border-color:rgba(92,61,46,0.2)}
+    .pac-header{display:flex;align-items:center;gap:0.8rem;margin-bottom:0.6rem}
+    .pac-emoji{font-size:1.6rem;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:var(--warm-white);border-radius:4px;flex-shrink:0}
+    .pac-name{font-family:'Playfair Display',serif;font-size:0.95rem;color:var(--dark);margin-bottom:0.15rem}
+    .pac-cat{font-size:0.68rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--clay)}
+    .pac-price{font-size:1rem;font-weight:600;color:var(--moss);margin-bottom:0.4rem}
+    .pac-desc{font-size:0.75rem;color:var(--light-text);line-height:1.4;margin-bottom:0.8rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .pac-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.4rem}
+    .pac-tag{font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;background:rgba(74,92,58,0.1);color:var(--moss);padding:0.15rem 0.5rem;border-radius:2px}
 
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
+    /* SINGLE PRODUCT FORM */
+    .form-card{background:var(--cream);padding:1.5rem;margin-bottom:1rem}
+    .form-card-title{font-family:'Playfair Display',serif;font-size:1rem;color:var(--dark);margin-bottom:1rem;padding-bottom:0.6rem;border-bottom:1px solid rgba(92,61,46,0.1);display:flex;justify-content:space-between;align-items:center}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:0.8rem}
+    .form-row.three{grid-template-columns:1fr 1fr 1fr}
+    .form-row.full{grid-template-columns:1fr}
+    .fg{display:flex;flex-direction:column;gap:0.3rem}
+    .fg label{font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);font-weight:500}
+    .fg input,.fg select,.fg textarea{font-family:'Jost',sans-serif;font-size:0.88rem;padding:0.6rem 0.8rem;border:1.5px solid rgba(92,61,46,0.18);background:var(--warm-white);color:var(--dark);outline:none;border-radius:0;width:100%;transition:border-color 0.2s}
+    .fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--clay)}
+    .fg textarea{resize:vertical;min-height:70px}
+    .color-opts{display:flex;gap:0.4rem;margin-top:0.3rem;flex-wrap:wrap}
+    .color-opt{width:32px;height:60px;border-radius:2px;cursor:pointer;border:2.5px solid transparent;transition:all 0.15s;display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:transparent;font-weight:700}
+    .color-opt.selected{border-color:var(--dark);color:white}
+    .form-msg{font-size:0.78rem;padding:0.5rem 0.8rem;border-radius:2px;margin-top:0.6rem;display:none}
+    .form-msg.ok{background:#d4edda;color:#155724;display:block}
+    .form-msg.err{background:#f8d7da;color:#721c24;display:block}
 
-const WHATSAPP_NUMBER = '918925401892';
-let allProducts = [];
-const cart = {};
+    /* BULK EDITOR */
+    .bulk-toolbar{display:flex;gap:0.8rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center}
+    .bulk-table-wrap{background:var(--cream);overflow-x:auto}
+    .bulk-table{width:100%;border-collapse:collapse;font-size:0.82rem;min-width:900px}
+    .bulk-table th{font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);font-weight:500;padding:0.6rem 0.8rem;border-bottom:1px solid rgba(92,61,46,0.15);background:var(--cream);white-space:nowrap}
+    .bulk-table td{padding:0.4rem 0.5rem;border-bottom:1px solid rgba(92,61,46,0.06);vertical-align:middle}
+    .bulk-table tr:hover td{background:rgba(92,61,46,0.02)}
+    .bulk-input{font-family:'Jost',sans-serif;font-size:0.82rem;padding:0.4rem 0.6rem;border:1.5px solid transparent;background:transparent;color:var(--dark);outline:none;width:100%;border-radius:0;transition:border-color 0.2s}
+    .bulk-input:focus{border-color:var(--clay);background:var(--warm-white)}
+    .bulk-select{font-family:'Jost',sans-serif;font-size:0.82rem;padding:0.4rem 0.5rem;border:1.5px solid transparent;background:transparent;color:var(--dark);outline:none;width:100%;border-radius:0}
+    .bulk-select:focus{border-color:var(--clay);background:var(--warm-white)}
+    .bulk-changed{border-color:var(--clay)!important;background:rgba(160,120,80,0.06)!important}
+    .changed-indicator{width:6px;height:6px;border-radius:50%;background:var(--clay);display:inline-block;margin-left:4px;opacity:0}
+    .changed-indicator.show{opacity:1}
+    .add-row-btn{background:rgba(74,92,58,0.08);border:1.5px dashed rgba(74,92,58,0.3);color:var(--moss);cursor:pointer;font-family:'Jost',sans-serif;font-size:0.75rem;padding:0.6rem;width:100%;text-align:center;transition:all 0.2s;margin-top:0.5rem}
+    .add-row-btn:hover{background:rgba(74,92,58,0.15)}
 
-// Normalise a phone to its last 10 digits so +91 / spacing variants match
-const normPhone = (p) => String(p ?? '').replace(/\D/g, '').slice(-10);
+    /* MODAL */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;padding:1rem}
+    .modal-overlay.open{display:flex}
+    .modal{background:var(--warm-white);padding:2rem;width:100%;max-width:420px;border-radius:2px;position:relative;max-height:90vh;overflow-y:auto}
+    .modal-title{font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--dark);margin-bottom:1.2rem}
+    .modal-close{position:absolute;top:1rem;right:1rem;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--stone)}
+    .mfg{display:flex;flex-direction:column;gap:0.3rem;margin-bottom:0.9rem}
+    .mfg label{font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);font-weight:500}
+    .mfg input,.mfg select{font-family:'Jost',sans-serif;font-size:0.88rem;padding:0.65rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0;width:100%}
+    .mfg input:focus,.mfg select:focus{border-color:var(--clay)}
 
-// Grouped products: products sharing a productGroup show as one card with a size selector
-const groupVariants = {}; // gid -> [variant product ids]
-const displayName = (p) => p && p.productGroup ? `${p.productGroup}${p.variant ? ' — ' + p.variant : ''}` : (p ? p.name : '');
-const selectedVariantId = (gid) => {
-  const s = document.getElementById('vsel-' + gid);
-  if (s) return s.value;
-  const arr = groupVariants[gid];
-  return arr && arr[0];
-};
+    .loading{color:var(--light-text);font-size:0.85rem;font-style:italic;padding:1.5rem;text-align:center}
+    .order-items{font-size:0.78rem;color:var(--light-text);max-width:180px;line-height:1.6}
+    .empty-state{text-align:center;padding:3rem;color:var(--light-text)}
+    .empty-state .es-icon{font-size:3rem;margin-bottom:1rem}
+    .toast{position:fixed;bottom:2rem;right:2rem;background:var(--dark);color:white;padding:0.8rem 1.3rem;font-size:0.82rem;border-radius:2px;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none}
+    .toast.show{opacity:1}
 
-
-// ══════════════════════════════
-// ORDER TRACKING (inline section)
-// ══════════════════════════════
-const COURIER_URLS = {
-  'ST Courier':           id => `https://www.stcourier.com/`,
-  'Professional Courier': id => `https://www.tpcindia.com/tracking.php?id=${id}&type=0&service=0`,
-  'DTDC':                 id => `https://www.dtdc.in/tracking/tracking_results.asp?Ttype=awb&strCNno=${id}`,
-  'India Post':           id => `https://www.indiapost.gov.in/VAS/Pages/trackconsignment.aspx`,
-};
-
-// For couriers where direct URL tracking doesn't work, show copy button
-const COURIER_MANUAL = ['ST Courier', 'India Post'];
-
-const STATUS_LABEL = {
-  new: '🟡 Order Received', confirmed: '🔵 Confirmed', ready: '📦 Ready for Dispatch',
-  dispatched: '🚚 Dispatched', delivered: '✅ Delivered', cancelled: '❌ Cancelled'
-};
-
-window.switchTrackTab = function(tab) {
-  const isPhone = tab === 'phone';
-  document.getElementById('trackPhonePanel').style.display = isPhone ? 'block' : 'none';
-  document.getElementById('trackIdPanel').style.display    = isPhone ? 'none'  : 'block';
-  document.getElementById('tabPhoneBtn').style.background  = isPhone ? 'var(--bark)' : 'var(--warm-white)';
-  document.getElementById('tabPhoneBtn').style.color       = isPhone ? 'var(--cream)' : 'var(--stone)';
-  document.getElementById('tabTrackBtn').style.background  = isPhone ? 'var(--warm-white)' : 'var(--bark)';
-  document.getElementById('tabTrackBtn').style.color       = isPhone ? 'var(--stone)' : 'var(--cream)';
-  document.getElementById('trackResultInline').style.display = 'none';
-};
-
-async function showTrackResult(order) {
-  const el = document.getElementById('trackResultInline');
-  const date = new Date(order.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
-  const items = (order.items || []).map(i => `${i.name} ×${i.qty}`).join(', ');
-  let statusLabel = STATUS_LABEL[order.status] || order.status;
-
-  // Auto-fetch ST Courier status on demand
-  const SUPPORTED_COURIERS = ['ST Courier', 'DTDC', 'Professional Courier', 'India Post'];
-  if (SUPPORTED_COURIERS.includes(order.tracking?.courier) && order.tracking?.trackingId && order.status !== 'delivered') {
-    el.innerHTML = '<p style="color:var(--light-text);font-style:italic;font-size:0.85rem">Fetching live status from ST Courier…</p>';
-    el.style.display = 'block';
-    try {
-      const trackRes = await fetch('/api/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: order.id, trackingId: order.tracking.trackingId, courier: order.tracking.courier })
-      });
-      const trackData = await trackRes.json();
-      if (trackData.success) {
-        order.tracking.rawStatus = trackData.rawStatus;
-        order.tracking.details   = trackData.details;
-        order.tracking.fetchedAt = trackData.fetchedAt;
-        if (trackData.mappedStatus) order.status = trackData.mappedStatus;
-        statusLabel = trackData.rawStatus || STATUS_LABEL[order.status] || order.status;
-      }
-    } catch (err) {
-      console.warn('Live tracking fetch failed:', err);
+    @media(max-width:768px){
+      .sidebar{width:100%;height:auto;position:relative;flex-direction:row;flex-wrap:wrap;gap:0.4rem;padding:0.8rem}
+      .main{margin-left:0;padding:1rem}
+      .sidebar-logo,.sidebar-sub,.sidebar-footer{display:none}
+      .nav-item{padding:0.4rem 0.7rem;font-size:0.75rem}
+      .form-row,.form-row.three{grid-template-columns:1fr}
     }
-  }
+  </style>
+</head>
+<body>
 
-  let trackingHtml = '';
-  if (order.tracking) {
-    const { courier, trackingId, rawStatus, details, fetchedAt } = order.tracking;
-    const url = COURIER_URLS[courier] ? COURIER_URLS[courier](trackingId) : null;
-    const isManual = COURIER_MANUAL && COURIER_MANUAL.includes(courier);
-    const fetchedTime = fetchedAt ? `<div style="font-size:0.7rem;color:var(--stone);margin-top:0.3rem">Last checked: ${new Date(fetchedAt).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'})}</div>` : '';
-    const liveStatus = rawStatus ? `<div style="font-size:0.85rem;color:var(--moss);font-weight:600;margin-top:0.4rem">📍 ${rawStatus}</div>${details ? `<div style="font-size:0.75rem;color:var(--light-text);margin-top:0.2rem">${details}</div>` : ''}${fetchedTime}` : '';
-    trackingHtml = `
-      <div style="margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid rgba(92,61,46,0.1)">
-        <div style="font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--stone);margin-bottom:0.4rem">Courier Details</div>
-        <div style="font-size:0.88rem;color:var(--dark);margin-bottom:0.4rem"><strong>${courier}</strong> · <span style="font-family:monospace;color:var(--stone)">${trackingId}</span></div>
-        ${liveStatus}
-        ${url ? `<a href="${url}" target="_blank" style="display:inline-flex;align-items:center;gap:0.4rem;margin-top:0.8rem;padding:0.45rem 0.9rem;background:transparent;border:1px solid rgba(92,61,46,0.3);color:var(--bark);text-decoration:none;font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:500">↗ Open ${courier} site</a>` : ''}
-      </div>`;
-  }
-
-  el.innerHTML = `
-    <div style="font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);margin-bottom:0.8rem;font-weight:500">Order Found</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem 1.5rem;font-size:0.85rem;margin-bottom:0.5rem">
-      <div><span style="color:var(--light-text)">Name:</span> <strong>${order.name}</strong></div>
-      <div><span style="color:var(--light-text)">Date:</span> ${date}</div>
-      <div><span style="color:var(--light-text)">Items:</span> ${items}</div>
-      <div><span style="color:var(--light-text)">Total:</span> <strong>₹${order.total}</strong></div>
+  <div class="sidebar">
+    <div class="sidebar-logo"><img src="/images/logo.png" alt="Pebble Store" style="height:60px;object-fit:contain;filter:brightness(0) invert(1);opacity:0.85"/></div>
+    <div class="sidebar-sub">Admin Panel</div>
+    <button class="nav-item active" onclick="showSection('orders',this)"><span>📦</span> Orders</button>
+    <button class="nav-item" onclick="showSection('products',this)"><span>🧼</span> Products</button>
+    <button class="nav-item" onclick="showSection('stock',this)"><span>📈</span> Stock</button>
+    <button class="nav-item" onclick="showSection('customers',this)"><span>👤</span> Customers</button>
+    <button class="nav-item" onclick="showSection('reports',this)"><span>📊</span> Reports</button>
+    <div class="sidebar-footer">
+      <button class="signout-btn" onclick="doSignOut()">⬅ Sign Out</button>
     </div>
-    <div style="font-size:0.9rem;margin-top:0.5rem"><span style="color:var(--light-text)">Status:</span> <strong>${statusLabel}</strong></div>
-    ${trackingHtml}
-    <div style="margin-top:1rem"><a href="/track.html" style="font-size:0.78rem;color:var(--clay);text-decoration:none">View full tracking page →</a></div>`;
+  </div>
 
-  el.style.display = 'block';
-  el.style.borderLeftColor = order.tracking ? 'var(--moss)' : 'var(--clay)';
-  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
+  <div class="main">
 
-function showTrackError(msg) {
-  const el = document.getElementById('trackResultInline');
-  el.innerHTML = `<p style="color:#c0392b;font-size:0.88rem">${msg}</p>`;
-  el.style.display = 'block';
-  el.style.borderLeftColor = '#c0392b';
-}
-
-// Store found orders by index for onclick reference
-const trackOrderCache = {};
-
-window.doTrackByPhone = async function() {
-  const phone = document.getElementById('trackPhone').value.trim();
-  if (!phone) { showTrackError('Please enter your phone number.'); return; }
-  const el = document.getElementById('trackResultInline');
-  el.innerHTML = '<p style="color:var(--light-text);font-style:italic;font-size:0.85rem">Looking up your order…</p>';
-  el.style.display = 'block';
-  try {
-    const snap = await getDocs(collection(db, 'orders'));
-    const c = normPhone(phone);
-    const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .filter(o => o.phone && normPhone(o.phone) === c)
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    if (!orders.length) { showTrackError('No orders found for this phone number.'); return; }
-    if (orders.length === 1) { await showTrackResult(orders[0]); return; }
-
-    // Multiple orders — store in cache and reference by index
-    orders.forEach((o, i) => { trackOrderCache[i] = o; });
-    el.innerHTML = `<div style="font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);margin-bottom:0.8rem;font-weight:500">Multiple orders found — select one:</div>` +
-      orders.map((o, i) => {
-        const date = new Date(o.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
-        const items = (o.items || []).map(x => x.name).join(', ');
-        return `<div onclick="selectTrackOrder(${i})" style="padding:0.8rem 1rem;background:var(--warm-white);margin-bottom:0.5rem;cursor:pointer;border:1.5px solid transparent;font-size:0.85rem;transition:border-color 0.2s" onmouseover="this.style.borderColor='var(--bark)'" onmouseout="this.style.borderColor='transparent'">
-          <strong>${date}</strong> &nbsp;·&nbsp; <strong>₹${o.total}</strong>
-          <div style="font-size:0.75rem;color:var(--light-text);margin-top:0.2rem">${items}</div>
-          <span style="font-size:0.68rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;padding:0.15rem 0.5rem;border-radius:2px;background:#fff3cd;color:#856404;display:inline-block;margin-top:0.3rem">${o.status}</span>
-        </div>`;
-      }).join('');
-    el.style.display = 'block';
-  } catch (err) {
-    console.error('Track by phone error:', err);
-    showTrackError('Error: ' + err.message);
-  }
-};
-
-window.selectTrackOrder = async function(index) {
-  const order = trackOrderCache[index];
-  if (order) await showTrackResult(order);
-};
-
-window.doTrackById = async function() {
-  const trackId = document.getElementById('trackId').value.trim();
-  if (!trackId) { showTrackError('Please enter your tracking ID.'); return; }
-  const el = document.getElementById('trackResultInline');
-  el.innerHTML = '<p style="color:var(--light-text);font-style:italic;font-size:0.85rem">Looking up your order…</p>';
-  el.style.display = 'block';
-  try {
-    const snap = await getDocs(collection(db, 'orders'));
-    const order = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .find(o => o.tracking?.trackingId === trackId);
-    if (!order) { showTrackError('No order found with this tracking ID.'); return; }
-    showTrackResult(order);
-  } catch (err) { showTrackError('Something went wrong. Please try again.'); }
-};
-
-// ── Sync cart from sessionStorage (shared with product page) ──
-function syncCartFromSession() {
-  const saved = localStorage.getItem('pebble_cart');
-  if (saved) {
-    const saved_cart = JSON.parse(saved);
-    Object.entries(saved_cart).forEach(([id, qty]) => {
-      if (qty > 0) cart[id] = qty;
-    });
-  }
-}
-
-function saveCartToSession() {
-  localStorage.setItem('pebble_cart', JSON.stringify(cart));
-  updateCartNav();
-}
-
-function updateCartNav() {
-  const items = Object.entries(cart).filter(([, q]) => q > 0);
-  const count = items.reduce((s, [, q]) => s + q, 0);
-  const total = items.reduce((sum, [id, qty]) => {
-    const p = allProducts.find(x => x.id === id);
-    return sum + (p ? p.price * qty : 0);
-  }, 0);
-
-  // Nav badge
-  const el = document.getElementById('cartNavCount');
-  if (el) {
-    el.textContent = count;
-    el.style.display = count > 0 ? 'inline-flex' : 'none';
-  }
-
-  // Sticky cart bar
-  const bar = document.getElementById('cartBar');
-  if (bar) {
-    if (count > 0) {
-      bar.style.display = 'flex';
-      const infoEl = document.getElementById('cartBarInfo');
-      const totalEl = document.getElementById('cartBarTotal');
-      if (infoEl) infoEl.textContent = `${count} item${count > 1 ? 's' : ''} in cart`;
-      if (totalEl) totalEl.textContent = `₹${total}`;
-    } else {
-      bar.style.display = 'none';
-    }
-  }
-}
-
-// ── Init ──
-async function init() {
-  syncCartFromSession();
-  await loadProducts();
-}
-
-// ── Load products from Firestore ──
-async function loadProducts() {
-  const grid     = document.getElementById('productsGrid');
-  const filtersEl = document.getElementById('categoryFilters');
-  try {
-    const snap  = await getDocs(collection(db, 'products'));
-    allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .filter(p => !p.hidden);  // hide products marked as hidden in admin
-
-    if (!allProducts.length) {
-      grid.innerHTML = '<p style="color:var(--light-text);grid-column:1/-1;font-style:italic">No products yet. Check back soon!</p>';
-      return;
-    }
-
-    // Categories only — no "All" tab, start with Soaps
-    const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))];
-    // Put Soaps first if it exists
-    const sorted = categories.includes('Soaps')
-      ? ['Soaps', ...categories.filter(c => c !== 'Soaps')]
-      : categories;
-
-    filtersEl.innerHTML = sorted.map((cat, i) =>
-      `<button class="filter-btn ${i === 0 ? 'active' : ''}" data-cat="${cat}">${cat}</button>`
-    ).join('');
-
-    filtersEl.querySelectorAll('.filter-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        filtersEl.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        renderProducts(allProducts.filter(p => p.category === btn.dataset.cat));
-      });
-    });
-
-    // Start with first category (Soaps)
-    renderProducts(allProducts.filter(p => p.category === sorted[0]));
-    updateCartNav();
-  } catch (err) {
-    grid.innerHTML = `<p style="color:var(--clay);grid-column:1/-1">⚠️ Could not load products. Please refresh.</p>`;
-    console.error(err);
-  }
-}
-
-// ── Render product cards ──
-function renderProducts(products) {
-  const grid = document.getElementById('productsGrid');
-  if (!products.length) {
-    grid.innerHTML = '<p style="color:var(--light-text);grid-column:1/-1;font-style:italic">No products in this category.</p>';
-    return;
-  }
-  // Group by productGroup; ungrouped products each form their own group
-  const groups = [];
-  const idx = {};
-  products.forEach(p => {
-    const key = p.productGroup ? 'g:' + p.productGroup : 'p:' + p.id;
-    if (idx[key] == null) { idx[key] = groups.length; groups.push({ key, name: p.productGroup || p.name, variants: [] }); }
-    groups[idx[key]].variants.push(p);
-  });
-
-  grid.innerHTML = groups.map(g => {
-    const gid = g.key.replace(/[^a-zA-Z0-9]/g, '_');
-    groupVariants[gid] = g.variants.map(v => v.id);
-    const multi = g.variants.length > 1;
-    const sel  = g.variants[0];
-    const qty  = cart[sel.id] || 0;
-    const variantSelect = multi
-      ? `<select class="variant-select" id="vsel-${gid}" onchange="onVariantChange('${gid}')" onclick="event.stopPropagation()" style="width:100%;margin:0.4rem 0;padding:0.45rem 0.6rem;border:1.5px solid rgba(92,61,46,0.25);background:var(--warm-white);font-family:'Jost',sans-serif;font-size:0.85rem;color:var(--dark)">
-            ${g.variants.map(v => `<option value="${v.id}" data-price="${v.price}">${v.variant || v.name}</option>`).join('')}
-          </select>`
-      : '';
-    return `
-      <div class="product-card" data-group="${gid}">
-        <div class="product-img ${sel.colorClass || 'pi1'}">
-          <div class="pat"></div>
-          ${sel.image ? `<img src="${sel.image}" alt="${g.name}" onerror="this.style.display='none'" />` : ''}
-          <span class="emoji-fallback">${sel.emoji || '🧼'}</span>
+    <!-- ORDERS -->
+    <div class="section active" id="section-orders">
+      <div class="page-header">
+        <div><div class="page-title">Orders</div><div class="page-sub">All customer orders</div></div>
+        <div style="display:flex;gap:0.6rem">
+          <button class="btn btn-green" onclick="openNewOrderModal()">➕ New Order</button>
+          <button class="btn btn-ghost" onclick="printOrdersSheet()">🖨️ Print Sheet</button>
+          <button class="btn btn-primary" onclick="loadOrders()">↻ Refresh</button>
         </div>
-        <div class="product-info">
-          <div class="product-meta">
-            <span class="product-tag">${sel.tag || ''}</span>
-            <span class="product-cat">${sel.category || ''}</span>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value" id="statTotal">—</div></div>
+        <div class="stat-card"><div class="stat-label">New</div><div class="stat-value clay" id="statNew">—</div></div>
+        <div class="stat-card"><div class="stat-label">Confirmed</div><div class="stat-value" id="statConfirmed">—</div></div>
+        <div class="stat-card"><div class="stat-label">Ready</div><div class="stat-value clay" id="statReady">—</div></div>
+        <div class="stat-card"><div class="stat-label">Dispatched</div><div class="stat-value green" id="statDispatched">—</div></div>
+        <div class="stat-card"><div class="stat-label">Delivered</div><div class="stat-value green" id="statDelivered">—</div></div>
+      </div>
+      <!-- Search & Filters -->
+      <div style="display:flex;gap:0.8rem;align-items:center;flex-wrap:wrap;margin-bottom:0.8rem;padding:0.8rem;background:var(--cream)">
+        <input type="text" id="orderSearch" placeholder="🔍 Search by name or phone…" oninput="applyOrderFilters()"
+          style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none;min-width:220px"/>
+        <select id="orderFilterStatus" onchange="applyOrderFilters()"
+          style="font-family:'Jost',sans-serif;font-size:0.82rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none">
+          <option value="">All Statuses</option>
+          <option value="new">New</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="ready">Ready for Dispatch</option>
+          <option value="dispatched">Dispatched</option>
+          <option value="delivered">Delivered</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <select id="orderFilterPaid" onchange="applyOrderFilters()"
+          style="font-family:'Jost',sans-serif;font-size:0.82rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none">
+          <option value="">All Payments</option>
+          <option value="paid">Paid</option>
+          <option value="unpaid">Unpaid</option>
+        </select>
+        <span id="orderCount" style="font-size:0.75rem;color:var(--stone);margin-left:auto"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th style="width:32px;text-align:center"><input type="checkbox" id="orderSelectAll" onclick="toggleSelectAll(this)" title="Select all shown"/></th>
+            <th>Date</th><th>Customer</th><th>Phone</th><th>Items</th>
+            <th>Total</th><th>Payment</th><th>Status</th><th>Tracking</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="ordersBody"><tr><td colspan="10" class="loading">Loading orders…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PRODUCTS -->
+    <div class="section" id="section-products">
+      <div class="page-header">
+        <div><div class="page-title">Products</div><div class="page-sub">Manage your soap catalogue</div></div>
+        <div style="display:flex;gap:0.6rem">
+          <button class="btn btn-ghost" onclick="switchProdTab('bulk')">📋 Bulk Edit</button>
+          <button class="btn btn-primary" onclick="switchProdTab('add')">➕ Add Product</button>
+        </div>
+      </div>
+
+      <!-- PRODUCT TABS -->
+      <div class="prod-tabs">
+        <button class="prod-tab active" id="ptab-list" onclick="switchProdTab('list')">🧼 All Products</button>
+        <button class="prod-tab" id="ptab-add" onclick="switchProdTab('add')">➕ Add / Edit</button>
+        <button class="prod-tab" id="ptab-bulk" onclick="switchProdTab('bulk')">📋 Bulk Edit</button>
+      </div>
+
+      <!-- LIST VIEW -->
+      <div class="prod-tab-content active" id="ptab-content-list">
+        <div id="productsAdminGrid"><div class="loading">Loading products…</div></div>
+      </div>
+
+      <!-- ADD / EDIT FORM -->
+      <div class="prod-tab-content" id="ptab-content-add">
+        <div class="form-card">
+          <div class="form-card-title">
+            <span id="formTitle">Add New Product</span>
+            <button class="btn btn-ghost btn-sm" onclick="resetProductForm()">✕ Clear Form</button>
           </div>
-          <div class="product-name">${g.name}</div>
-          <div class="product-desc">${sel.description || ''}</div>
-          ${variantSelect}
-          <div class="product-price" id="price-${gid}">₹${sel.price}</div>
-          <div class="card-bottom">
-            <div class="qty-control" onclick="event.stopPropagation()">
-              <button class="qty-btn" onclick="event.stopPropagation();changeQtyGroup('${gid}', -1)">−</button>
-              <span class="qty-num" id="qty-${gid}">${qty}</span>
-              <button class="qty-btn" onclick="event.stopPropagation();changeQtyGroup('${gid}', 1)">+</button>
+          <input type="hidden" id="editProductId"/>
+
+          <div class="form-row">
+            <div class="fg"><label>Product Name *</label><input id="pName" placeholder="e.g. Lavender Rose Clay Soap"/></div>
+            <div class="fg"><label>Category *</label>
+              <select id="pCategory">
+                <option value="">Select…</option>
+                <option>Face Care</option><option>Body Care</option>
+                <option>Hair Care</option><option>Wellness</option><option>Gift Sets</option>
+              </select>
             </div>
-            <button class="add-to-order-btn ${qty > 0 ? 'selected' : ''}" id="btn-${gid}" onclick="event.stopPropagation();addToOrderGroup('${gid}')">
-              ${qty > 0 ? '✓ Added' : 'Add to Order'}
-            </button>
+          </div>
+          <div class="form-row">
+            <div class="fg"><label>Product Group (optional)</label><input id="pGroup" placeholder="e.g. Hibiscus Silky Shine Shampoo"/></div>
+            <div class="fg"><label>Variant / Size</label><input id="pVariant" placeholder="e.g. 100ml"/></div>
+          </div>
+          <div class="form-row">
+            <div class="fg"><label>Price (₹) *</label><input type="number" id="pPrice" placeholder="180" min="0"/></div>
+            <div class="fg"><label>Tag / Badge</label>
+              <select id="pTag">
+                <option value="">None</option>
+                <option>Bestseller</option><option>New</option><option>Detox</option>
+                <option>Brightening</option><option>Moisturising</option><option>Exfoliating</option>
+                <option>Refreshing</option><option>Strengthening</option><option>Traditional</option>
+                <option>Therapeutic</option><option>Nourishing</option><option>Antibacterial</option><option>Gift Ready</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row full">
+            <div class="fg"><label>Description</label><textarea id="pDescription" placeholder="Short product description shown on the store…"></textarea></div>
+          </div>
+          <div class="form-row">
+            <div class="fg"><label>Emoji Icon</label><input id="pEmoji" placeholder="🧼" maxlength="4" style="font-size:1.3rem;text-align:center"/></div>
+            <div class="fg"><label>Image Path (optional)</label><input id="pImage" placeholder="images/product-name.jpg"/></div>
+          </div>
+          <div class="fg" style="margin-top:0.3rem">
+            <label>Card Colour</label>
+            <div class="color-opts" id="colorPicker">
+              <div class="color-opt selected" data-val="pi1" style="background:linear-gradient(135deg,#c4a0c0,#8b5e8b)" onclick="selectColor(this)">✓</div>
+              <div class="color-opt" data-val="pi2" style="background:linear-gradient(135deg,#4a5c3a,#2e3d25)" onclick="selectColor(this)">✓</div>
+              <div class="color-opt" data-val="pi3" style="background:linear-gradient(135deg,#c4a882,#8d6040)" onclick="selectColor(this)">✓</div>
+              <div class="color-opt" data-val="pi4" style="background:linear-gradient(135deg,#5c7a6a,#3a5248)" onclick="selectColor(this)">✓</div>
+              <div class="color-opt" data-val="pi5" style="background:linear-gradient(135deg,#e8c4a0,#c49070)" onclick="selectColor(this)">✓</div>
+              <div class="color-opt" data-val="pi6" style="background:linear-gradient(135deg,#7a6a5a,#4a3a2e)" onclick="selectColor(this)">✓</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.8rem;margin-top:1.2rem;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="saveProduct()">💾 Save Product</button>
+            <button class="btn btn-ghost" onclick="resetProductForm()">Cancel</button>
+          </div>
+          <div class="form-msg" id="productFormMsg"></div>
+        </div>
+      </div>
+
+      <!-- BULK EDIT TABLE -->
+      <div class="prod-tab-content" id="ptab-content-bulk">
+        <div class="bulk-toolbar">
+          <button class="btn btn-primary" onclick="saveBulkEdits()">💾 Save All Changes</button>
+          <button class="btn btn-ghost" onclick="loadBulkTable()">↻ Reload</button>
+          <label class="btn btn-clay" style="cursor:pointer;margin:0">
+            📂 Upload CSV
+            <input type="file" id="csvUpload" accept=".csv" style="display:none" onchange="handleCSVUpload(event)"/>
+          </label>
+          <button class="btn btn-ghost btn-sm" onclick="downloadCSVTemplate()">⬇ Download Template</button>
+        </div>
+        <!-- Filter & Sort bar -->
+        <div style="display:flex;gap:0.8rem;align-items:center;flex-wrap:wrap;margin-bottom:0.8rem;padding:0.8rem;background:var(--cream)">
+          <input type="text" id="bulkSearch" placeholder="🔍 Search by name…" oninput="applyBulkFilter()"
+            style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none;min-width:180px"/>
+          <select id="bulkFilterCat" onchange="applyBulkFilter()"
+            style="font-family:'Jost',sans-serif;font-size:0.82rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none">
+            <option value="">All Categories</option>
+          </select>
+          <select id="bulkFilterHidden" onchange="applyBulkFilter()"
+            style="font-family:'Jost',sans-serif;font-size:0.82rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none">
+            <option value="">All Products</option>
+            <option value="visible">Visible only</option>
+            <option value="hidden">Hidden only</option>
+          </select>
+          <select id="bulkSort" onchange="applyBulkFilter()"
+            style="font-family:'Jost',sans-serif;font-size:0.82rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none">
+            <option value="name">Sort: Name A-Z</option>
+            <option value="name-desc">Sort: Name Z-A</option>
+            <option value="price-asc">Sort: Price Low-High</option>
+            <option value="price-desc">Sort: Price High-Low</option>
+            <option value="cat">Sort: Category</option>
+          </select>
+          <span id="bulkCount" style="font-size:0.75rem;color:var(--stone);margin-left:auto"></span>
+        </div>
+        <div id="csvMsg" style="display:none;margin-bottom:1rem;padding:0.8rem 1rem;font-size:0.82rem;border-radius:2px"></div>
+        <div class="bulk-table-wrap">
+          <table class="bulk-table">
+            <thead><tr>
+              <th>Emoji</th><th style="min-width:180px">Name</th><th style="min-width:150px">Group</th><th style="min-width:80px">Variant</th><th style="min-width:130px">Category</th>
+              <th style="min-width:80px">Price ₹</th><th style="min-width:120px">Tag</th>
+              <th style="min-width:250px">Description</th><th style="min-width:150px">Image Path</th>
+              <th style="min-width:80px">Colour</th><th style="min-width:70px">Hidden</th><th>Action</th>
+            </tr></thead>
+            <tbody id="bulkTableBody"><tr><td colspan="9" class="loading">Loading…</td></tr></tbody>
+          </table>
+          <button class="add-row-btn" onclick="addBulkRow()">➕ Add New Product Row</button>
+        </div>
+        <div style="margin-top:1rem;display:flex;gap:0.8rem;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="saveBulkEdits()">💾 Save All Changes</button>
+          <div class="form-msg" id="bulkMsg" style="display:inline-block;margin:0"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STOCK -->
+    <div class="section" id="section-stock">
+      <div class="page-header">
+        <div><div class="page-title">Stock</div><div class="page-sub">Adjust stock per product</div></div>
+        <button class="btn btn-primary" onclick="loadStockTable()">↻ Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Current Stock</th><th>Actions</th></tr></thead>
+          <tbody id="stockBody"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CUSTOMERS -->
+    <div class="section" id="section-customers">
+      <div class="page-header">
+        <div><div class="page-title">Customers</div><div class="page-sub">Built from order history</div></div>
+      </div>
+      <div style="display:flex;gap:0.6rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
+        <span style="font-size:0.72rem;color:var(--stone);text-transform:uppercase;letter-spacing:0.08em">Sort by:</span>
+        <button class="filter-btn active" onclick="sortCustomers('name',this)">Name</button>
+        <button class="filter-btn" onclick="sortCustomers('orders',this)">Most Orders</button>
+        <button class="filter-btn" onclick="sortCustomers('spent',this)">Most Spent</button>
+        <button class="filter-btn" onclick="sortCustomers('recent',this)">Recent</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th style="cursor:pointer" onclick="sortCustomers('name',null)">Name ↕</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>Address</th>
+            <th style="cursor:pointer" onclick="sortCustomers('orders',null)">Orders ↕</th>
+            <th style="cursor:pointer" onclick="sortCustomers('spent',null)">Total Spent ↕</th>
+            <th style="cursor:pointer" onclick="sortCustomers('recent',null)">Last Order ↕</th>
+          </tr></thead>
+          <tbody id="customersBody"><tr><td colspan="7" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- REPORTS -->
+    <div class="section" id="section-reports">
+      <div class="page-header">
+        <div><div class="page-title">Reports</div><div class="page-sub">Sales summary & product split</div></div>
+        <div style="display:flex;gap:0.6rem">
+          <button class="btn btn-ghost" onclick="exportReportsCSV()">⬇ Export CSV</button>
+          <button class="btn btn-primary" onclick="loadReports()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:0.8rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:1.2rem;padding:0.8rem;background:var(--cream)">
+        <div class="fg"><label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone)">From</label><input type="date" id="repFrom" onchange="renderReports()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"/></div>
+        <div class="fg"><label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone)">To</label><input type="date" id="repTo" onchange="renderReports()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"/></div>
+        <button class="btn btn-ghost btn-sm" onclick="resetReportFilter()">Clear dates</button>
+        <span id="repRangeInfo" style="font-size:0.75rem;color:var(--stone);margin-left:auto"></span>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label">Revenue</div><div class="stat-value green" id="repRevenue">—</div></div>
+        <div class="stat-card"><div class="stat-label">Orders</div><div class="stat-value" id="repOrders">—</div></div>
+        <div class="stat-card"><div class="stat-label">Items Sold</div><div class="stat-value" id="repItems">—</div></div>
+        <div class="stat-card"><div class="stat-label">Avg Order</div><div class="stat-value clay" id="repAvg">—</div></div>
+      </div>
+
+      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.6rem">Sales by Category</div>
+      <div class="table-wrap" style="margin-bottom:1.6rem">
+        <table>
+          <thead><tr><th>Category</th><th style="text-align:center">Qty</th><th style="text-align:right">Revenue</th><th style="text-align:right">Share</th></tr></thead>
+          <tbody id="repCategoryBody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+
+      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.6rem">Product Split</div>
+      <div class="table-wrap" style="margin-bottom:1.6rem">
+        <table>
+          <thead><tr><th>Product</th><th style="text-align:center">Qty</th><th style="text-align:right">Price / Unit</th><th style="text-align:right">Total</th></tr></thead>
+          <tbody id="repProductBody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+
+      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.6rem">Monthly Summary</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Month</th><th style="text-align:center">Orders</th><th style="text-align:center">Items</th><th style="text-align:right">Revenue</th></tr></thead>
+          <tbody id="repMonthlyBody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- DISPATCH MODAL -->
+  <div class="modal-overlay" id="dispatchModal">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal('dispatchModal')">×</button>
+      <div class="modal-title">📦 Mark as Dispatched</div>
+      <div class="mfg"><label>Courier *</label>
+        <select id="courierSelect" onchange="toggleOtherCourier()">
+          <option value="">Select courier…</option>
+          <option>ST Courier</option><option>Professional Courier</option>
+          <option>DTDC</option><option>India Post</option><option value="other">Other…</option>
+        </select>
+        <input type="text" id="courierOther" placeholder="Enter courier name" style="display:none;margin-top:0.5rem;font-family:'Jost',sans-serif;font-size:0.88rem;padding:0.65rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0;width:100%"/>
+      </div>
+      <div class="mfg"><label>Tracking ID *</label><input id="trackingId" placeholder="e.g. 1234567890"/></div>
+      <div style="display:flex;gap:0.8rem;margin-top:0.5rem">
+        <button class="btn btn-green" style="flex:1" onclick="confirmDispatch()">✓ Confirm Dispatch</button>
+        <button class="btn btn-ghost" onclick="closeModal('dispatchModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STOCK MODAL -->
+  <div class="modal-overlay" id="stockModal">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal('stockModal')">×</button>
+      <div class="modal-title">Adjust Stock</div>
+      <div class="mfg"><label>Product</label><input id="modalProductName" readonly style="opacity:0.6"/></div>
+      <div class="mfg"><label>Action</label>
+        <select id="modalAction"><option value="add">➕ Add Stock</option><option value="reduce">➖ Reduce Stock</option></select>
+      </div>
+      <div class="mfg"><label>Quantity</label><input type="number" id="modalQty" min="1" value="1"/></div>
+      <div class="mfg"><label>Notes (optional)</label><input id="modalNotes" placeholder="e.g. New batch received"/></div>
+      <div style="display:flex;gap:0.8rem;margin-top:0.5rem">
+        <button class="btn btn-primary" style="flex:1" onclick="saveStock()">Save</button>
+        <button class="btn btn-ghost" onclick="closeModal('stockModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- NEW ORDER MODAL -->
+  <div class="modal-overlay" id="newOrderModal">
+    <div class="modal" style="max-width:600px;width:100%">
+      <button class="modal-close" onclick="closeModal('newOrderModal')">×</button>
+      <div class="modal-title" id="noModalTitle">➕ New Manual Order</div>
+
+      <!-- Customer Details -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:1rem">
+        <div class="mfg" style="grid-column:1/-1"><label>Customer Name *</label><input id="noName" placeholder="Full name" style="text-transform:uppercase"/></div>
+        <div class="mfg"><label>Phone *</label><input id="noPhone" placeholder="00000 00000" oninput="autofillFromPhone()"/></div>
+        <div class="mfg"><label>Alternate Phone</label><input id="noAltPhone" placeholder="Optional"/></div>
+        <div class="mfg" style="grid-column:1/-1"><label>Address</label><input id="noAddress" placeholder="Delivery address" style="text-transform:uppercase"/></div>
+        <div class="mfg"><label>Email</label><input id="noEmail" type="email" placeholder="email@example.com"/></div>
+        <div class="mfg"><label>Notes</label><input id="noNotes" placeholder="Special instructions" style="text-transform:uppercase"/></div>
+      </div>
+
+      <div class="mfg" style="margin-bottom:1rem;max-width:220px"><label>Order Date</label><input type="date" id="noDate"/></div>
+
+      <!-- Product Selection -->
+      <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--stone);font-weight:500;margin-bottom:0.6rem">Products</div>
+      <div id="noProductRows" style="margin-bottom:0.8rem"></div>
+      <button class="btn btn-ghost btn-sm" onclick="addOrderProductRow()" style="margin-bottom:1rem;width:100%">➕ Add Product</button>
+
+      <!-- Order Summary -->
+      <div style="background:var(--cream);padding:0.8rem 1rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:0.82rem;color:var(--stone)">Order Total</span>
+        <span id="noTotal" style="font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--moss);font-weight:600">₹0</span>
+      </div>
+
+      <!-- Payment & Discount -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0.8rem;margin-bottom:1rem">
+        <div class="mfg">
+          <label>Shipping (₹)</label>
+          <input id="noShipping" type="number" value="0" min="0" oninput="recalcNewOrder()"/>
+        </div>
+        <div class="mfg">
+          <label>Discount (₹)</label>
+          <input id="noDiscount" type="number" value="0" min="0" oninput="recalcNewOrder()"/>
+        </div>
+        <div class="mfg">
+          <label>Payment Status</label>
+          <select id="noPaid">
+            <option value="false">Unpaid</option>
+            <option value="true">Paid</option>
+          </select>
+        </div>
+        <div class="mfg">
+          <label>Order Status</label>
+          <select id="noStatus">
+            <option value="confirmed">Confirmed</option>
+            <option value="new">New</option>
+            <option value="ready">Ready for Dispatch</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="noMsg" style="font-size:0.8rem;margin-bottom:0.8rem;display:none"></div>
+      <div style="display:flex;gap:0.8rem">
+        <button class="btn btn-primary" style="flex:1" onclick="saveNewOrder()">💾 Save Order</button>
+        <button class="btn btn-ghost" onclick="closeModal('newOrderModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import { getFirestore, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
+      authDomain: "pebble-store-70889.firebaseapp.com",
+      projectId: "pebble-store-70889",
+      storageBucket: "pebble-store-70889.firebasestorage.app",
+      messagingSenderId: "611731436877",
+      appId: "1:611731436877:web:eee0ef64cd8b4b86467304"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    let allProducts = [];
+    let selectedColorClass = 'pi1';
+    let currentStockProductId = null;
+    let currentStockValue = 0;
+    let currentDispatchOrderId = null;
+
+    // ── Auth ──
+    onAuthStateChanged(auth, user => {
+      if (!user) { window.location.href = '/admin/login.html'; return; }
+      loadOrders();
+    });
+    window.doSignOut = async () => { await signOut(auth); window.location.href = '/admin/login.html'; };
+
+    // ── Section switch ──
+    window.showSection = (name, el) => {
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById('section-' + name).classList.add('active');
+      el.classList.add('active');
+      if (name === 'orders')    loadOrders();
+      if (name === 'products')  { loadProductsList(); loadBulkTable(); }
+      if (name === 'stock')     loadStockTable();
+      if (name === 'customers') loadCustomers();
+      if (name === 'reports')   loadReports();
+    };
+
+    // ── Product tab switch ──
+    window.switchProdTab = (tab) => {
+      document.querySelectorAll('.prod-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.prod-tab-content').forEach(t => t.classList.remove('active'));
+      document.getElementById('ptab-' + tab).classList.add('active');
+      document.getElementById('ptab-content-' + tab).classList.add('active');
+      if (tab === 'bulk') loadBulkTable();
+      if (tab === 'list') loadProductsList();
+    };
+
+    function toast(msg, duration = 3000) {
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), duration);
+    }
+    window.closeModal = id => document.getElementById(id).classList.remove('open');
+
+    // ══════════════════════════════
+    // ORDERS
+    // ══════════════════════════════
+    let allOrders = [];
+    let filteredOrders = [];
+    const selectedOrderIds = new Set();
+
+    window.applyOrderFilters = () => {
+      const search = (document.getElementById('orderSearch')?.value || '').toLowerCase().trim();
+      const status = document.getElementById('orderFilterStatus')?.value || '';
+      const paid   = document.getElementById('orderFilterPaid')?.value || '';
+      const digits = search.replace(/\D/g, '');
+
+      let filtered = [...allOrders];
+      if (search) filtered = filtered.filter(o =>
+        (o.name || '').toLowerCase().includes(search) ||
+        (digits && (o.phone || '').replace(/\D/g, '').includes(digits)) ||
+        (digits && o.orderNo != null && String(o.orderNo).includes(digits))
+      );
+      if (status) filtered = filtered.filter(o => o.status === status);
+      if (paid === 'paid')   filtered = filtered.filter(o => o.paid);
+      if (paid === 'unpaid') filtered = filtered.filter(o => !o.paid);
+
+      filteredOrders = filtered;
+      renderOrdersTable(filtered);
+      updateOrderCount();
+    };
+
+    function updateOrderCount() {
+      const el = document.getElementById('orderCount');
+      if (el) el.textContent = `${filteredOrders.length} of ${allOrders.length} orders` +
+        (selectedOrderIds.size ? ` · ${selectedOrderIds.size} selected` : '');
+    }
+
+    window.toggleOrderSelect = (id, el) => {
+      if (el.checked) selectedOrderIds.add(id); else selectedOrderIds.delete(id);
+      const all = document.getElementById('orderSelectAll');
+      if (all && !el.checked) all.checked = false;
+      updateOrderCount();
+    };
+
+    window.toggleSelectAll = (el) => {
+      document.querySelectorAll('#ordersBody .order-check').forEach(cb => {
+        cb.checked = el.checked;
+        if (el.checked) selectedOrderIds.add(cb.value); else selectedOrderIds.delete(cb.value);
+      });
+      updateOrderCount();
+    };
+
+    window.loadOrders = async () => {
+      try {
+        const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+        const snap = await getDocs(q);
+        allOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const orders = allOrders;
+        document.getElementById('statTotal').textContent      = orders.length;
+        document.getElementById('statNew').textContent        = orders.filter(o => o.status === 'new').length;
+        document.getElementById('statConfirmed').textContent  = orders.filter(o => o.status === 'confirmed').length;
+        document.getElementById('statReady').textContent      = orders.filter(o => o.status === 'ready').length;
+        document.getElementById('statDispatched').textContent = orders.filter(o => o.status === 'dispatched').length;
+        document.getElementById('statDelivered').textContent  = orders.filter(o => o.status === 'delivered').length;
+        applyOrderFilters();
+      } catch (err) { document.getElementById('ordersBody').innerHTML = `<tr><td colspan="8" class="loading">Error: ${err.message}</td></tr>`; }
+    };
+
+    function renderOrdersTable(orders) {
+      if (!orders.length) { document.getElementById('ordersBody').innerHTML = '<tr><td colspan="10" class="loading">No orders found.</td></tr>'; return; }
+        const sc = { new:'badge-new', confirmed:'badge-confirmed', ready:'badge-ready', dispatched:'badge-dispatched', delivered:'badge-delivered', cancelled:'badge-cancelled' };
+        document.getElementById('ordersBody').innerHTML = orders.map(o => {
+          const date  = new Date(o.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
+          const items = (o.items || []).map(i => `${i.name} ×${i.qty}`).join('<br>');
+          const trackingHtml = o.tracking
+            ? `<div style="font-size:0.75rem"><strong>${o.tracking.courier}</strong><br><span style="font-family:monospace;color:var(--moss)">${o.tracking.trackingId}</span></div>`
+            : `<span style="color:var(--stone);font-size:0.72rem">—</span>`;
+          let actions = '';
+          if (o.status === 'new') {
+            actions = `<button class="btn btn-sm btn-ghost" onclick="updateStatus('${o.id}','confirmed')">Confirm</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button><button class="btn btn-sm" style="margin-top:3px;background:var(--dark);color:var(--cream)" onclick="deleteOrder('${o.id}')">Delete</button>`;
+          } else if (o.status === 'confirmed') {
+            actions = `<button class="btn btn-sm btn-blue" onclick="updateStatus('${o.id}','ready')">Mark Ready</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button><button class="btn btn-sm" style="margin-top:3px;background:var(--dark);color:var(--cream)" onclick="deleteOrder('${o.id}')">Delete</button>`;
+          } else if (o.status === 'ready') {
+            actions = `<button class="btn btn-sm btn-green" onclick="openDispatchModal('${o.id}')">Dispatch</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button><button class="btn btn-sm" style="margin-top:3px;background:var(--dark);color:var(--cream)" onclick="deleteOrder('${o.id}')">Delete</button>`;
+          } else if (o.status === 'dispatched') {
+            actions = `<button class="btn btn-sm btn-blue" onclick="updateStatus('${o.id}','delivered')">Delivered</button>`;
+          } else if (o.status === 'delivered') {
+            actions = `<span style="font-size:0.72rem;color:var(--moss)">✓ Complete</span>`;
+          } else if (o.status === 'cancelled') {
+            actions = `<span style="font-size:0.72rem;color:#c0392b">✗ Cancelled</span>`;
+          }
+          actions += `<button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="printReceipt('${o.id}')">🧾 Receipt</button>`;
+          return `<tr>
+            <td style="text-align:center"><input type="checkbox" class="order-check" value="${o.id}" ${selectedOrderIds.has(o.id) ? 'checked' : ''} onclick="toggleOrderSelect('${o.id}',this)"/></td>
+            <td style="white-space:nowrap;font-size:0.78rem">${date}<br><span style="color:var(--stone);font-size:0.72rem">#${o.orderNo != null ? o.orderNo : '—'}</span></td>
+            <td><strong>${o.name}</strong>${o.source === 'admin' ? ' <span style="font-size:0.62rem;background:#e8d5ff;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">ADMIN</span>' : ''}<br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
+            <td>${normPhone(o.phone) || o.phone || ''}</td>
+            <td class="order-items">${items}</td>
+            <td><strong>₹${o.total}</strong></td>
+            <td>${o.paid
+              ? '<span style="font-size:0.72rem;color:var(--moss);font-weight:600">✓ Paid</span>'
+              : `<button class="btn btn-sm btn-green" onclick="markAsPaid('${o.id}')" style="font-size:0.65rem;padding:0.2rem 0.5rem">Mark Paid</button>`
+            }</td>
+            <td><span class="badge ${sc[o.status] || 'badge-new'}">${o.status === 'ready' ? 'ready for dispatch' : o.status}</span></td>
+            <td>${trackingHtml}</td>
+            <td><div class="action-btns">${actions}</div></td>
+          </tr>`;
+        }).join('');
+    }
+
+    window.markAsPaid = async (id) => {
+      try {
+        await updateDoc(doc(db, 'orders', id), { paid: true, updatedAt: new Date().toISOString() });
+        toast('✅ Order marked as paid');
+        loadOrders();
+      } catch (err) { toast('❌ ' + err.message); }
+    };
+
+    window.updateStatus = async (id, status) => {
+      try { await updateDoc(doc(db, 'orders', id), { status, updatedAt: new Date().toISOString() }); toast(`✅ Order marked as ${status}`); loadOrders(); }
+      catch (err) { toast('❌ ' + err.message); }
+    };
+    window.cancelOrder = async (id) => {
+      if (!confirm('Cancel this order?')) return;
+      try { await updateDoc(doc(db, 'orders', id), { status: 'cancelled', updatedAt: new Date().toISOString() }); toast('✅ Order cancelled'); loadOrders(); }
+      catch (err) { toast('❌ ' + err.message); }
+    };
+    window.deleteOrder = async (id) => {
+      if (!confirm('Permanently delete this order? This cannot be undone.')) return;
+      try { await deleteDoc(doc(db, 'orders', id)); toast('🗑️ Order deleted'); loadOrders(); }
+      catch (err) { toast('❌ ' + err.message); }
+    };
+
+    // ── Receipt / Invoice (print → Save as PDF) ──
+    const STORE = {
+      name:    'PEBBLE STORE',
+      address: '10-4-4 Munsip Kadu, Rangampalayam, Konganapuram, Salem - 637102',
+      phone:   '9791240655',
+      logo:    location.origin + '/images/logo.png'
+    };
+    const PHONE_ICON = '<svg width="11" height="11" viewBox="0 0 24 24" fill="#000" style="vertical-align:-1px;margin-right:3px"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.6.1.4 0 .8-.3 1L6.6 10.8z"/></svg>';
+
+    // Next order number = highest existing orderNo + 1 (starts at 1000)
+    async function nextOrderNo() {
+      const snap = await getDocs(collection(db, 'orders'));
+      let max = 999;
+      snap.forEach(d => { const n = d.data().orderNo; if (typeof n === 'number' && n > max) max = n; });
+      return max + 1;
+    }
+
+    const escapeHtml = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+    // Normalise a phone to its last 10 digits so +91 / spacing variants match
+    const normPhone = (p) => String(p ?? '').replace(/\D/g, '').slice(-10);
+    // Grouped-product label: "Group — Variant" when grouped, else the plain name
+    const prodLabel = (p) => p && p.productGroup ? `${p.productGroup}${p.variant ? ' — ' + p.variant : ''}` : (p ? p.name : '');
+
+    function buildReceiptHtml(o) {
+      const fmt   = n => '₹' + Number(n || 0).toLocaleString('en-IN');
+      const items = o.items || [];
+      const subtotal = o.subtotal != null ? o.subtotal : items.reduce((s, i) => s + (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0)), 0);
+      const shipping = o.shipping || 0;
+      const discount = o.discount || 0;
+      const total    = o.total != null ? o.total : Math.max(0, subtotal + shipping - discount);
+      const orderNo  = o.orderNo != null ? o.orderNo : o.id;
+      const toPhone  = normPhone(o.phone) || o.phone || '';
+      const altPhone = o.altPhone ? (normPhone(o.altPhone) || o.altPhone) : '';
+      const date = o.createdAt
+        ? new Date(o.createdAt).toLocaleString('en-IN', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+        : '—';
+      const rows = items.map(i => `
+        <tr>
+          <td>${escapeHtml(i.name)}</td>
+          <td class="num">${fmt(i.price)}</td>
+          <td class="num">${i.qty}</td>
+          <td class="num">${fmt(i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0))}</td>
+        </tr>`).join('');
+
+      return `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>Label · ${escapeHtml(o.name)} · #${escapeHtml(String(orderNo))}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;color:#000;padding:32px;font-size:13px}
+  .rc{max-width:720px;margin:0 auto}
+  .lblhead{display:flex;justify-content:space-between;gap:24px;border-bottom:2px solid #000;padding-bottom:16px;margin-bottom:16px}
+  .to{flex:1;text-align:right;border-left:2px solid #000;padding-left:24px}
+  .lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#000;margin-bottom:5px}
+  .to .lbl{color:#000}
+  .to-name{font-size:20px;font-weight:700;color:#000;margin-bottom:5px;letter-spacing:0.5px}
+  .to-addr{font-size:15px;line-height:1.5;color:#000;margin-left:auto;max-width:360px}
+  .to-phone{font-size:14px;margin-top:7px;color:#000;font-weight:600}
+  .from{text-align:left;max-width:320px}
+  .listing{position:relative}
+  .watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:75%;max-width:440px;opacity:0.10;pointer-events:none}
+  .listing table,.listing .totals{position:relative;z-index:1}
+  .from-name{font-size:13px;font-weight:700;color:#000;letter-spacing:1px}
+  .from-addr{font-size:15px;color:#000;line-height:1.5;margin-top:2px;text-transform:uppercase}
+  .from-phone{font-size:14px;color:#000;margin-top:3px;font-weight:600}
+  .orderbar{font-size:13px;color:#000;font-weight:700;letter-spacing:0.5px;margin-bottom:12px}
+  table{width:100%;border-collapse:collapse;margin-bottom:16px}
+  th{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#000;border-bottom:1.5px solid #000;padding:8px 10px;text-align:left}
+  td{padding:8px 10px;border-bottom:1px solid #ccc}
+  .num{text-align:right}
+  th.num{text-align:right}
+  .totals{margin-left:auto;width:280px}
+  .totals .row{display:flex;justify-content:space-between;padding:5px 10px}
+  .totals .grand{border-top:2px solid #000;margin-top:6px;padding-top:10px;font-size:16px;font-weight:700;color:#000}
+  .foot{margin-top:30px;text-align:center;font-size:11px;color:#000;border-top:1px solid #ccc;padding-top:16px;line-height:1.6}
+  @media print{ body{padding:0} @page{margin:16mm} }
+</style></head>
+<body onload="setTimeout(function(){window.print()},250)">
+  <div class="rc">
+    <div class="lblhead">
+      <div class="from">
+        <div class="lbl">From</div>
+        <div class="from-name">${STORE.name}</div>
+        <div class="from-addr">${STORE.address}</div>
+        <div class="from-phone">${PHONE_ICON}${STORE.phone}</div>
+      </div>
+      <div class="to">
+        <div class="lbl">Deliver To</div>
+        <div class="to-name">${escapeHtml(o.name)}</div>
+        <div class="to-addr">${escapeHtml(o.address || '—')}</div>
+        <div class="to-phone">${PHONE_ICON}${escapeHtml(toPhone)}</div>
+        ${altPhone ? `<div class="to-phone" style="font-weight:400;font-size:13px">${PHONE_ICON}${escapeHtml(altPhone)} (alt)</div>` : ''}
+      </div>
+    </div>
+    <div class="orderbar">Order #${escapeHtml(String(orderNo))} &nbsp;·&nbsp; ${date}</div>
+    <div class="listing">
+      <img class="watermark" src="${STORE.logo}" alt="" onerror="this.style.display='none'"/>
+      <table>
+        <thead><tr><th>Item</th><th class="num">Price</th><th class="num">Qty</th><th class="num">Amount</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="4" style="text-align:center;color:#000">No items</td></tr>'}</tbody>
+      </table>
+      <div class="totals">
+      <div class="row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
+      ${shipping ? `<div class="row"><span>Shipping</span><span>${fmt(shipping)}</span></div>` : ''}
+      ${discount ? `<div class="row"><span>Discount</span><span>−${fmt(discount)}</span></div>` : ''}
+      <div class="row grand"><span>Total</span><span>${fmt(total)}</span></div>
+      </div>
+    </div>
+    ${o.notes ? `<div style="margin-top:18px;font-size:12px;color:#000"><strong>Notes:</strong> ${escapeHtml(o.notes)}</div>` : ''}
+    <div class="foot">Thank you for shopping with Pebble Store 🌿<br/>Handmade natural products, crafted with care.</div>
+  </div>
+</body></html>`;
+    }
+
+    window.printReceipt = (id) => {
+      const o = allOrders.find(x => x.id === id);
+      if (!o) { toast('❌ Order not found'); return; }
+      const win = window.open('', '_blank', 'width=820,height=920');
+      if (!win) { toast('⚠️ Allow pop-ups to print the receipt'); return; }
+      win.document.write(buildReceiptHtml(o));
+      win.document.close();
+    };
+
+    // ── Batch sheet: 4 compact receipts per A4 page ──
+    function buildReceiptCard(o) {
+      const fmt   = n => '₹' + Number(n || 0).toLocaleString('en-IN');
+      const items = o.items || [];
+      const subtotal = o.subtotal != null ? o.subtotal : items.reduce((s, i) => s + (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0)), 0);
+      const shipping = o.shipping || 0;
+      const discount = o.discount || 0;
+      const total    = o.total != null ? o.total : Math.max(0, subtotal + shipping - discount);
+      const orderNo  = o.orderNo != null ? o.orderNo : o.id;
+      const toPhone  = normPhone(o.phone) || o.phone || '';
+      const altPhone = o.altPhone ? (normPhone(o.altPhone) || o.altPhone) : '';
+      const date = o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : '—';
+      const itemLines = items.map(i =>
+        `<div class="ci"><span>${escapeHtml(i.name)} ×${i.qty}</span><span>${fmt(i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0))}</span></div>`
+      ).join('');
+      return `<div class="card">
+        <img class="cwatermark" src="${STORE.logo}" alt="" onerror="this.style.display='none'"/>
+        <div class="chead">
+          <div class="cfrom">
+            <div class="cfrom-lbl">From</div>
+            <div><strong>${STORE.name}</strong><br/>Konganapuram, Salem - 637102<br/>${PHONE_ICON}${STORE.phone}</div>
+          </div>
+          <div class="cto">
+            <div class="clbl">Deliver To</div>
+            <div class="cto-name">${escapeHtml(o.name)}</div>
+            <div class="cto-addr">${escapeHtml(o.address || '—')}</div>
+            <div class="cto-phone">${PHONE_ICON}${escapeHtml(toPhone)}</div>
+            ${altPhone ? `<div class="cto-phone" style="font-weight:400">${PHONE_ICON}${escapeHtml(altPhone)} (alt)</div>` : ''}
           </div>
         </div>
+        <div class="cmeta">Order #${escapeHtml(String(orderNo))} · ${date}</div>
+        <div class="citems">${itemLines || '<div class="ci"><span>No items</span><span></span></div>'}</div>
+        ${shipping ? `<div class="ci small"><span>Shipping</span><span>${fmt(shipping)}</span></div>` : ''}
+        ${discount ? `<div class="ci small"><span>Discount</span><span>−${fmt(discount)}</span></div>` : ''}
+        <div class="ctotal"><span>Total</span><span>${fmt(total)}</span></div>
       </div>`;
-  }).join('');
-}
-
-// Variant switched → reflect that variant's price and cart state
-window.onVariantChange = function(gid) {
-  const s = document.getElementById('vsel-' + gid);
-  const opt = s && s.selectedOptions[0];
-  if (!opt) return;
-  const id = s.value;
-  const priceEl = document.getElementById('price-' + gid);
-  if (priceEl) priceEl.textContent = '₹' + opt.dataset.price;
-  const qty = cart[id] || 0;
-  const qtyEl = document.getElementById('qty-' + gid);
-  const btnEl = document.getElementById('btn-' + gid);
-  if (qtyEl) qtyEl.textContent = qty;
-  if (btnEl) { btnEl.textContent = qty > 0 ? '✓ Added' : 'Add to Order'; btnEl.classList.toggle('selected', qty > 0); }
-};
-
-window.changeQtyGroup = function(gid, delta) {
-  const id = selectedVariantId(gid);
-  if (!id) return;
-  const newQty = Math.max(0, (cart[id] || 0) + delta);
-  if (newQty === 0) delete cart[id]; else cart[id] = newQty;
-  const qtyEl = document.getElementById('qty-' + gid);
-  const btnEl = document.getElementById('btn-' + gid);
-  if (qtyEl) qtyEl.textContent = newQty;
-  if (btnEl) { btnEl.textContent = newQty > 0 ? '✓ Added' : 'Add to Order'; btnEl.classList.toggle('selected', newQty > 0); }
-  updateSummary();
-  saveCartToSession();
-};
-
-window.addToOrderGroup = function(gid) {
-  const id = selectedVariantId(gid);
-  if (!id) return;
-  cart[id] = (cart[id] || 0) + 1;
-  const qtyEl = document.getElementById('qty-' + gid);
-  const btnEl = document.getElementById('btn-' + gid);
-  if (qtyEl) qtyEl.textContent = cart[id];
-  if (btnEl) { btnEl.textContent = '✓ Added'; btnEl.classList.add('selected'); }
-  saveCartToSession();
-};
-
-// ── Cart ──
-window.changeQty = function(id, delta) {
-  const newQty = Math.max(0, (cart[id] || 0) + delta);
-  if (newQty === 0) delete cart[id]; else cart[id] = newQty;
-  const qtyEl = document.getElementById('qty-' + id);
-  const btnEl = document.getElementById('btn-' + id);
-  if (qtyEl) qtyEl.textContent = newQty;
-  if (btnEl) { btnEl.textContent = newQty > 0 ? '✓ Added' : 'Add to Order'; btnEl.classList.toggle('selected', newQty > 0); }
-  updateSummary();
-  saveCartToSession();
-};
-
-window.addToOrder = function(id) {
-  if (!cart[id]) cart[id] = 0;
-  cart[id] = (cart[id] || 0) + 1;
-  const qtyEl = document.getElementById('qty-' + id);
-  const btnEl = document.getElementById('btn-' + id);
-  if (qtyEl) qtyEl.textContent = cart[id];
-  if (btnEl) { btnEl.textContent = '✓ Added'; btnEl.classList.add('selected'); }
-  saveCartToSession();
-};
-
-window.removeFromCart = function(id) {
-  delete cart[id];
-  const qtyEl = document.getElementById('qty-' + id);
-  const btnEl = document.getElementById('btn-' + id);
-  if (qtyEl) qtyEl.textContent = 0;
-  if (btnEl) { btnEl.textContent = 'Add to Order'; btnEl.classList.remove('selected'); }
-  updateSummary();
-  saveCartToSession();
-};
-
-// ── Cart total ──
-function getCartTotal() {
-  return Object.entries(cart)
-    .filter(([, q]) => q > 0)
-    .reduce((sum, [id, qty]) => {
-      const p = allProducts.find(x => x.id === id);
-      return sum + (p ? p.price * qty : 0);
-    }, 0);
-}
-
-// ── Order summary table ──
-function updateSummary() {
-  const container = document.getElementById('summaryContent');
-  if (!container) return;
-  const items = Object.entries(cart).filter(([, q]) => q > 0);
-  if (!items.length) {
-    container.innerHTML = '<span class="empty-selection">No products added yet — set a quantity above and click "Add to Order"</span>';
-    return;
-  }
-  let total = 0;
-  const rows = items.map(([id, qty]) => {
-    const p = allProducts.find(x => x.id === id);
-    if (!p) return '';
-    const sub = p.price * qty;
-    total += sub;
-    return `<tr>
-      <td>${p.emoji || '🧼'} ${displayName(p)}</td>
-      <td style="text-align:center">₹${p.price}</td>
-      <td style="text-align:center">${qty}</td>
-      <td style="text-align:right">₹${sub}</td>
-      <td style="text-align:center"><button class="summary-remove" onclick="removeFromCart('${id}')" title="Remove">×</button></td>
-    </tr>`;
-  }).join('');
-  container.innerHTML = `
-    <table class="summary-table">
-      <thead><tr>
-        <th>Product</th><th style="text-align:center">Price</th>
-        <th style="text-align:center">Qty</th><th style="text-align:right">Subtotal</th><th></th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-      <tfoot><tr class="summary-total-row">
-        <td colspan="3">Total</td>
-        <td style="text-align:right">₹${total}</td><td></td>
-      </tr></tfoot>
-    </table>`;
-}
-
-// ── Build order object ──
-function buildOrder() {
-  const items = Object.entries(cart)
-    .filter(([, q]) => q > 0)
-    .map(([id, qty]) => {
-      const p = allProducts.find(x => x.id === id);
-      return p ? { id, name: displayName(p), price: p.price, qty, subtotal: p.price * qty } : null;
-    }).filter(Boolean);
-  return {
-    name:      document.getElementById('custName').value.trim(),
-    phone:     document.getElementById('phone').value.trim(),
-    email:     document.getElementById('email').value.trim(),
-    address:   document.getElementById('address').value.trim(),
-    notes:     document.getElementById('notes').value.trim(),
-    items,
-    total:     items.reduce((s, i) => s + i.subtotal, 0),
-    status:    'new',
-    paid:      false,
-    tracking:  null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-}
-
-// ── Next order number = highest existing orderNo + 1 (starts at 1000) ──
-async function nextOrderNo() {
-  const snap = await getDocs(collection(db, 'orders'));
-  let max = 999;
-  snap.forEach(d => { const n = d.data().orderNo; if (typeof n === 'number' && n > max) max = n; });
-  return max + 1;
-}
-
-// ── Save order to Firestore ──
-async function saveOrder() {
-  const order = buildOrder();
-  try { order.orderNo = await nextOrderNo(); } catch (e) { console.warn('Order number assignment failed:', e); }
-  const docRef = await addDoc(collection(db, 'orders'), order);
-  return { ...order, id: docRef.id };
-}
-
-// ── Validate form ──
-function validateOrder() {
-  const hasItems = Object.values(cart).some(q => q > 0);
-  const err      = document.getElementById('errorMsg');
-  const name     = document.getElementById('custName').value.trim();
-  const phone    = document.getElementById('phone').value.trim();
-  const address  = document.getElementById('address').value.trim();
-  if (!hasItems) {
-    err.textContent = '⚠️ Please add at least one product to your order.';
-    err.style.display = 'block';
-    err.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return false;
-  }
-  if (!name || !phone || !address) {
-    err.textContent = '⚠️ Please fill in your name, phone and address.';
-    err.style.display = 'block';
-    err.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return false;
-  }
-  err.style.display = 'none';
-  return true;
-}
-
-// ── Show success page ──
-function showSuccessPage() {
-  const items = Object.entries(cart).filter(([, q]) => q > 0);
-  let total = 0;
-  const rows = items.map(([id, qty]) => {
-    const p = allProducts.find(x => x.id === id);
-    if (!p) return '';
-    const sub = p.price * qty;
-    total += sub;
-    return `<div class="success-order-row">
-      <span>${p.emoji || '🧼'} ${p.name} × ${qty}</span>
-      <span>₹${sub}</span>
-    </div>`;
-  }).filter(Boolean).join('');
-
-  document.getElementById('successOrderDetails').innerHTML = rows;
-  document.getElementById('successTotal').innerHTML = `<span>Total</span><span>₹${total}</span>`;
-  document.getElementById('orderFormView').style.display  = 'none';
-  document.getElementById('orderSuccessView').style.display = 'block';
-}
-
-
-// ── Reset order ──
-window.resetOrder = function() {
-  Object.keys(cart).forEach(id => {
-    delete cart[id];
-    const qtyEl = document.getElementById('qty-' + id);
-    const btnEl = document.getElementById('btn-' + id);
-    if (qtyEl) qtyEl.textContent = 0;
-    if (btnEl) { btnEl.textContent = 'Add to Order'; btnEl.classList.remove('selected'); }
-  });
-  updateSummary();
-  document.getElementById('orderForm').reset();
-  document.getElementById('orderSuccessView').style.display = 'none';
-  document.getElementById('orderFormView').style.display    = 'block';
-  document.getElementById('products').scrollIntoView({ behavior: 'smooth' });
-};
-
-// ── Build WhatsApp query message ──
-function buildWhatsAppQueryUrl() {
-  const name  = document.getElementById('custName').value.trim();
-  const items = Object.entries(cart).filter(([, q]) => q > 0);
-  let msg = `Hi Pebble Store! 👋\n\n`;
-  if (name) msg += `I'm ${name} and I have a query about my order.\n\n`;
-  if (items.length) {
-    msg += `*Products I'm interested in:*\n`;
-    items.forEach(([id, qty]) => {
-      const p = allProducts.find(x => x.id === id);
-      if (p) msg += `• ${displayName(p)} × ${qty} = ₹${p.price * qty}\n`;
-    });
-    msg += `\n*Total: ₹${getCartTotal()}*\n\n`;
-  }
-  msg += `Could you please help me?`;
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
-}
-
-// ── Payment button (order form submit) ──
-// TODO: Replace saveOrder() with Razorpay payment initiation when ready
-const orderFormEl = document.getElementById('orderForm');
-if (orderFormEl) orderFormEl.addEventListener('submit', async function(e) {
-  e.preventDefault();
-  if (!validateOrder()) return;
-
-  const btn = document.getElementById('placeOrderBtn');
-  if (!btn) return;
-  btn.style.opacity = '0.7';
-  btn.style.pointerEvents = 'none';
-  btn.querySelector('.btn-sub').textContent = 'Placing order…';
-
-  try {
-    await saveOrder();
-    // ── PAYMENT INTEGRATION POINT ──
-    // When Razorpay is ready, replace saveOrder() above with:
-    // 1. saveOrder() to get orderId
-    // 2. Open Razorpay checkout with orderId + total
-    // 3. On payment success → mark order as paid in Firestore
-    showSuccessPage();
-  } catch (err) {
-    const errEl = document.getElementById('errorMsg');
-    errEl.textContent = '⚠️ Something went wrong. Please try again.';
-    errEl.style.display = 'block';
-    btn.style.opacity = '1';
-    btn.style.pointerEvents = 'auto';
-    btn.querySelector('.btn-sub').textContent = 'Secure checkout · Cards, UPI & more';
-  }
-});
-
-// ── WhatsApp button — QR on desktop, open on mobile ──
-const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
-let waQrGenerated = false;
-
-const whatsappBtnEl = document.getElementById('whatsappBtn');
-if (whatsappBtnEl) whatsappBtnEl.addEventListener('click', function() {
-  if (isMobile) {
-    // Mobile → open WhatsApp directly
-    window.open(buildWhatsAppQueryUrl(), '_blank');
-  } else {
-    // Desktop → toggle QR panel
-    const panel = document.getElementById('waQrPanel');
-    const isOpen = panel.classList.contains('visible');
-    if (isOpen) {
-      panel.classList.remove('visible');
-      document.getElementById("waBtnSub").textContent = "Questions? We'll reply instantly";
-      return;
     }
-    // Generate QR — wait for library if not ready yet
-    function generateWaQR() {
-      if (typeof QRCode === 'undefined') {
-        setTimeout(generateWaQR, 100);
+
+    window.printOrdersSheet = () => {
+      const orders = selectedOrderIds.size
+        ? allOrders.filter(o => selectedOrderIds.has(o.id))
+        : (filteredOrders.length ? filteredOrders : allOrders);
+      if (!orders.length) { toast('No orders to print'); return; }
+      const win = window.open('', '_blank', 'width=900,height=1000');
+      if (!win) { toast('⚠️ Allow pop-ups to print'); return; }
+      const pages = [];
+      for (let i = 0; i < orders.length; i += 4) pages.push(orders.slice(i, i + 4));
+      const body = pages.map(g => `<div class="page">${g.map(buildReceiptCard).join('')}</div>`).join('');
+      win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>Order Receipts (${orders.length})</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;color:#000}
+  .page{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6mm;height:281mm;page-break-after:always}
+  .page:last-child{page-break-after:auto}
+  .card{border:1px solid #000;border-radius:3px;padding:6mm;display:flex;flex-direction:column;overflow:hidden;font-size:11px;position:relative}
+  .cwatermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;opacity:0.10;pointer-events:none;z-index:0}
+  .card > div{position:relative;z-index:1}
+  .chead{display:flex;justify-content:space-between;gap:8px;border-bottom:1.5px solid #000;padding-bottom:6px;margin-bottom:6px}
+  .cto{flex:1;text-align:right}
+  .clbl{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:#000;margin-bottom:2px}
+  .cto-name{font-size:14px;font-weight:700;color:#000;letter-spacing:0.3px}
+  .cto-addr{font-size:11px;line-height:1.35;color:#000}
+  .cto-phone{font-size:11px;margin-top:2px;font-weight:600}
+  .cfrom{text-align:left;max-width:150px;font-size:11px;color:#000;line-height:1.35;text-transform:uppercase}
+  .cfrom .clogo{height:30px;object-fit:contain;margin:0 0 3px 0;display:block}
+  .cfrom-lbl{font-size:7px;letter-spacing:1px;text-transform:uppercase;color:#000}
+  .cmeta{font-size:10px;color:#000;font-weight:600;margin-bottom:5px}
+  .citems{flex:1;border-top:1px dashed #ccc;padding-top:6px;overflow:hidden}
+  .ci{display:flex;justify-content:space-between;padding:2px 0}
+  .ci.small{color:#000;font-size:10px}
+  .ctotal{display:flex;justify-content:space-between;border-top:1.5px solid #000;margin-top:6px;padding-top:6px;font-weight:700;font-size:13px;color:#000}
+  @page{size:A4;margin:8mm}
+</style></head>
+<body onload="setTimeout(function(){window.print()},250)">${body}</body></html>`);
+      win.document.close();
+    };
+    window.openDispatchModal = (id) => {
+      currentDispatchOrderId = id;
+      document.getElementById('courierSelect').value = '';
+      document.getElementById('courierOther').value = '';
+      document.getElementById('courierOther').style.display = 'none';
+      document.getElementById('trackingId').value = '';
+      document.getElementById('dispatchModal').classList.add('open');
+    };
+    window.toggleOtherCourier = () => {
+      document.getElementById('courierOther').style.display =
+        document.getElementById('courierSelect').value === 'other' ? 'block' : 'none';
+    };
+    window.confirmDispatch = async () => {
+      const sel = document.getElementById('courierSelect').value;
+      const courier = sel === 'other' ? document.getElementById('courierOther').value.trim() : sel;
+      const trackingId = document.getElementById('trackingId').value.trim();
+      if (!courier || !trackingId) { toast('⚠️ Select courier and enter tracking ID'); return; }
+      try {
+        await updateDoc(doc(db, 'orders', currentDispatchOrderId), {
+          status: 'dispatched',
+          tracking: { courier, trackingId, dispatchedAt: new Date().toISOString() },
+          updatedAt: new Date().toISOString()
+        });
+        toast('✅ Order dispatched!'); closeModal('dispatchModal'); loadOrders();
+      } catch (err) { toast('❌ ' + err.message); }
+    };
+
+    // ══════════════════════════════
+    // PRODUCTS — LIST VIEW
+    // ══════════════════════════════
+    window.toggleHideProduct = async (id, hide) => {
+      try {
+        await updateDoc(doc(db, 'products', id), { hidden: hide, updatedAt: new Date().toISOString() });
+        toast(hide ? '🚫 Product hidden from store' : '✅ Product visible in store');
+        loadProductsList();
+      } catch (err) { toast('❌ ' + err.message); }
+    };
+
+    window.loadProductsList = async () => {
+      const grid = document.getElementById('productsAdminGrid');
+      grid.innerHTML = '<div class="loading">Loading products…</div>';
+      try {
+        const snap = await getDocs(collection(db, 'products'));
+        allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (!allProducts.length) {
+          grid.innerHTML = `<div class="empty-state"><div class="es-icon">🧼</div><p>No products yet.</p><button class="btn btn-primary" onclick="switchProdTab('add')">➕ Add First Product</button></div>`;
+          return;
+        }
+        grid.innerHTML = `<div class="products-grid-admin">` + allProducts.map(p => {
+          const stock = p.stock || 0;
+          const sc = stock <= 5 ? 'color:#c0392b;font-weight:600' : 'color:var(--moss);font-weight:600';
+          return `<div class="pac">
+            <div class="pac-header">
+              <div class="pac-emoji">${p.emoji || '🧼'}</div>
+              <div><div class="pac-name">${p.name}</div><div class="pac-cat">${p.category || ''}</div></div>
+            </div>
+            ${p.tag ? `<span class="pac-tag">${p.tag}</span>` : ''}
+            <div class="pac-price">₹${p.price} / bar</div>
+            <div class="pac-desc">${p.description || ''}</div>
+            <div class="pac-footer">
+              <span style="${sc}">${stock <= 5 ? '⚠️ ' : ''}${stock} in stock</span>
+              <div style="display:flex;gap:0.4rem">
+                <button class="btn btn-sm btn-ghost" onclick="editProduct('${p.id}')">Edit</button>
+                <button class="btn btn-sm btn-red" onclick="deleteProduct('${p.id}','${p.name.replace(/'/g,"\\'")}')">Delete</button>
+              </div>
+            </div>
+          </div>`;
+        }).join('') + `</div>`;
+      } catch (err) { grid.innerHTML = `<div class="loading">Error: ${err.message}</div>`; }
+    };
+
+    // ══════════════════════════════
+    // PRODUCTS — ADD / EDIT FORM
+    // ══════════════════════════════
+    window.resetProductForm = () => {
+      document.getElementById('formTitle').textContent = 'Add New Product';
+      document.getElementById('editProductId').value = '';
+      ['pName','pDescription','pEmoji','pImage','pGroup','pVariant'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('pEmoji').value = '🧼';
+      document.getElementById('pCategory').value = '';
+      document.getElementById('pPrice').value = '';
+      document.getElementById('pTag').value = '';
+      document.getElementById('productFormMsg').className = 'form-msg';
+      selectColorByVal('pi1');
+    };
+
+    window.selectColor = (el) => {
+      document.querySelectorAll('.color-opt').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+      selectedColorClass = el.dataset.val;
+    };
+    function selectColorByVal(val) {
+      document.querySelectorAll('.color-opt').forEach(o => o.classList.toggle('selected', o.dataset.val === val));
+      selectedColorClass = val;
+    }
+
+    window.editProduct = (id) => {
+      const p = allProducts.find(x => x.id === id);
+      if (!p) return;
+      document.getElementById('formTitle').textContent = `Edit: ${p.name}`;
+      document.getElementById('editProductId').value = id;
+      document.getElementById('pName').value        = p.name || '';
+      document.getElementById('pCategory').value    = p.category || '';
+      document.getElementById('pPrice').value       = p.price || '';
+      document.getElementById('pTag').value         = p.tag || '';
+      document.getElementById('pDescription').value = p.description || '';
+      document.getElementById('pEmoji').value       = p.emoji || '🧼';
+      document.getElementById('pImage').value       = p.image || '';
+      document.getElementById('pGroup').value        = p.productGroup || '';
+      document.getElementById('pVariant').value      = p.variant || '';
+      selectColorByVal(p.colorClass || 'pi1');
+      document.getElementById('productFormMsg').className = 'form-msg';
+      switchProdTab('add');
+    };
+
+    window.saveProduct = async () => {
+      const name     = document.getElementById('pName').value.trim();
+      const category = document.getElementById('pCategory').value;
+      const price    = parseFloat(document.getElementById('pPrice').value);
+      const msg      = document.getElementById('productFormMsg');
+      if (!name || !category || isNaN(price)) {
+        msg.textContent = '⚠️ Name, category and price are required.';
+        msg.className = 'form-msg err'; return;
+      }
+      const data = {
+        name, category, price,
+        tag:          document.getElementById('pTag').value,
+        description:  document.getElementById('pDescription').value.trim(),
+        emoji:        document.getElementById('pEmoji').value || '🧼',
+        image:        document.getElementById('pImage').value.trim(),
+        productGroup: document.getElementById('pGroup').value.trim(),
+        variant:      document.getElementById('pVariant').value.trim(),
+        colorClass:   selectedColorClass,
+        updatedAt:    new Date().toISOString()
+      };
+      msg.textContent = 'Saving…'; msg.className = 'form-msg ok';
+      try {
+        const editId = document.getElementById('editProductId').value;
+        if (editId) {
+          await updateDoc(doc(db, 'products', editId), data);
+          toast('✅ Product updated!');
+        } else {
+          const id = (name + (data.variant ? '-' + data.variant : '')).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          data.createdAt = new Date().toISOString();
+          data.stock = 0;
+          await setDoc(doc(db, 'products', id), data);
+          toast('✅ Product added!');
+        }
+        msg.textContent = editId ? '✅ Product updated!' : '✅ Product added!';
+        loadProductsList(); loadBulkTable();
+      } catch (err) { msg.textContent = '❌ ' + err.message; msg.className = 'form-msg err'; }
+    };
+
+    window.deleteProduct = async (id, name) => {
+      if (!confirm(`Delete "${name}"?`)) return;
+      try { await deleteDoc(doc(db, 'products', id)); toast('✅ Product deleted'); loadProductsList(); loadBulkTable(); }
+      catch (err) { toast('❌ ' + err.message); }
+    };
+
+    // ══════════════════════════════
+    // PRODUCTS — BULK EDIT TABLE
+    // ══════════════════════════════
+    const CATEGORIES = ['Face Care','Body Care','Hair Care','Wellness','Gift Sets'];
+    const TAGS       = ['','Bestseller','New','Detox','Brightening','Moisturising','Exfoliating','Refreshing','Strengthening','Traditional','Therapeutic','Nourishing','Antibacterial','Gift Ready'];
+    const COLORS     = ['pi1','pi2','pi3','pi4','pi5','pi6'];
+    const COLOR_BG   = {
+      pi1:'linear-gradient(135deg,#c4a0c0,#8b5e8b)',
+      pi2:'linear-gradient(135deg,#4a5c3a,#2e3d25)',
+      pi3:'linear-gradient(135deg,#c4a882,#8d6040)',
+      pi4:'linear-gradient(135deg,#5c7a6a,#3a5248)',
+      pi5:'linear-gradient(135deg,#e8c4a0,#c49070)',
+      pi6:'linear-gradient(135deg,#7a6a5a,#4a3a2e)'
+    };
+
+    function bulkRow(p, isNew = false) {
+      const id = p.id || ('new-' + Date.now() + Math.random());
+      const tagOpts = TAGS.map(t => `<option ${p.tag === t ? 'selected' : ''} value="${t}">${t || '—'}</option>`).join('');
+      const colorOpts = COLORS.map(c =>
+        `<option value="${c}" ${p.colorClass === c ? 'selected' : ''}>${c}</option>`
+      ).join('');
+      return `<tr data-id="${id}" data-isnew="${isNew}" data-changed="false">
+        <td><input class="bulk-input" data-field="emoji" value="${p.emoji || '🧼'}" style="width:60px;text-align:center;font-size:1.2rem" oninput="markChanged(this)"/></td>
+        <td><input class="bulk-input" data-field="name" value="${(p.name || '').replace(/"/g,'&quot;')}" oninput="markChanged(this)"/></td>
+        <td><input class="bulk-input" data-field="productGroup" value="${(p.productGroup || '').replace(/"/g,'&quot;')}" placeholder="(group)" oninput="markChanged(this)"/></td>
+        <td><input class="bulk-input" data-field="variant" value="${(p.variant || '').replace(/"/g,'&quot;')}" placeholder="100ml" style="width:80px" oninput="markChanged(this)"/></td>
+        <td><input class="bulk-input" data-field="category" value="${p.category || ''}" placeholder="e.g. Soaps" oninput="markChanged(this)"/></td>
+        <td><input class="bulk-input" data-field="price" type="number" value="${p.price || ''}" style="width:80px" oninput="markChanged(this)"/></td>
+        <td><select class="bulk-select" data-field="tag" onchange="markChanged(this)">${tagOpts}</select></td>
+        <td><input class="bulk-input" data-field="description" value="${(p.description || '').replace(/"/g,'&quot;')}" oninput="markChanged(this)"/></td>
+        <td><input class="bulk-input" data-field="image" value="${p.image || ''}" placeholder="images/name.jpg" oninput="markChanged(this)"/></td>
+        <td><select class="bulk-select" data-field="colorClass" onchange="markChanged(this);updateColorPreview(this)">${colorOpts}</select></td>
+        <td><select class="bulk-select" data-field="hidden" onchange="markChanged(this)" style="min-width:60px">
+          <option value="false" ${!p.hidden ? 'selected' : ''}>Visible</option>
+          <option value="true" ${p.hidden ? 'selected' : ''}>Hidden</option>
+        </select></td>
+        <td><button class="btn btn-sm btn-red" onclick="deleteBulkRow(this,'${id}')">✕</button></td>
+      </tr>`;
+    }
+
+    window.loadBulkTable = async () => {
+      const tbody = document.getElementById('bulkTableBody');
+      tbody.innerHTML = '<tr><td colspan="11" class="loading">Loading…</td></tr>';
+      try {
+        const snap  = await getDocs(collection(db, 'products'));
+        allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        // Populate category dropdown
+        const cats   = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
+        const catSel = document.getElementById('bulkFilterCat');
+        if (catSel) {
+          const current = catSel.value;
+          catSel.innerHTML = '<option value="">All Categories</option>' +
+            cats.map(c => `<option value="${c}" ${c === current ? 'selected' : ''}>${c}</option>`).join('');
+        }
+
+        applyBulkFilter();
+      } catch (err) {
+        document.getElementById('bulkTableBody').innerHTML =
+          `<tr><td colspan="11" class="loading">Error: ${err.message}</td></tr>`;
+      }
+    };
+
+    window.applyBulkFilter = () => {
+      const search    = (document.getElementById('bulkSearch')?.value || '').toLowerCase().trim();
+      const filterCat = document.getElementById('bulkFilterCat')?.value || '';
+      const filterVis = document.getElementById('bulkFilterHidden')?.value || '';
+      const sortField = document.getElementById('bulkSort')?.value || 'name';
+
+      let filtered = [...allProducts];
+
+      if (search) filtered = filtered.filter(p =>
+        (p.name     || '').toLowerCase().includes(search) ||
+        (p.category || '').toLowerCase().includes(search) ||
+        (p.tag      || '').toLowerCase().includes(search)
+      );
+      if (filterCat)             filtered = filtered.filter(p => p.category === filterCat);
+      if (filterVis === 'visible') filtered = filtered.filter(p => !p.hidden);
+      if (filterVis === 'hidden')  filtered = filtered.filter(p =>  p.hidden);
+
+      filtered.sort((a, b) => {
+        if (sortField === 'name')       return (a.name || '').localeCompare(b.name || '');
+        if (sortField === 'name-desc')  return (b.name || '').localeCompare(a.name || '');
+        if (sortField === 'price-asc')  return (a.price || 0) - (b.price || 0);
+        if (sortField === 'price-desc') return (b.price || 0) - (a.price || 0);
+        if (sortField === 'cat')        return (a.category || '').localeCompare(b.category || '');
+        return 0;
+      });
+
+      const tbody = document.getElementById('bulkTableBody');
+      tbody.innerHTML = filtered.length
+        ? filtered.map(p => bulkRow(p)).join('')
+        : '<tr><td colspan="11" style="text-align:center;padding:1.5rem;color:var(--stone);font-style:italic">No products match.</td></tr>';
+
+      const countEl = document.getElementById('bulkCount');
+      if (countEl) countEl.textContent = `${filtered.length} of ${allProducts.length} products`;
+    };
+
+    window.markChanged = (el) => {
+      el.classList.add('bulk-changed');
+      const row = el.closest('tr');
+      row.dataset.changed = 'true';
+    };
+
+    window.updateColorPreview = (sel) => {
+      // Optional: could update a preview dot
+    };
+
+    window.addBulkRow = () => {
+      const tbody = document.getElementById('bulkTableBody');
+      const newRow = document.createElement('tbody');
+      newRow.innerHTML = bulkRow({ id:'', name:'', category:'', price:'', tag:'', description:'', emoji:'🧼', image:'', colorClass:'pi1' }, true);
+      tbody.appendChild(newRow.firstChild);
+    };
+
+    window.deleteBulkRow = async (btn, id) => {
+      const row = btn.closest('tr');
+      const isNew = row.dataset.isnew === 'true';
+      if (isNew) { row.remove(); return; }
+      if (!confirm('Delete this product?')) return;
+      try {
+        await deleteDoc(doc(db, 'products', id));
+        row.remove(); toast('✅ Product deleted');
+      } catch (err) { toast('❌ ' + err.message); }
+    };
+
+    window.saveBulkEdits = async () => {
+      const msg = document.getElementById('bulkMsg');
+      msg.textContent = 'Saving…'; msg.className = 'form-msg ok';
+      const rows = document.querySelectorAll('#bulkTableBody tr');
+      let saved = 0, errors = 0;
+      for (const row of rows) {
+        const isNew     = row.dataset.isnew === 'true';
+        const isChanged = row.dataset.changed === 'true';
+        if (!isNew && !isChanged) continue;
+
+        const get = field => {
+          const el = row.querySelector(`[data-field="${field}"]`);
+          return el ? el.value.trim() : '';
+        };
+
+        const name  = get('name');
+        const price = parseFloat(get('price'));
+        if (!name || isNaN(price)) { errors++; continue; }
+
+        const data = {
+          name,
+          productGroup: get('productGroup'),
+          variant:      get('variant'),
+          category:    get('category'),
+          price,
+          tag:         get('tag'),
+          description: get('description'),
+          emoji:       get('emoji') || '🧼',
+          image:       get('image'),
+          colorClass:  get('colorClass') || 'pi1',
+          updatedAt:   new Date().toISOString()
+        };
+
+        try {
+          if (isNew) {
+            const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now();
+            data.stock = 0; data.createdAt = new Date().toISOString();
+            await setDoc(doc(db, 'products', id), data);
+            row.dataset.isnew = 'false';
+            row.dataset.id = id;
+          } else {
+            await updateDoc(doc(db, 'products', row.dataset.id), data);
+          }
+          // Clear changed highlight
+          row.querySelectorAll('.bulk-changed').forEach(el => el.classList.remove('bulk-changed'));
+          row.dataset.changed = 'false';
+          saved++;
+        } catch (err) { console.error(err); errors++; }
+      }
+
+      if (errors > 0) {
+        msg.textContent = `⚠️ ${saved} saved, ${errors} failed. Check name & price fields.`;
+        msg.className = 'form-msg err';
+      } else if (saved > 0) {
+        msg.textContent = `✅ ${saved} product${saved > 1 ? 's' : ''} saved!`;
+        msg.className = 'form-msg ok';
+        toast(`✅ ${saved} products saved!`);
+        loadProductsList();
+      } else {
+        msg.textContent = 'No changes to save.';
+        msg.className = 'form-msg ok';
+      }
+    };
+
+    // ══════════════════════════════
+    // STOCK
+    // ══════════════════════════════
+    window.loadStockTable = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'products'));
+        allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (!allProducts.length) { document.getElementById('stockBody').innerHTML = '<tr><td colspan="5" class="loading">No products yet.</td></tr>'; return; }
+        document.getElementById('stockBody').innerHTML = allProducts.map(p => {
+          const stock = p.stock || 0;
+          const style = stock <= 5 ? 'color:#c0392b;font-weight:bold' : 'color:var(--moss);font-weight:bold';
+          return `<tr>
+            <td><strong>${p.emoji || '🧼'} ${p.name}</strong></td>
+            <td>${p.category || '—'}</td>
+            <td>₹${p.price}</td>
+            <td><span style="${style}">${stock}</span>${stock <= 5 ? ' ⚠️' : ''}</td>
+            <td><button class="btn btn-sm btn-green" onclick="openStockModal('${p.id}','${p.name.replace(/'/g,"\\'")}',${stock})">Adjust</button></td>
+          </tr>`;
+        }).join('');
+      } catch (err) { document.getElementById('stockBody').innerHTML = `<tr><td colspan="5" class="loading">Error: ${err.message}</td></tr>`; }
+    };
+
+    window.openStockModal = (id, name, current) => {
+      currentStockProductId = id; currentStockValue = current;
+      document.getElementById('modalProductName').value = `${name} (Current: ${current})`;
+      document.getElementById('modalQty').value = 1;
+      document.getElementById('modalNotes').value = '';
+      document.getElementById('modalAction').value = 'add';
+      document.getElementById('stockModal').classList.add('open');
+    };
+
+    window.saveStock = async () => {
+      if (!currentStockProductId) return;
+      const action = document.getElementById('modalAction').value;
+      const qty    = parseInt(document.getElementById('modalQty').value) || 0;
+      if (qty <= 0) { toast('⚠️ Quantity must be > 0'); return; }
+      const newStock = action === 'add' ? currentStockValue + qty : Math.max(0, currentStockValue - qty);
+      try {
+        await updateDoc(doc(db, 'products', currentStockProductId), { stock: newStock, updatedAt: new Date().toISOString() });
+        await addDoc(collection(db, 'stockHistory'), {
+          productId: currentStockProductId, action, qty,
+          previousStock: currentStockValue, newStock,
+          notes: document.getElementById('modalNotes').value,
+          timestamp: new Date().toISOString()
+        });
+        toast(`✅ Stock updated to ${newStock}`);
+        closeModal('stockModal'); loadStockTable();
+      } catch (err) { toast('❌ ' + err.message); }
+    };
+
+    // ══════════════════════════════
+    // CUSTOMERS
+    // ══════════════════════════════
+    let allCustomers = [];
+    let currentCustomerSort = 'name';
+
+    window.loadCustomers = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'orders'));
+        const map  = {};
+        snap.docs.forEach(d => {
+          const o = d.data();
+          const key = normPhone(o.phone);
+          if (!key) return;
+          if (!map[key]) {
+            map[key] = {
+              name:     o.name || '—',
+              phone:    o.phone || key,
+              email:    o.email || '—',
+              address:  o.address || '—',
+              orders:   0,
+              spent:    0,
+              lastOrder: o.createdAt || ''
+            };
+          }
+          map[key].orders++;
+          map[key].spent += o.total || 0;
+          // Keep the most recent order's details as the customer's display record
+          if ((o.createdAt || '') > map[key].lastOrder) {
+            map[key].lastOrder = o.createdAt || '';
+            if (o.name)    map[key].name    = o.name;
+            if (o.address) map[key].address = o.address;
+            if (o.email)   map[key].email   = o.email;
+            if (o.phone)   map[key].phone   = o.phone;
+          }
+        });
+        allCustomers = Object.values(map);
+        renderCustomers(currentCustomerSort);
+      } catch (err) {
+        document.getElementById('customersBody').innerHTML = `<tr><td colspan="7" class="loading">Error: ${err.message}</td></tr>`;
+      }
+    };
+
+    window.sortCustomers = (field, btn) => {
+      currentCustomerSort = field;
+      if (btn) {
+        document.querySelectorAll('#section-customers .filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+      renderCustomers(field);
+    };
+
+    function renderCustomers(sortField) {
+      if (!allCustomers.length) {
+        document.getElementById('customersBody').innerHTML = '<tr><td colspan="7" class="loading">No customers yet.</td></tr>';
         return;
       }
-      document.getElementById('waQrCode').innerHTML = '';
-      new QRCode(document.getElementById('waQrCode'), {
-        text: buildWhatsAppQueryUrl(),
-        width: 180, height: 180,
-        colorDark: '#2b1f14', colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.M
+
+      const sorted = [...allCustomers].sort((a, b) => {
+        if (sortField === 'name')    return a.name.localeCompare(b.name);
+        if (sortField === 'orders')  return b.orders - a.orders;
+        if (sortField === 'spent')   return b.spent - a.spent;
+        if (sortField === 'recent')  return b.lastOrder.localeCompare(a.lastOrder);
+        return 0;
       });
+
+      document.getElementById('customersBody').innerHTML = sorted.map(c => {
+        const lastDate = c.lastOrder
+          ? new Date(c.lastOrder).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })
+          : '—';
+        return `<tr>
+          <td><strong>${c.name}</strong></td>
+          <td>${normPhone(c.phone) || c.phone}</td>
+          <td>${c.email}</td>
+          <td style="font-size:0.78rem;max-width:160px">${c.address}</td>
+          <td style="text-align:center">${c.orders}</td>
+          <td><strong>₹${c.spent.toLocaleString('en-IN')}</strong></td>
+          <td style="font-size:0.78rem;white-space:nowrap">${lastDate}</td>
+        </tr>`;
+      }).join('');
     }
-    generateWaQR();
-    panel.classList.add('visible');
-    document.getElementById("waBtnSub").textContent = "Scan QR with your phone";
-    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-});
 
-// ── Nav scroll highlight ──
-const navSections = document.querySelectorAll('section[id]');
-const navLinks    = document.querySelectorAll('.nav-links a');
-window.addEventListener('scroll', () => {
-  let current = '';
-  navSections.forEach(s => { if (window.scrollY >= s.offsetTop - 120) current = s.id; });
-  navLinks.forEach(a => { a.style.color = a.getAttribute('href') === '#' + current ? 'var(--bark)' : ''; });
-});
+    // ══════════════════════════════
+    // CSV UPLOAD
+    // ══════════════════════════════
+    const CSV_HEADERS = ['id','name','category','price','tag','description','emoji','image','colorClass'];
 
-init();
+    // Download blank CSV template
+    window.downloadCSVTemplate = () => {
+      const header = CSV_HEADERS.join(',');
+      const nl = String.fromCharCode(10);
+      const r1 = 'coconut-oil-soap,Coconut Oil Soap,Body Care,180,Bestseller,Rich soap,🥥,images/coconut-oil-soap.jpg,pi3';
+      const r2 = 'charcoal-soap,Charcoal Soap,Face Care,200,Detox,Charcoal soap,🖤,images/charcoal-soap.jpg,pi2';
+      const blob = new Blob([header + nl + r1 + nl + r2], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'pebble-store-products.csv';
+      a.click(); URL.revokeObjectURL(url);
+    };
+
+    // Parse CSV text into array of objects
+    function parseCSV(text) {
+      const lines = text.trim().split(String.fromCharCode(10));
+      if (lines.length < 2) return [];
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
+      return lines.slice(1).map(line => {
+        // Handle quoted fields with commas inside
+        const fields = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') { inQuotes = !inQuotes; }
+          else if (ch === ',' && !inQuotes) { fields.push(current.trim()); current = ''; }
+          else { current += ch; }
+        }
+        fields.push(current.trim());
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = (fields[i] || '').replace(/^"|"$/g, '').trim(); });
+        return obj;
+      }).filter(row => row.name); // skip empty rows
+    }
+
+    // Handle CSV file upload
+    window.handleCSVUpload = async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      const msgEl = document.getElementById('csvMsg');
+      msgEl.style.display = 'block';
+      msgEl.style.background = '#fff3cd'; msgEl.style.color = '#856404';
+      msgEl.textContent = `📂 Reading ${file.name}…`;
+
+      const text = await file.text();
+      const rows = parseCSV(text);
+
+      if (!rows.length) {
+        msgEl.style.background = '#f8d7da'; msgEl.style.color = '#721c24';
+        msgEl.textContent = '❌ No valid rows found. Check your CSV format.';
+        return;
+      }
+
+      msgEl.textContent = `Found ${rows.length} products. Uploading…`;
+
+      // Get existing products from Firestore
+      const snap = await getDocs(collection(db, 'products'));
+      const existing = {};
+      snap.docs.forEach(d => { existing[d.id] = d.data(); });
+
+      let added = 0, updated = 0, skipped = 0, errors = 0;
+
+      for (const row of rows) {
+        // Generate ID from row.id or name
+        const id = (row.id || row.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')).trim();
+        if (!id || !row.name || !row.price) { skipped++; continue; }
+
+        const price = parseFloat(row.price);
+        if (isNaN(price)) { skipped++; continue; }
+
+        try {
+          if (existing[id]) {
+            // ── UPDATE existing product (never touch stock) ──
+            const updates = {
+              name:        row.name,
+              category:    row.category    || existing[id].category || '',
+              price,
+              tag:         row.tag         || existing[id].tag || '',
+              description: row.description || existing[id].description || '',
+              emoji:       row.emoji       || existing[id].emoji || '🧼',
+              image:       row.image       || existing[id].image || '',
+              colorClass:  row.colorClass  || existing[id].colorClass || 'pi1',
+              updatedAt:   new Date().toISOString()
+              // stock is intentionally NOT included — never overwrite
+            };
+            await updateDoc(doc(db, 'products', id), updates);
+            updated++;
+          } else {
+            // ── ADD new product ──
+            await setDoc(doc(db, 'products', id), {
+              name:        row.name,
+              category:    row.category    || '',
+              price,
+              tag:         row.tag         || '',
+              description: row.description || '',
+              emoji:       row.emoji       || '🧼',
+              image:       row.image       || '',
+              colorClass:  row.colorClass  || 'pi1',
+              stock:       0,  // new products start with 0 stock
+              createdAt:   new Date().toISOString(),
+              updatedAt:   new Date().toISOString()
+            });
+            added++;
+          }
+        } catch (err) { console.error('Row error:', id, err); errors++; }
+      }
+
+      // Show result
+      const parts = [];
+      if (added)   parts.push(`✅ ${added} added`);
+      if (updated) parts.push(`✏️ ${updated} updated`);
+      if (skipped) parts.push(`⏭ ${skipped} skipped (missing name/price)`);
+      if (errors)  parts.push(`❌ ${errors} errors`);
+
+      msgEl.style.background = errors ? '#f8d7da' : '#d4edda';
+      msgEl.style.color      = errors ? '#721c24' : '#155724';
+      msgEl.textContent      = parts.join(' · ') + ' · Products in DB not in CSV were left untouched.';
+
+      // Reload tables
+      loadProductsList();
+      loadBulkTable();
+      event.target.value = ''; // reset file input
+      toast(`✅ CSV imported: ${added} added, ${updated} updated`);
+    };
+
+    // ══════════════════════════════
+    // MANUAL ORDER
+    // ══════════════════════════════
+    let noProducts = []; // products for new order rows
+    let editingOrderId = null; // set when the modal is editing an existing order
+
+    // Ensure the product catalogue is available for the order rows
+    async function ensureProductsLoaded() {
+      if (!allProducts.length) {
+        const snap = await getDocs(collection(db, 'products'));
+        allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+      noProducts = allProducts;
+    }
+
+    window.openNewOrderModal = async () => {
+      await ensureProductsLoaded();
+      editingOrderId = null;
+      document.getElementById('noModalTitle').textContent = '➕ New Manual Order';
+      // Reset form
+      ['noName','noPhone','noAltPhone','noAddress','noEmail','noNotes'].forEach(id => document.getElementById(id).value = '');
+      const _t = new Date();
+      document.getElementById('noDate').value = new Date(_t.getTime() - _t.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+      document.getElementById('noShipping').value = 0;
+      document.getElementById('noDiscount').value = 0;
+      document.getElementById('noPaid').value = 'false';
+      document.getElementById('noStatus').value = 'confirmed';
+      document.getElementById('noProductRows').innerHTML = '';
+      document.getElementById('noTotal').textContent = '₹0';
+      document.getElementById('noMsg').style.display = 'none';
+      addOrderProductRow();
+      document.getElementById('newOrderModal').classList.add('open');
+    };
+
+    // Edit an existing (non-dispatched) order — reuses the New Order modal
+    window.openEditOrder = async (id) => {
+      await ensureProductsLoaded();
+      const order = allOrders.find(o => o.id === id);
+      if (!order) { toast('❌ Order not found'); return; }
+      editingOrderId = id;
+      document.getElementById('noModalTitle').textContent = '✏️ Edit Order';
+      document.getElementById('noName').value    = order.name    || '';
+      document.getElementById('noPhone').value    = order.phone    || '';
+      document.getElementById('noAltPhone').value = order.altPhone || '';
+      document.getElementById('noAddress').value  = order.address  || '';
+      document.getElementById('noEmail').value   = order.email   || '';
+      document.getElementById('noNotes').value   = order.notes   || '';
+      document.getElementById('noShipping').value = order.shipping || 0;
+      document.getElementById('noDiscount').value = order.discount || 0;
+      document.getElementById('noPaid').value   = order.paid ? 'true' : 'false';
+      document.getElementById('noStatus').value = order.status || 'confirmed';
+      document.getElementById('noDate').value    = (order.createdAt || '').slice(0, 10);
+      document.getElementById('noProductRows').innerHTML = '';
+      const items = order.items || [];
+      if (items.length) items.forEach(it => addOrderProductRow(it.id, it.qty));
+      else addOrderProductRow();
+      document.getElementById('noMsg').style.display = 'none';
+      recalcNewOrder();
+      document.getElementById('newOrderModal').classList.add('open');
+    };
+
+    window.addOrderProductRow = (preId = null, preQty = 1) => {
+      const container = document.getElementById('noProductRows');
+      const opts = noProducts.map(p =>
+        `<option value="${p.id}" data-price="${p.price}" ${preId === p.id ? 'selected' : ''}>${prodLabel(p)} — ₹${p.price}</option>`
+      ).join('');
+      const row = document.createElement('div');
+      row.style.cssText = 'display:grid;grid-template-columns:1fr 80px 80px 32px;gap:0.5rem;margin-bottom:0.5rem;align-items:center';
+      row.innerHTML = `
+        <select class="no-product-select" onchange="recalcNewOrder()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0;width:100%">
+          ${opts}
+        </select>
+        <input type="number" class="no-qty-input" value="${preQty}" min="1" oninput="recalcNewOrder()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;text-align:center;width:100%"/>
+        <span class="no-row-total" style="font-size:0.85rem;font-weight:600;color:var(--moss);text-align:right">₹0</span>
+        <button onclick="this.parentElement.remove();recalcNewOrder()" style="background:#c0392b;color:white;border:none;cursor:pointer;width:28px;height:28px;font-size:1rem;display:flex;align-items:center;justify-content:center">×</button>`;
+      container.appendChild(row);
+      recalcNewOrder();
+    };
+
+    window.recalcNewOrder = () => {
+      let subtotal = 0;
+      document.querySelectorAll('#noProductRows > div').forEach(row => {
+        const sel = row.querySelector('.no-product-select');
+        const qty = parseInt(row.querySelector('.no-qty-input').value) || 0;
+        const price = parseFloat(sel.selectedOptions[0]?.dataset.price) || 0;
+        const lineTotal = price * qty;
+        row.querySelector('.no-row-total').textContent = `₹${lineTotal}`;
+        subtotal += lineTotal;
+      });
+      const shipping  = parseFloat(document.getElementById('noShipping').value) || 0;
+      const discount  = parseFloat(document.getElementById('noDiscount').value) || 0;
+      const total     = Math.max(0, subtotal + shipping - discount);
+      document.getElementById('noTotal').textContent = `₹${total}`;
+    };
+
+    // Auto-fill name/address/email from a returning customer's most recent order.
+    // Only fills empty fields, so anything already typed is preserved.
+    window.autofillFromPhone = () => {
+      const key = normPhone(document.getElementById('noPhone').value);
+      if (key.length < 10) return;
+      const match = allOrders.find(o => normPhone(o.phone) === key); // allOrders is newest-first
+      if (!match) return;
+      const setIfEmpty = (id, val) => { const el = document.getElementById(id); if (el && !el.value.trim() && val) el.value = val; };
+      setIfEmpty('noName', match.name);
+      setIfEmpty('noAddress', match.address);
+      setIfEmpty('noEmail', match.email);
+      setIfEmpty('noAltPhone', match.altPhone);
+    };
+
+    const showNoErr = (msg, text) => {
+      msg.textContent = text;
+      msg.style.cssText = 'display:block;color:#c0392b;font-size:0.8rem';
+    };
+
+    window.saveNewOrder = async () => {
+      const msg   = document.getElementById('noMsg');
+      // Uppercase the free-text customer columns
+      const name  = document.getElementById('noName').value.trim().toUpperCase();
+      // Strip all whitespace from the phone, then validate
+      const phone = document.getElementById('noPhone').value.replace(/\s+/g, '');
+      const altPhone = document.getElementById('noAltPhone').value.replace(/\s+/g, '');
+      const dateVal  = document.getElementById('noDate').value;
+      const createdAtISO = dateVal ? new Date(dateVal + 'T12:00:00').toISOString() : new Date().toISOString();
+
+      if (!name || !phone) { showNoErr(msg, '⚠️ Name and phone are required.'); return; }
+      if (!/^\+?\d{10,15}$/.test(phone)) {
+        showNoErr(msg, '⚠️ Enter a valid phone number (10–15 digits, optional leading +).');
+        return;
+      }
+
+      const items = [];
+      document.querySelectorAll('#noProductRows > div').forEach(row => {
+        const sel  = row.querySelector('.no-product-select');
+        const qty  = parseInt(row.querySelector('.no-qty-input').value) || 0;
+        const prod = allProducts.find(p => p.id === sel.value);
+        if (prod && qty > 0) items.push({ id: prod.id, name: prodLabel(prod), price: prod.price, qty, subtotal: prod.price * qty });
+      });
+      if (!items.length) { showNoErr(msg, '⚠️ Add at least one product.'); return; }
+
+      const shippingVal = parseFloat(document.getElementById('noShipping').value) || 0;
+      const discountVal = parseFloat(document.getElementById('noDiscount').value) || 0;
+      const subtotal    = items.reduce((s, i) => s + i.subtotal, 0);
+      const total       = Math.max(0, subtotal + shippingVal - discountVal);
+
+      msg.textContent = 'Saving…';
+      msg.style.cssText = 'display:block;color:var(--moss);font-size:0.8rem';
+
+      const data = {
+        name,
+        phone,
+        altPhone,
+        email:    document.getElementById('noEmail').value.trim(),
+        address:  document.getElementById('noAddress').value.trim().toUpperCase(),
+        notes:    document.getElementById('noNotes').value.trim().toUpperCase(),
+        items,
+        subtotal,
+        shipping: shippingVal,
+        discount: discountVal,
+        total,
+        status:   document.getElementById('noStatus').value,
+        paid:     document.getElementById('noPaid').value === 'true',
+        createdAt: createdAtISO,
+        updatedAt: new Date().toISOString()
+      };
+
+      try {
+        if (editingOrderId) {
+          await updateDoc(doc(db, 'orders', editingOrderId), data);
+          toast('✅ Order updated!');
+        } else {
+          data.source    = 'admin';   // marks as manual/admin order
+          data.tracking  = null;
+          data.orderNo   = await nextOrderNo();
+          await addDoc(collection(db, 'orders'), data);
+          toast('✅ Order saved!');
+        }
+        editingOrderId = null;
+        closeModal('newOrderModal');
+        loadOrders();
+      } catch (err) {
+        showNoErr(msg, '❌ Error: ' + err.message);
+      }
+    };
+
+    // ══════════════════════════════
+    // REPORTS
+    // ══════════════════════════════
+    let reportOrders = [];
+    let repMonthlyRows = [], repProductRows = [], repCategoryRows = [];
+    let reportCatById = {}, reportCatByLabel = {};
+
+    window.loadReports = async () => {
+      try {
+        const [oSnap, pSnap] = await Promise.all([
+          getDocs(collection(db, 'orders')),
+          getDocs(collection(db, 'products'))
+        ]);
+        reportOrders = oSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Map order items back to a category (orders don't store category)
+        reportCatById = {}; reportCatByLabel = {};
+        pSnap.docs.forEach(d => {
+          const p = { id: d.id, ...d.data() };
+          if (p.category) { reportCatById[p.id] = p.category; reportCatByLabel[prodLabel(p)] = p.category; }
+        });
+        renderReports();
+      } catch (err) {
+        document.getElementById('repMonthlyBody').innerHTML = `<tr><td colspan="4" class="loading">Error: ${err.message}</td></tr>`;
+      }
+    };
+
+    window.resetReportFilter = () => {
+      document.getElementById('repFrom').value = '';
+      document.getElementById('repTo').value = '';
+      renderReports();
+    };
+
+    window.renderReports = () => {
+      const from = document.getElementById('repFrom').value;   // yyyy-mm-dd or ''
+      const to   = document.getElementById('repTo').value;
+      let orders = reportOrders.filter(o => o.status !== 'cancelled');
+      if (from) orders = orders.filter(o => (o.createdAt || '') >= from);
+      if (to)   orders = orders.filter(o => (o.createdAt || '') <= to + 'T23:59:59');
+
+      const fmt = n => '₹' + Number(n || 0).toLocaleString('en-IN');
+      const revenue   = orders.reduce((s, o) => s + (o.total || 0), 0);
+      const itemsSold = orders.reduce((s, o) => s + (o.items || []).reduce((t, i) => t + (i.qty || 0), 0), 0);
+      const count     = orders.length;
+      const avg       = count ? Math.round(revenue / count) : 0;
+
+      document.getElementById('repRevenue').textContent = fmt(revenue);
+      document.getElementById('repOrders').textContent  = count;
+      document.getElementById('repItems').textContent   = itemsSold;
+      document.getElementById('repAvg').textContent     = fmt(avg);
+      document.getElementById('repRangeInfo').textContent =
+        (from || to) ? `${from || '…'} → ${to || '…'} · excludes cancelled` : 'All time · excludes cancelled';
+
+      // Sales by category (item category resolved from the products list)
+      const byCat = {};
+      let catTotal = 0;
+      orders.forEach(o => (o.items || []).forEach(i => {
+        const rev = (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0));
+        const cat = reportCatById[i.id] || reportCatByLabel[i.name] || 'Uncategorised';
+        const c = (byCat[cat] = byCat[cat] || { qty: 0, revenue: 0 });
+        c.qty += i.qty || 0; c.revenue += rev; catTotal += rev;
+      }));
+      const cTot = catTotal || 1;
+      repCategoryRows = Object.entries(byCat).map(([name, v]) => ({ name, ...v, share: Math.round(v.revenue / cTot * 100) })).sort((a, b) => b.revenue - a.revenue);
+      document.getElementById('repCategoryBody').innerHTML = repCategoryRows.length
+        ? repCategoryRows.map(r => `<tr><td><strong>${r.name}</strong></td><td style="text-align:center">${r.qty}</td><td style="text-align:right">${fmt(r.revenue)}</td><td style="text-align:right">${r.share}%</td></tr>`).join('')
+        : '<tr><td colspan="4" class="loading">No sales in this range.</td></tr>';
+
+      // Monthly breakdown
+      const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const byMonth = {};
+      orders.forEach(o => {
+        const d = new Date(o.createdAt);
+        const key = isNaN(d.getTime()) ? '0000-00' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        (byMonth[key] = byMonth[key] || { orders: 0, items: 0, revenue: 0 });
+        byMonth[key].orders++;
+        byMonth[key].revenue += o.total || 0;
+        byMonth[key].items   += (o.items || []).reduce((t, i) => t + (i.qty || 0), 0);
+      });
+      repMonthlyRows = Object.keys(byMonth).sort().reverse().map(k => {
+        const [y, m] = k.split('-');
+        return { label: k === '0000-00' ? 'Unknown' : `${MON[parseInt(m) - 1]} ${y}`, ...byMonth[k] };
+      });
+      document.getElementById('repMonthlyBody').innerHTML = repMonthlyRows.length
+        ? repMonthlyRows.map(r => `<tr><td><strong>${r.label}</strong></td><td style="text-align:center">${r.orders}</td><td style="text-align:center">${r.items}</td><td style="text-align:right"><strong>${fmt(r.revenue)}</strong></td></tr>`).join('')
+        : '<tr><td colspan="4" class="loading">No orders in this range.</td></tr>';
+
+      // Product split — grouped by product, with size variants as sub-rows.
+      // Item names for grouped products are stored as "Group — Variant".
+      const byGroup = {};
+      orders.forEach(o => (o.items || []).forEach(i => {
+        const full = i.name || i.id || 'Unknown';
+        const parts = String(full).split(' — ');
+        const group = parts[0];
+        const variant = parts.slice(1).join(' — ');
+        const rev = (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0));
+        const g = (byGroup[group] = byGroup[group] || { qty: 0, revenue: 0, variants: {} });
+        g.qty += i.qty || 0; g.revenue += rev;
+        if (variant) {
+          const v = (g.variants[variant] = g.variants[variant] || { qty: 0, revenue: 0 });
+          v.qty += i.qty || 0; v.revenue += rev;
+        }
+      }));
+      const groupsArr = Object.entries(byGroup).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.revenue - a.revenue);
+      const unitFor = (r) => r.qty ? Math.round(r.revenue / r.qty) : 0;
+      repProductRows = [];
+      let phtml = '';
+      groupsArr.forEach(g => {
+        const vks = Object.keys(g.variants);
+        if (vks.length) {
+          phtml += `<tr><td><strong>${g.name}</strong></td><td style="text-align:center"><strong>${g.qty}</strong></td><td style="text-align:right">—</td><td style="text-align:right"><strong>${fmt(g.revenue)}</strong></td></tr>`;
+          repProductRows.push({ name: g.name, qty: g.qty, unit: '', revenue: g.revenue });
+          vks.map(vk => ({ vk, ...g.variants[vk] })).sort((a, b) => b.revenue - a.revenue).forEach(v => {
+            const vu = v.qty ? Math.round(v.revenue / v.qty) : 0;
+            phtml += `<tr><td style="padding-left:2rem;color:var(--stone)">${v.vk}</td><td style="text-align:center">${v.qty}</td><td style="text-align:right">${fmt(vu)}</td><td style="text-align:right">${fmt(v.revenue)}</td></tr>`;
+            repProductRows.push({ name: '   ' + g.name + ' — ' + v.vk, qty: v.qty, unit: vu, revenue: v.revenue });
+          });
+        } else {
+          phtml += `<tr><td>${g.name}</td><td style="text-align:center">${g.qty}</td><td style="text-align:right">${fmt(unitFor(g))}</td><td style="text-align:right"><strong>${fmt(g.revenue)}</strong></td></tr>`;
+          repProductRows.push({ name: g.name, qty: g.qty, unit: unitFor(g), revenue: g.revenue });
+        }
+      });
+      document.getElementById('repProductBody').innerHTML = groupsArr.length
+        ? phtml : '<tr><td colspan="4" class="loading">No products in this range.</td></tr>';
+    };
+
+    window.exportReportsCSV = () => {
+      const nl = String.fromCharCode(10);
+      let csv = 'Sales by Category' + nl + 'Category,Qty,Revenue,Share %' + nl;
+      csv += repCategoryRows.map(r => `"${String(r.name).replace(/"/g, '""')}",${r.qty},${r.revenue},${r.share}`).join(nl);
+      csv += nl + nl + 'Monthly Summary' + nl + 'Month,Orders,Items,Revenue' + nl;
+      csv += repMonthlyRows.map(r => `${r.label},${r.orders},${r.items},${r.revenue}`).join(nl);
+      csv += nl + nl + 'Product Split' + nl + 'Product,Qty,Price Per Unit,Total' + nl;
+      csv += repProductRows.map(r => `"${String(r.name).trim().replace(/"/g, '""')}",${r.qty},${r.unit},${r.revenue}`).join(nl);
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'pebble-store-report.csv';
+      a.click(); URL.revokeObjectURL(url);
+    };
+
+    ['dispatchModal','stockModal','newOrderModal'].forEach(id => {
+      document.getElementById(id).addEventListener('click', e => { if (e.target === document.getElementById(id)) closeModal(id); });
+    });
+  </script>
+</body>
+</html>

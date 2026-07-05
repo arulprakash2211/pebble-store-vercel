@@ -884,7 +884,7 @@
         </div>
         <div class="cmeta">Order #${escapeHtml(String(orderNo))} · ${date}</div>
         <div class="citems">${itemLines || '<div class="ci"><span>No items</span><span></span></div>'}</div>
-        ${shipping ? `<div class="ci small"><span>Shipping</span><span>${fmt(shipping)}</span></div>` : ''}
+        <div class="ci small"><span>Shipping</span><span>${fmt(shipping)}</span></div>
         ${discount ? `<div class="ci small"><span>Discount</span><span>−${fmt(discount)}</span></div>` : ''}
         <div class="ctotal"><span>Total</span><span>${fmt(total)}</span></div>
       </div>`;

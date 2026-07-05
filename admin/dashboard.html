@@ -157,7 +157,6 @@
         <div style="display:flex;gap:0.6rem">
           <button class="btn btn-green" onclick="openNewOrderModal()">➕ New Order</button>
           <button class="btn btn-ghost" onclick="printOrdersSheet()">🖨️ Print Sheet</button>
-          <button class="btn btn-ghost" onclick="migrateOrderNumbers()" title="One-time: assign #1000+ to existing orders">⚙ Assign #s</button>
           <button class="btn btn-primary" onclick="loadOrders()">↻ Refresh</button>
         </div>
       </div>
@@ -486,7 +485,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-    import { getFirestore, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, runTransaction, writeBatch } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getFirestore, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
@@ -681,39 +680,13 @@
       logo:    location.origin + '/images/logo.png'
     };
 
-    // Sequential order number via an atomic counter (starts at 1000)
+    // Next order number = highest existing orderNo + 1 (starts at 1000)
     async function nextOrderNo() {
-      const counterRef = doc(db, 'counters', 'orders');
-      return await runTransaction(db, async (tx) => {
-        const snap = await tx.get(counterRef);
-        const current = snap.exists() ? (snap.data().current || 999) : 999;
-        const next = current + 1;
-        tx.set(counterRef, { current: next }, { merge: true });
-        return next;
-      });
+      const snap = await getDocs(collection(db, 'orders'));
+      let max = 999;
+      snap.forEach(d => { const n = d.data().orderNo; if (typeof n === 'number' && n > max) max = n; });
+      return max + 1;
     }
-
-    // One-time migration: assign #1000+ to all orders in chronological order
-    window.migrateOrderNumbers = async () => {
-      if (!confirm('Assign sequential order numbers (from #1000) to ALL orders in date order — oldest first?\n\nAny existing order numbers will be reassigned. Run this once.')) return;
-      try {
-        const snap = await getDocs(collection(db, 'orders'));
-        const docs = snap.docs.slice().sort((a, b) =>
-          String(a.data().createdAt || '').localeCompare(String(b.data().createdAt || '')));
-        if (!docs.length) { toast('No orders to migrate'); return; }
-
-        let n = 1000;
-        for (let i = 0; i < docs.length; i += 450) {
-          const batch = writeBatch(db);
-          docs.slice(i, i + 450).forEach(d => batch.update(d.ref, { orderNo: n++ }));
-          await batch.commit();
-        }
-        // Point the counter at the last assigned number so new orders continue
-        await setDoc(doc(db, 'counters', 'orders'), { current: n - 1 }, { merge: true });
-        toast(`✅ Numbered ${docs.length} orders (#1000–#${n - 1})`);
-        loadOrders();
-      } catch (err) { toast('❌ ' + err.message); }
-    };
 
     const escapeHtml = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 

@@ -25,6 +25,16 @@ const cart = {};
 // Normalise a phone to its last 10 digits so +91 / spacing variants match
 const normPhone = (p) => String(p ?? '').replace(/\D/g, '').slice(-10);
 
+// Grouped products: products sharing a productGroup show as one card with a size selector
+const groupVariants = {}; // gid -> [variant product ids]
+const displayName = (p) => p && p.productGroup ? `${p.productGroup}${p.variant ? ' — ' + p.variant : ''}` : (p ? p.name : '');
+const selectedVariantId = (gid) => {
+  const s = document.getElementById('vsel-' + gid);
+  if (s) return s.value;
+  const arr = groupVariants[gid];
+  return arr && arr[0];
+};
+
 
 // ══════════════════════════════
 // ORDER TRACKING (inline section)
@@ -283,31 +293,49 @@ function renderProducts(products) {
     grid.innerHTML = '<p style="color:var(--light-text);grid-column:1/-1;font-style:italic">No products in this category.</p>';
     return;
   }
-  grid.innerHTML = products.map(p => {
-    const qty = cart[p.id] || 0;
-    const slug = p.variantGroup || p.id;
+  // Group by productGroup; ungrouped products each form their own group
+  const groups = [];
+  const idx = {};
+  products.forEach(p => {
+    const key = p.productGroup ? 'g:' + p.productGroup : 'p:' + p.id;
+    if (idx[key] == null) { idx[key] = groups.length; groups.push({ key, name: p.productGroup || p.name, variants: [] }); }
+    groups[idx[key]].variants.push(p);
+  });
+
+  grid.innerHTML = groups.map(g => {
+    const gid = g.key.replace(/[^a-zA-Z0-9]/g, '_');
+    groupVariants[gid] = g.variants.map(v => v.id);
+    const multi = g.variants.length > 1;
+    const sel  = g.variants[0];
+    const qty  = cart[sel.id] || 0;
+    const variantSelect = multi
+      ? `<select class="variant-select" id="vsel-${gid}" onchange="onVariantChange('${gid}')" onclick="event.stopPropagation()" style="width:100%;margin:0.4rem 0;padding:0.45rem 0.6rem;border:1.5px solid rgba(92,61,46,0.25);background:var(--warm-white);font-family:'Jost',sans-serif;font-size:0.85rem;color:var(--dark)">
+            ${g.variants.map(v => `<option value="${v.id}" data-price="${v.price}">${v.variant || v.name}</option>`).join('')}
+          </select>`
+      : '';
     return `
-      <div class="product-card" data-id="${p.id}">
-        <div class="product-img ${p.colorClass || 'pi1'}">
+      <div class="product-card" data-group="${gid}">
+        <div class="product-img ${sel.colorClass || 'pi1'}">
           <div class="pat"></div>
-          ${p.image ? `<img src="${p.image}" alt="${p.name}" onerror="this.style.display='none'" />` : ''}
-          <span class="emoji-fallback">${p.emoji || '🧼'}</span>
+          ${sel.image ? `<img src="${sel.image}" alt="${g.name}" onerror="this.style.display='none'" />` : ''}
+          <span class="emoji-fallback">${sel.emoji || '🧼'}</span>
         </div>
         <div class="product-info">
           <div class="product-meta">
-            <span class="product-tag">${p.tag || ''}</span>
-            <span class="product-cat">${p.category || ''}</span>
+            <span class="product-tag">${sel.tag || ''}</span>
+            <span class="product-cat">${sel.category || ''}</span>
           </div>
-          <div class="product-name">${p.name}</div>
-          <div class="product-desc">${p.description || ''}</div>
-          <div class="product-price">₹${p.price}</div>
+          <div class="product-name">${g.name}</div>
+          <div class="product-desc">${sel.description || ''}</div>
+          ${variantSelect}
+          <div class="product-price" id="price-${gid}">₹${sel.price}</div>
           <div class="card-bottom">
             <div class="qty-control" onclick="event.stopPropagation()">
-              <button class="qty-btn" onclick="event.stopPropagation();changeQty('${p.id}', -1)">−</button>
-              <span class="qty-num" id="qty-${p.id}">${qty}</span>
-              <button class="qty-btn" onclick="event.stopPropagation();changeQty('${p.id}', 1)">+</button>
+              <button class="qty-btn" onclick="event.stopPropagation();changeQtyGroup('${gid}', -1)">−</button>
+              <span class="qty-num" id="qty-${gid}">${qty}</span>
+              <button class="qty-btn" onclick="event.stopPropagation();changeQtyGroup('${gid}', 1)">+</button>
             </div>
-            <button class="add-to-order-btn ${qty > 0 ? 'selected' : ''}" id="btn-${p.id}" onclick="event.stopPropagation();addToOrder('${p.id}')">
+            <button class="add-to-order-btn ${qty > 0 ? 'selected' : ''}" id="btn-${gid}" onclick="event.stopPropagation();addToOrderGroup('${gid}')">
               ${qty > 0 ? '✓ Added' : 'Add to Order'}
             </button>
           </div>
@@ -315,6 +343,45 @@ function renderProducts(products) {
       </div>`;
   }).join('');
 }
+
+// Variant switched → reflect that variant's price and cart state
+window.onVariantChange = function(gid) {
+  const s = document.getElementById('vsel-' + gid);
+  const opt = s && s.selectedOptions[0];
+  if (!opt) return;
+  const id = s.value;
+  const priceEl = document.getElementById('price-' + gid);
+  if (priceEl) priceEl.textContent = '₹' + opt.dataset.price;
+  const qty = cart[id] || 0;
+  const qtyEl = document.getElementById('qty-' + gid);
+  const btnEl = document.getElementById('btn-' + gid);
+  if (qtyEl) qtyEl.textContent = qty;
+  if (btnEl) { btnEl.textContent = qty > 0 ? '✓ Added' : 'Add to Order'; btnEl.classList.toggle('selected', qty > 0); }
+};
+
+window.changeQtyGroup = function(gid, delta) {
+  const id = selectedVariantId(gid);
+  if (!id) return;
+  const newQty = Math.max(0, (cart[id] || 0) + delta);
+  if (newQty === 0) delete cart[id]; else cart[id] = newQty;
+  const qtyEl = document.getElementById('qty-' + gid);
+  const btnEl = document.getElementById('btn-' + gid);
+  if (qtyEl) qtyEl.textContent = newQty;
+  if (btnEl) { btnEl.textContent = newQty > 0 ? '✓ Added' : 'Add to Order'; btnEl.classList.toggle('selected', newQty > 0); }
+  updateSummary();
+  saveCartToSession();
+};
+
+window.addToOrderGroup = function(gid) {
+  const id = selectedVariantId(gid);
+  if (!id) return;
+  cart[id] = (cart[id] || 0) + 1;
+  const qtyEl = document.getElementById('qty-' + gid);
+  const btnEl = document.getElementById('btn-' + gid);
+  if (qtyEl) qtyEl.textContent = cart[id];
+  if (btnEl) { btnEl.textContent = '✓ Added'; btnEl.classList.add('selected'); }
+  saveCartToSession();
+};
 
 // ── Cart ──
 window.changeQty = function(id, delta) {
@@ -361,6 +428,7 @@ function getCartTotal() {
 // ── Order summary table ──
 function updateSummary() {
   const container = document.getElementById('summaryContent');
+  if (!container) return;
   const items = Object.entries(cart).filter(([, q]) => q > 0);
   if (!items.length) {
     container.innerHTML = '<span class="empty-selection">No products added yet — set a quantity above and click "Add to Order"</span>';
@@ -373,7 +441,7 @@ function updateSummary() {
     const sub = p.price * qty;
     total += sub;
     return `<tr>
-      <td>${p.emoji || '🧼'} ${p.name}</td>
+      <td>${p.emoji || '🧼'} ${displayName(p)}</td>
       <td style="text-align:center">₹${p.price}</td>
       <td style="text-align:center">${qty}</td>
       <td style="text-align:right">₹${sub}</td>
@@ -400,7 +468,7 @@ function buildOrder() {
     .filter(([, q]) => q > 0)
     .map(([id, qty]) => {
       const p = allProducts.find(x => x.id === id);
-      return p ? { id, name: p.name, price: p.price, qty, subtotal: p.price * qty } : null;
+      return p ? { id, name: displayName(p), price: p.price, qty, subtotal: p.price * qty } : null;
     }).filter(Boolean);
   return {
     name:      document.getElementById('custName').value.trim(),
@@ -505,7 +573,7 @@ function buildWhatsAppQueryUrl() {
     msg += `*Products I'm interested in:*\n`;
     items.forEach(([id, qty]) => {
       const p = allProducts.find(x => x.id === id);
-      if (p) msg += `• ${p.name} × ${qty} = ₹${p.price * qty}\n`;
+      if (p) msg += `• ${displayName(p)} × ${qty} = ₹${p.price * qty}\n`;
     });
     msg += `\n*Total: ₹${getCartTotal()}*\n\n`;
   }

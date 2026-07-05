@@ -245,6 +245,10 @@
             </div>
           </div>
           <div class="form-row">
+            <div class="fg"><label>Product Group (optional)</label><input id="pGroup" placeholder="e.g. Hibiscus Silky Shine Shampoo"/></div>
+            <div class="fg"><label>Variant / Size</label><input id="pVariant" placeholder="e.g. 100ml"/></div>
+          </div>
+          <div class="form-row">
             <div class="fg"><label>Price (₹) *</label><input type="number" id="pPrice" placeholder="180" min="0"/></div>
             <div class="fg"><label>Tag / Badge</label>
               <select id="pTag">
@@ -321,7 +325,7 @@
         <div class="bulk-table-wrap">
           <table class="bulk-table">
             <thead><tr>
-              <th>Emoji</th><th style="min-width:180px">Name</th><th style="min-width:130px">Category</th>
+              <th>Emoji</th><th style="min-width:180px">Name</th><th style="min-width:150px">Group</th><th style="min-width:80px">Variant</th><th style="min-width:130px">Category</th>
               <th style="min-width:80px">Price ₹</th><th style="min-width:120px">Tag</th>
               <th style="min-width:250px">Description</th><th style="min-width:150px">Image Path</th>
               <th style="min-width:80px">Colour</th><th style="min-width:70px">Hidden</th><th>Action</th>
@@ -738,6 +742,8 @@
     const escapeHtml = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
     // Normalise a phone to its last 10 digits so +91 / spacing variants match
     const normPhone = (p) => String(p ?? '').replace(/\D/g, '').slice(-10);
+    // Grouped-product label: "Group — Variant" when grouped, else the plain name
+    const prodLabel = (p) => p && p.productGroup ? `${p.productGroup}${p.variant ? ' — ' + p.variant : ''}` : (p ? p.name : '');
 
     function buildReceiptHtml(o) {
       const fmt   = n => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -992,7 +998,7 @@
     window.resetProductForm = () => {
       document.getElementById('formTitle').textContent = 'Add New Product';
       document.getElementById('editProductId').value = '';
-      ['pName','pDescription','pEmoji','pImage'].forEach(id => document.getElementById(id).value = '');
+      ['pName','pDescription','pEmoji','pImage','pGroup','pVariant'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('pEmoji').value = '🧼';
       document.getElementById('pCategory').value = '';
       document.getElementById('pPrice').value = '';
@@ -1023,6 +1029,8 @@
       document.getElementById('pDescription').value = p.description || '';
       document.getElementById('pEmoji').value       = p.emoji || '🧼';
       document.getElementById('pImage').value       = p.image || '';
+      document.getElementById('pGroup').value        = p.productGroup || '';
+      document.getElementById('pVariant').value      = p.variant || '';
       selectColorByVal(p.colorClass || 'pi1');
       document.getElementById('productFormMsg').className = 'form-msg';
       switchProdTab('add');
@@ -1039,12 +1047,14 @@
       }
       const data = {
         name, category, price,
-        tag:         document.getElementById('pTag').value,
-        description: document.getElementById('pDescription').value.trim(),
-        emoji:       document.getElementById('pEmoji').value || '🧼',
-        image:       document.getElementById('pImage').value.trim(),
-        colorClass:  selectedColorClass,
-        updatedAt:   new Date().toISOString()
+        tag:          document.getElementById('pTag').value,
+        description:  document.getElementById('pDescription').value.trim(),
+        emoji:        document.getElementById('pEmoji').value || '🧼',
+        image:        document.getElementById('pImage').value.trim(),
+        productGroup: document.getElementById('pGroup').value.trim(),
+        variant:      document.getElementById('pVariant').value.trim(),
+        colorClass:   selectedColorClass,
+        updatedAt:    new Date().toISOString()
       };
       msg.textContent = 'Saving…'; msg.className = 'form-msg ok';
       try {
@@ -1053,7 +1063,7 @@
           await updateDoc(doc(db, 'products', editId), data);
           toast('✅ Product updated!');
         } else {
-          const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          const id = (name + (data.variant ? '-' + data.variant : '')).toLowerCase().replace(/[^a-z0-9]+/g, '-');
           data.createdAt = new Date().toISOString();
           data.stock = 0;
           await setDoc(doc(db, 'products', id), data);
@@ -1094,6 +1104,8 @@
       return `<tr data-id="${id}" data-isnew="${isNew}" data-changed="false">
         <td><input class="bulk-input" data-field="emoji" value="${p.emoji || '🧼'}" style="width:60px;text-align:center;font-size:1.2rem" oninput="markChanged(this)"/></td>
         <td><input class="bulk-input" data-field="name" value="${(p.name || '').replace(/"/g,'&quot;')}" oninput="markChanged(this)"/></td>
+        <td><input class="bulk-input" data-field="productGroup" value="${(p.productGroup || '').replace(/"/g,'&quot;')}" placeholder="(group)" oninput="markChanged(this)"/></td>
+        <td><input class="bulk-input" data-field="variant" value="${(p.variant || '').replace(/"/g,'&quot;')}" placeholder="100ml" style="width:80px" oninput="markChanged(this)"/></td>
         <td><input class="bulk-input" data-field="category" value="${p.category || ''}" placeholder="e.g. Soaps" oninput="markChanged(this)"/></td>
         <td><input class="bulk-input" data-field="price" type="number" value="${p.price || ''}" style="width:80px" oninput="markChanged(this)"/></td>
         <td><select class="bulk-select" data-field="tag" onchange="markChanged(this)">${tagOpts}</select></td>
@@ -1215,6 +1227,8 @@
 
         const data = {
           name,
+          productGroup: get('productGroup'),
+          variant:      get('variant'),
           category:    get('category'),
           price,
           tag:         get('tag'),
@@ -1583,7 +1597,7 @@
     window.addOrderProductRow = (preId = null, preQty = 1) => {
       const container = document.getElementById('noProductRows');
       const opts = noProducts.map(p =>
-        `<option value="${p.id}" data-price="${p.price}" ${preId === p.id ? 'selected' : ''}>${p.name} — ₹${p.price}</option>`
+        `<option value="${p.id}" data-price="${p.price}" ${preId === p.id ? 'selected' : ''}>${prodLabel(p)} — ₹${p.price}</option>`
       ).join('');
       const row = document.createElement('div');
       row.style.cssText = 'display:grid;grid-template-columns:1fr 80px 80px 32px;gap:0.5rem;margin-bottom:0.5rem;align-items:center';
@@ -1654,7 +1668,7 @@
         const sel  = row.querySelector('.no-product-select');
         const qty  = parseInt(row.querySelector('.no-qty-input').value) || 0;
         const prod = allProducts.find(p => p.id === sel.value);
-        if (prod && qty > 0) items.push({ id: prod.id, name: prod.name, price: prod.price, qty, subtotal: prod.price * qty });
+        if (prod && qty > 0) items.push({ id: prod.id, name: prodLabel(prod), price: prod.price, qty, subtotal: prod.price * qty });
       });
       if (!items.length) { showNoErr(msg, '⚠️ Add at least one product.'); return; }
 
@@ -1764,20 +1778,43 @@
         ? repMonthlyRows.map(r => `<tr><td><strong>${r.label}</strong></td><td style="text-align:center">${r.orders}</td><td style="text-align:center">${r.items}</td><td style="text-align:right"><strong>${fmt(r.revenue)}</strong></td></tr>`).join('')
         : '<tr><td colspan="4" class="loading">No orders in this range.</td></tr>';
 
-      // Product split
-      const byProduct = {};
+      // Product split — grouped by product, with size variants as sub-rows.
+      // Item names for grouped products are stored as "Group — Variant".
+      const byGroup = {};
       orders.forEach(o => (o.items || []).forEach(i => {
-        const key = i.name || i.id || 'Unknown';
-        (byProduct[key] = byProduct[key] || { qty: 0, revenue: 0 });
-        byProduct[key].qty     += i.qty || 0;
-        byProduct[key].revenue += (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0));
+        const full = i.name || i.id || 'Unknown';
+        const parts = String(full).split(' — ');
+        const group = parts[0];
+        const variant = parts.slice(1).join(' — ');
+        const rev = (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0));
+        const g = (byGroup[group] = byGroup[group] || { qty: 0, revenue: 0, variants: {} });
+        g.qty += i.qty || 0; g.revenue += rev;
+        if (variant) {
+          const v = (g.variants[variant] = g.variants[variant] || { qty: 0, revenue: 0 });
+          v.qty += i.qty || 0; v.revenue += rev;
+        }
       }));
-      repProductRows = Object.entries(byProduct)
-        .map(([name, v]) => ({ name, ...v }))
-        .sort((a, b) => b.revenue - a.revenue);
-      document.getElementById('repProductBody').innerHTML = repProductRows.length
-        ? repProductRows.map(r => { const unit = r.qty ? Math.round(r.revenue / r.qty) : 0; return `<tr><td>${r.name}</td><td style="text-align:center">${r.qty}</td><td style="text-align:right">${fmt(unit)}</td><td style="text-align:right"><strong>${fmt(r.revenue)}</strong></td></tr>`; }).join('')
-        : '<tr><td colspan="4" class="loading">No products in this range.</td></tr>';
+      const groupsArr = Object.entries(byGroup).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.revenue - a.revenue);
+      const unitFor = (r) => r.qty ? Math.round(r.revenue / r.qty) : 0;
+      repProductRows = [];
+      let phtml = '';
+      groupsArr.forEach(g => {
+        const vks = Object.keys(g.variants);
+        if (vks.length) {
+          phtml += `<tr><td><strong>${g.name}</strong></td><td style="text-align:center"><strong>${g.qty}</strong></td><td style="text-align:right">—</td><td style="text-align:right"><strong>${fmt(g.revenue)}</strong></td></tr>`;
+          repProductRows.push({ name: g.name, qty: g.qty, unit: '', revenue: g.revenue });
+          vks.map(vk => ({ vk, ...g.variants[vk] })).sort((a, b) => b.revenue - a.revenue).forEach(v => {
+            const vu = v.qty ? Math.round(v.revenue / v.qty) : 0;
+            phtml += `<tr><td style="padding-left:2rem;color:var(--stone)">${v.vk}</td><td style="text-align:center">${v.qty}</td><td style="text-align:right">${fmt(vu)}</td><td style="text-align:right">${fmt(v.revenue)}</td></tr>`;
+            repProductRows.push({ name: '   ' + g.name + ' — ' + v.vk, qty: v.qty, unit: vu, revenue: v.revenue });
+          });
+        } else {
+          phtml += `<tr><td>${g.name}</td><td style="text-align:center">${g.qty}</td><td style="text-align:right">${fmt(unitFor(g))}</td><td style="text-align:right"><strong>${fmt(g.revenue)}</strong></td></tr>`;
+          repProductRows.push({ name: g.name, qty: g.qty, unit: unitFor(g), revenue: g.revenue });
+        }
+      });
+      document.getElementById('repProductBody').innerHTML = groupsArr.length
+        ? phtml : '<tr><td colspan="4" class="loading">No products in this range.</td></tr>';
     };
 
     window.exportReportsCSV = () => {
@@ -1785,7 +1822,7 @@
       let csv = 'Monthly Summary' + nl + 'Month,Orders,Items,Revenue' + nl;
       csv += repMonthlyRows.map(r => `${r.label},${r.orders},${r.items},${r.revenue}`).join(nl);
       csv += nl + nl + 'Product Split' + nl + 'Product,Qty,Price Per Unit,Total' + nl;
-      csv += repProductRows.map(r => `"${String(r.name).replace(/"/g, '""')}",${r.qty},${r.qty ? Math.round(r.revenue / r.qty) : 0},${r.revenue}`).join(nl);
+      csv += repProductRows.map(r => `"${String(r.name).trim().replace(/"/g, '""')}",${r.qty},${r.unit},${r.revenue}`).join(nl);
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

@@ -558,9 +558,9 @@
             : `<span style="color:var(--stone);font-size:0.72rem">—</span>`;
           let actions = '';
           if (o.status === 'new') {
-            actions = `<button class="btn btn-sm btn-ghost" onclick="updateStatus('${o.id}','confirmed')">Confirm</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
+            actions = `<button class="btn btn-sm btn-ghost" onclick="updateStatus('${o.id}','confirmed')">Confirm</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button><button class="btn btn-sm" style="margin-top:3px;background:var(--dark);color:var(--cream)" onclick="deleteOrder('${o.id}')">Delete</button>`;
           } else if (o.status === 'confirmed') {
-            actions = `<button class="btn btn-sm btn-green" onclick="openDispatchModal('${o.id}')">Dispatch</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
+            actions = `<button class="btn btn-sm btn-green" onclick="openDispatchModal('${o.id}')">Dispatch</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button><button class="btn btn-sm" style="margin-top:3px;background:var(--dark);color:var(--cream)" onclick="deleteOrder('${o.id}')">Delete</button>`;
           } else if (o.status === 'dispatched') {
             actions = `<button class="btn btn-sm btn-blue" onclick="updateStatus('${o.id}','delivered')">Delivered</button>`;
           } else if (o.status === 'delivered') {
@@ -600,6 +600,11 @@
     window.cancelOrder = async (id) => {
       if (!confirm('Cancel this order?')) return;
       try { await updateDoc(doc(db, 'orders', id), { status: 'cancelled', updatedAt: new Date().toISOString() }); toast('✅ Order cancelled'); loadOrders(); }
+      catch (err) { toast('❌ ' + err.message); }
+    };
+    window.deleteOrder = async (id) => {
+      if (!confirm('Permanently delete this order? This cannot be undone.')) return;
+      try { await deleteDoc(doc(db, 'orders', id)); toast('🗑️ Order deleted'); loadOrders(); }
       catch (err) { toast('❌ ' + err.message); }
     };
     window.openDispatchModal = (id) => {

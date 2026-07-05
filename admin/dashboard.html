@@ -407,19 +407,27 @@
         <div class="stat-card"><div class="stat-label">Avg Order</div><div class="stat-value clay" id="repAvg">—</div></div>
       </div>
 
-      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.6rem">Monthly Summary</div>
+      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.6rem">Sales by Category</div>
       <div class="table-wrap" style="margin-bottom:1.6rem">
         <table>
-          <thead><tr><th>Month</th><th style="text-align:center">Orders</th><th style="text-align:center">Items</th><th style="text-align:right">Revenue</th></tr></thead>
-          <tbody id="repMonthlyBody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+          <thead><tr><th>Category</th><th style="text-align:center">Qty</th><th style="text-align:right">Revenue</th><th style="text-align:right">Share</th></tr></thead>
+          <tbody id="repCategoryBody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
         </table>
       </div>
 
       <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.6rem">Product Split</div>
-      <div class="table-wrap">
+      <div class="table-wrap" style="margin-bottom:1.6rem">
         <table>
           <thead><tr><th>Product</th><th style="text-align:center">Qty</th><th style="text-align:right">Price / Unit</th><th style="text-align:right">Total</th></tr></thead>
           <tbody id="repProductBody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+
+      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.6rem">Monthly Summary</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Month</th><th style="text-align:center">Orders</th><th style="text-align:center">Items</th><th style="text-align:right">Revenue</th></tr></thead>
+          <tbody id="repMonthlyBody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -824,13 +832,13 @@
       </table>
       <div class="totals">
       <div class="row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
-      ${shipping ? `<div class="row"><span>Shipping</span><span>${fmt(shipping)}</span></div>` : ''}
+      <div class="row"><span>Shipping</span><span>${fmt(shipping)}</span></div>
       ${discount ? `<div class="row"><span>Discount</span><span>−${fmt(discount)}</span></div>` : ''}
       <div class="row grand"><span>Total</span><span>${fmt(total)}</span></div>
       </div>
     </div>
     ${o.notes ? `<div style="margin-top:18px;font-size:12px;color:#000"><strong>Notes:</strong> ${escapeHtml(o.notes)}</div>` : ''}
-    <div class="foot">Thank you for shopping with Pebble Store 🌿<br/>Handmade natural products, crafted with care.</div>
+    <div class="foot">Thank you for shopping with Pebble Store 🌿<br/>Curated with love • Packed with care.<br/><br/><strong>PEBBLE STORE</strong><br/>10-4-4 Munsip Kadu<br/>Konganapuram<br/>Salem - 637102</div>
   </div>
 </body></html>`;
     }
@@ -1721,12 +1729,22 @@
     // REPORTS
     // ══════════════════════════════
     let reportOrders = [];
-    let repMonthlyRows = [], repProductRows = [];
+    let repMonthlyRows = [], repProductRows = [], repCategoryRows = [];
+    let reportCatById = {}, reportCatByLabel = {};
 
     window.loadReports = async () => {
       try {
-        const snap = await getDocs(collection(db, 'orders'));
-        reportOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const [oSnap, pSnap] = await Promise.all([
+          getDocs(collection(db, 'orders')),
+          getDocs(collection(db, 'products'))
+        ]);
+        reportOrders = oSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Map order items back to a category (orders don't store category)
+        reportCatById = {}; reportCatByLabel = {};
+        pSnap.docs.forEach(d => {
+          const p = { id: d.id, ...d.data() };
+          if (p.category) { reportCatById[p.id] = p.category; reportCatByLabel[prodLabel(p)] = p.category; }
+        });
         renderReports();
       } catch (err) {
         document.getElementById('repMonthlyBody').innerHTML = `<tr><td colspan="4" class="loading">Error: ${err.message}</td></tr>`;
@@ -1758,6 +1776,21 @@
       document.getElementById('repAvg').textContent     = fmt(avg);
       document.getElementById('repRangeInfo').textContent =
         (from || to) ? `${from || '…'} → ${to || '…'} · excludes cancelled` : 'All time · excludes cancelled';
+
+      // Sales by category (item category resolved from the products list)
+      const byCat = {};
+      let catTotal = 0;
+      orders.forEach(o => (o.items || []).forEach(i => {
+        const rev = (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0));
+        const cat = reportCatById[i.id] || reportCatByLabel[i.name] || 'Uncategorised';
+        const c = (byCat[cat] = byCat[cat] || { qty: 0, revenue: 0 });
+        c.qty += i.qty || 0; c.revenue += rev; catTotal += rev;
+      }));
+      const cTot = catTotal || 1;
+      repCategoryRows = Object.entries(byCat).map(([name, v]) => ({ name, ...v, share: Math.round(v.revenue / cTot * 100) })).sort((a, b) => b.revenue - a.revenue);
+      document.getElementById('repCategoryBody').innerHTML = repCategoryRows.length
+        ? repCategoryRows.map(r => `<tr><td><strong>${r.name}</strong></td><td style="text-align:center">${r.qty}</td><td style="text-align:right">${fmt(r.revenue)}</td><td style="text-align:right">${r.share}%</td></tr>`).join('')
+        : '<tr><td colspan="4" class="loading">No sales in this range.</td></tr>';
 
       // Monthly breakdown
       const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -1819,7 +1852,9 @@
 
     window.exportReportsCSV = () => {
       const nl = String.fromCharCode(10);
-      let csv = 'Monthly Summary' + nl + 'Month,Orders,Items,Revenue' + nl;
+      let csv = 'Sales by Category' + nl + 'Category,Qty,Revenue,Share %' + nl;
+      csv += repCategoryRows.map(r => `"${String(r.name).replace(/"/g, '""')}",${r.qty},${r.revenue},${r.share}`).join(nl);
+      csv += nl + nl + 'Monthly Summary' + nl + 'Month,Orders,Items,Revenue' + nl;
       csv += repMonthlyRows.map(r => `${r.label},${r.orders},${r.items},${r.revenue}`).join(nl);
       csv += nl + nl + 'Product Split' + nl + 'Product,Qty,Price Per Unit,Total' + nl;
       csv += repProductRows.map(r => `"${String(r.name).trim().replace(/"/g, '""')}",${r.qty},${r.unit},${r.revenue}`).join(nl);

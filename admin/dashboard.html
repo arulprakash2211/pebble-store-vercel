@@ -733,7 +733,7 @@
     // ── Receipt / Invoice (print → Save as PDF) ──
     const STORE = {
       name:    'PEBBLE STORE',
-      address: '10-4-4 Munsip Kadu, Rangampalayam, Konganapuram, Salem - 637102',
+      address: '10-4-4 Munsip Kadu, Konganapuram, Salem - 637102',
       phone:   '9791240655',
       logo:    location.origin + '/images/logo.png'
     };
@@ -752,6 +752,19 @@
     const normPhone = (p) => String(p ?? '').replace(/\D/g, '').slice(-10);
     // Grouped-product label: "Group — Variant" when grouped, else the plain name
     const prodLabel = (p) => p && p.productGroup ? `${p.productGroup}${p.variant ? ' — ' + p.variant : ''}` : (p ? p.name : '');
+    // Split an address at commas onto separate lines, but keep short parts (≤15 chars) together
+    const addrLines = (addr) => {
+      const parts = String(addr).split(',').map(s => s.trim()).filter(Boolean);
+      const lines = [];
+      let cur = '';
+      parts.forEach(p => {
+        const cand = cur ? cur + ', ' + p : p;
+        if (cur && cand.length > 15) { lines.push(cur); cur = p; }
+        else { cur = cand; }
+      });
+      if (cur) lines.push(cur);
+      return lines.join('<br/>');
+    };
 
     function buildReceiptHtml(o) {
       const fmt   = n => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -812,7 +825,7 @@
       <div class="from">
         <div class="lbl">From</div>
         <div class="from-name">${STORE.name}</div>
-        <div class="from-addr">${STORE.address}</div>
+        <div class="from-addr">${addrLines(STORE.address)}</div>
         <div class="from-phone">${PHONE_ICON}${STORE.phone}</div>
       </div>
       <div class="to">
@@ -838,7 +851,7 @@
       </div>
     </div>
     ${o.notes ? `<div style="margin-top:18px;font-size:12px;color:#000"><strong>Notes:</strong> ${escapeHtml(o.notes)}</div>` : ''}
-    <div class="foot">Thank you for shopping with Pebble Store 🌿<br/>Curated with love • Packed with care.<br/><br/><strong>PEBBLE STORE</strong><br/>10-4-4 Munsip Kadu<br/>Konganapuram<br/>Salem - 637102</div>
+    <div class="foot">Thank you for shopping with Pebble Store 🌿<br/>Curated with love • Packed with care.</div>
   </div>
 </body></html>`;
     }
@@ -872,7 +885,7 @@
         <div class="chead">
           <div class="cfrom">
             <div class="cfrom-lbl">From</div>
-            <div><strong>${STORE.name}</strong><br/>Konganapuram, Salem - 637102<br/>${PHONE_ICON}${STORE.phone}</div>
+            <div><strong>${STORE.name}</strong><br/>${addrLines('Konganapuram, Salem - 637102')}<br/>${PHONE_ICON}${STORE.phone}</div>
           </div>
           <div class="cto">
             <div class="clbl">Deliver To</div>

@@ -22,6 +22,9 @@ const WHATSAPP_NUMBER = '918925401892';
 let allProducts = [];
 const cart = {};
 
+// Normalise a phone to its last 10 digits so +91 / spacing variants match
+const normPhone = (p) => String(p ?? '').replace(/\D/g, '').slice(-10);
+
 
 // ══════════════════════════════
 // ORDER TRACKING (inline section)
@@ -133,8 +136,9 @@ window.doTrackByPhone = async function() {
   el.style.display = 'block';
   try {
     const snap = await getDocs(collection(db, 'orders'));
+    const c = normPhone(phone);
     const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .filter(o => { const c = phone.replace(/[^0-9]/g, ''); return o.phone && o.phone.replace(/[^0-9]/g, '') === c; })
+      .filter(o => o.phone && normPhone(o.phone) === c)
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     if (!orders.length) { showTrackError('No orders found for this phone number.'); return; }
     if (orders.length === 1) { await showTrackResult(orders[0]); return; }

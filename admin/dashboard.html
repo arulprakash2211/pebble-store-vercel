@@ -1777,20 +1777,32 @@
       document.getElementById('repRangeInfo').textContent =
         (from || to) ? `${from || '…'} → ${to || '…'} · excludes cancelled` : 'All time · excludes cancelled';
 
-      // Sales by category (item category resolved from the products list)
+      // Sales by category, with the products inside each category as sub-rows
       const byCat = {};
       let catTotal = 0;
       orders.forEach(o => (o.items || []).forEach(i => {
         const rev = (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0));
         const cat = reportCatById[i.id] || reportCatByLabel[i.name] || 'Uncategorised';
-        const c = (byCat[cat] = byCat[cat] || { qty: 0, revenue: 0 });
+        const group = String(i.name || i.id || 'Unknown').split(' — ')[0];
+        const c = (byCat[cat] = byCat[cat] || { qty: 0, revenue: 0, products: {} });
         c.qty += i.qty || 0; c.revenue += rev; catTotal += rev;
+        const p = (c.products[group] = c.products[group] || { qty: 0, revenue: 0 });
+        p.qty += i.qty || 0; p.revenue += rev;
       }));
       const cTot = catTotal || 1;
-      repCategoryRows = Object.entries(byCat).map(([name, v]) => ({ name, ...v, share: Math.round(v.revenue / cTot * 100) })).sort((a, b) => b.revenue - a.revenue);
-      document.getElementById('repCategoryBody').innerHTML = repCategoryRows.length
-        ? repCategoryRows.map(r => `<tr><td><strong>${r.name}</strong></td><td style="text-align:center">${r.qty}</td><td style="text-align:right">${fmt(r.revenue)}</td><td style="text-align:right">${r.share}%</td></tr>`).join('')
-        : '<tr><td colspan="4" class="loading">No sales in this range.</td></tr>';
+      const catArr = Object.entries(byCat).map(([name, v]) => ({ name, ...v, share: Math.round(v.revenue / cTot * 100) })).sort((a, b) => b.revenue - a.revenue);
+      repCategoryRows = [];
+      let chtml = '';
+      catArr.forEach(c => {
+        chtml += `<tr><td><strong>${c.name}</strong></td><td style="text-align:center"><strong>${c.qty}</strong></td><td style="text-align:right"><strong>${fmt(c.revenue)}</strong></td><td style="text-align:right"><strong>${c.share}%</strong></td></tr>`;
+        repCategoryRows.push({ name: c.name, qty: c.qty, revenue: c.revenue, share: c.share });
+        Object.entries(c.products).map(([pn, pv]) => ({ pn, ...pv })).sort((a, b) => b.revenue - a.revenue).forEach(p => {
+          chtml += `<tr><td style="padding-left:2rem;color:var(--stone)">${p.pn}</td><td style="text-align:center">${p.qty}</td><td style="text-align:right">${fmt(p.revenue)}</td><td style="text-align:right"></td></tr>`;
+          repCategoryRows.push({ name: '   ' + p.pn, qty: p.qty, revenue: p.revenue, share: '' });
+        });
+      });
+      document.getElementById('repCategoryBody').innerHTML = catArr.length
+        ? chtml : '<tr><td colspan="4" class="loading">No sales in this range.</td></tr>';
 
       // Monthly breakdown
       const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -1852,8 +1864,8 @@
 
     window.exportReportsCSV = () => {
       const nl = String.fromCharCode(10);
-      let csv = 'Sales by Category' + nl + 'Category,Qty,Revenue,Share %' + nl;
-      csv += repCategoryRows.map(r => `"${String(r.name).replace(/"/g, '""')}",${r.qty},${r.revenue},${r.share}`).join(nl);
+      let csv = 'Sales by Category' + nl + 'Category / Product,Qty,Revenue,Share %' + nl;
+      csv += repCategoryRows.map(r => `"${String(r.name).trim().replace(/"/g, '""')}",${r.qty},${r.revenue},${r.share}`).join(nl);
       csv += nl + nl + 'Monthly Summary' + nl + 'Month,Orders,Items,Revenue' + nl;
       csv += repMonthlyRows.map(r => `${r.label},${r.orders},${r.items},${r.revenue}`).join(nl);
       csv += nl + nl + 'Product Split' + nl + 'Product,Qty,Price Per Unit,Total' + nl;

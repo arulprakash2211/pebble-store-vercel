@@ -597,6 +597,7 @@
           } else if (o.status === 'cancelled') {
             actions = `<span style="font-size:0.72rem;color:#c0392b">✗ Cancelled</span>`;
           }
+          actions += `<button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="printReceipt('${o.id}')">🧾 Receipt</button>`;
           return `<tr>
             <td style="white-space:nowrap;font-size:0.78rem">${date}</td>
             <td><strong>${o.name}</strong>${o.source === 'admin' ? ' <span style="font-size:0.62rem;background:#e8d5ff;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">ADMIN</span>' : ''}<br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
@@ -635,6 +636,114 @@
       if (!confirm('Permanently delete this order? This cannot be undone.')) return;
       try { await deleteDoc(doc(db, 'orders', id)); toast('🗑️ Order deleted'); loadOrders(); }
       catch (err) { toast('❌ ' + err.message); }
+    };
+
+    // ── Receipt / Invoice (print → Save as PDF) ──
+    const STORE = {
+      name:    'PEBBLE STORE',
+      address: '10-4-4 Munsip Kadu, Rangampalayam, Konganapuram - 637102',
+      phone:   '9791240655'
+    };
+
+    const escapeHtml = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+    function buildReceiptHtml(o) {
+      const fmt   = n => '₹' + Number(n || 0).toLocaleString('en-IN');
+      const items = o.items || [];
+      const subtotal = o.subtotal != null ? o.subtotal : items.reduce((s, i) => s + (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0)), 0);
+      const shipping = o.shipping || 0;
+      const discount = o.discount || 0;
+      const total    = o.total != null ? o.total : Math.max(0, subtotal + shipping - discount);
+      const date = o.createdAt
+        ? new Date(o.createdAt).toLocaleString('en-IN', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+        : '—';
+      const rows = items.map(i => `
+        <tr>
+          <td>${escapeHtml(i.name)}</td>
+          <td class="num">${fmt(i.price)}</td>
+          <td class="num">${i.qty}</td>
+          <td class="num">${fmt(i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0))}</td>
+        </tr>`).join('');
+
+      return `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>Receipt · ${escapeHtml(o.name)} · ${escapeHtml(o.id)}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;color:#2b1f14;padding:32px;font-size:13px}
+  .rc{max-width:720px;margin:0 auto}
+  .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #5c3d2e;padding-bottom:16px;margin-bottom:22px}
+  .brand h1{font-size:22px;color:#5c3d2e;letter-spacing:2px}
+  .brand p{font-size:12px;color:#7a6a58;line-height:1.5;margin-top:6px;max-width:280px}
+  .doc{text-align:right}
+  .doc h2{font-size:16px;letter-spacing:3px;text-transform:uppercase;color:#4a5c3a}
+  .doc p{font-size:11px;color:#7a6a58;margin-top:6px;line-height:1.6}
+  .cols{display:flex;justify-content:space-between;gap:24px;margin-bottom:22px}
+  .box{flex:1}
+  .box .lbl{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#8a7968;margin-bottom:6px}
+  .box .val{font-size:13px;line-height:1.7}
+  table{width:100%;border-collapse:collapse;margin-bottom:16px}
+  th{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#8a7968;border-bottom:1.5px solid #5c3d2e;padding:8px 10px;text-align:left}
+  td{padding:8px 10px;border-bottom:1px solid #eee}
+  .num{text-align:right}
+  th.num{text-align:right}
+  .totals{margin-left:auto;width:280px}
+  .totals .row{display:flex;justify-content:space-between;padding:5px 10px}
+  .totals .grand{border-top:2px solid #5c3d2e;margin-top:6px;padding-top:10px;font-size:16px;font-weight:700;color:#4a5c3a}
+  .badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:0.5px}
+  .paid{background:#d4edda;color:#155724}
+  .unpaid{background:#f8d7da;color:#721c24}
+  .foot{margin-top:30px;text-align:center;font-size:11px;color:#8a7968;border-top:1px solid #eee;padding-top:16px;line-height:1.6}
+  @media print{ body{padding:0} @page{margin:16mm} }
+</style></head>
+<body onload="setTimeout(function(){window.print()},250)">
+  <div class="rc">
+    <div class="head">
+      <div class="brand">
+        <h1>${STORE.name}</h1>
+        <p>${STORE.address}<br/>Phone: ${STORE.phone}</p>
+      </div>
+      <div class="doc">
+        <h2>Receipt</h2>
+        <p>Order #${escapeHtml(o.id)}<br/>${date}</p>
+      </div>
+    </div>
+    <div class="cols">
+      <div class="box">
+        <div class="lbl">Bill To</div>
+        <div class="val"><strong>${escapeHtml(o.name)}</strong><br/>${escapeHtml(o.address || '—')}<br/>${escapeHtml(o.phone || '')}${o.email ? '<br/>' + escapeHtml(o.email) : ''}</div>
+      </div>
+      <div class="box" style="text-align:right">
+        <div class="lbl">Status</div>
+        <div class="val">
+          ${escapeHtml((o.status || '').toUpperCase())}
+          &nbsp;<span class="badge ${o.paid ? 'paid' : 'unpaid'}">${o.paid ? 'PAID' : 'UNPAID'}</span>
+          ${o.tracking ? `<div style="margin-top:8px;font-size:12px">${escapeHtml(o.tracking.courier)}<br/><span style="font-family:monospace">${escapeHtml(o.tracking.trackingId)}</span></div>` : ''}
+        </div>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Item</th><th class="num">Price</th><th class="num">Qty</th><th class="num">Amount</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4" style="text-align:center;color:#8a7968">No items</td></tr>'}</tbody>
+    </table>
+    <div class="totals">
+      <div class="row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
+      ${shipping ? `<div class="row"><span>Shipping</span><span>${fmt(shipping)}</span></div>` : ''}
+      ${discount ? `<div class="row"><span>Discount</span><span>−${fmt(discount)}</span></div>` : ''}
+      <div class="row grand"><span>Total</span><span>${fmt(total)}</span></div>
+    </div>
+    ${o.notes ? `<div style="margin-top:18px;font-size:12px;color:#7a6a58"><strong>Notes:</strong> ${escapeHtml(o.notes)}</div>` : ''}
+    <div class="foot">Thank you for shopping with Pebble Store 🌿<br/>Handmade natural products, crafted with care.</div>
+  </div>
+</body></html>`;
+    }
+
+    window.printReceipt = (id) => {
+      const o = allOrders.find(x => x.id === id);
+      if (!o) { toast('❌ Order not found'); return; }
+      const win = window.open('', '_blank', 'width=820,height=920');
+      if (!win) { toast('⚠️ Allow pop-ups to print the receipt'); return; }
+      win.document.write(buildReceiptHtml(o));
+      win.document.close();
     };
     window.openDispatchModal = (id) => {
       currentDispatchOrderId = id;

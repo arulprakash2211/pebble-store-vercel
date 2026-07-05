@@ -765,7 +765,6 @@
     </div>
     <div class="orderbar">Order #${escapeHtml(String(orderNo))} &nbsp;·&nbsp; ${date}</div>
     <div class="listing">
-      <img class="watermark" src="${STORE.logo}" alt="" onerror="this.style.display='none'"/>
       <table>
         <thead><tr><th>Item</th><th class="num">Price</th><th class="num">Qty</th><th class="num">Amount</th></tr></thead>
         <tbody>${rows || '<tr><td colspan="4" style="text-align:center;color:#000">No items</td></tr>'}</tbody>
@@ -810,7 +809,6 @@
       return `<div class="card">
         <div class="chead">
           <div class="cfrom">
-            <img src="${STORE.logo}" class="clogo" alt="" onerror="this.style.display='none'"/>
             <div class="cfrom-lbl">From</div>
             <div><strong>${STORE.name}</strong><br/>Konganapuram - 637102<br/>${STORE.phone}</div>
           </div>

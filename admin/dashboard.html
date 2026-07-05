@@ -414,7 +414,7 @@
       <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.6rem">Product Split</div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Product</th><th style="text-align:center">Qty Sold</th><th style="text-align:right">Revenue</th><th style="text-align:right">Share</th></tr></thead>
+          <thead><tr><th>Product</th><th style="text-align:center">Qty</th><th style="text-align:right">Price / Unit</th><th style="text-align:right">Total</th></tr></thead>
           <tbody id="repProductBody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
         </table>
       </div>
@@ -478,6 +478,8 @@
         <div class="mfg"><label>Email</label><input id="noEmail" type="email" placeholder="email@example.com"/></div>
         <div class="mfg"><label>Notes</label><input id="noNotes" placeholder="Special instructions" style="text-transform:uppercase"/></div>
       </div>
+
+      <div class="mfg" style="margin-bottom:1rem;max-width:220px"><label>Order Date</label><input type="date" id="noDate"/></div>
 
       <!-- Product Selection -->
       <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--stone);font-weight:500;margin-bottom:0.6rem">Products</div>
@@ -1537,6 +1539,8 @@
       document.getElementById('noModalTitle').textContent = '➕ New Manual Order';
       // Reset form
       ['noName','noPhone','noAltPhone','noAddress','noEmail','noNotes'].forEach(id => document.getElementById(id).value = '');
+      const _t = new Date();
+      document.getElementById('noDate').value = new Date(_t.getTime() - _t.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
       document.getElementById('noShipping').value = 0;
       document.getElementById('noDiscount').value = 0;
       document.getElementById('noPaid').value = 'false';
@@ -1565,6 +1569,7 @@
       document.getElementById('noDiscount').value = order.discount || 0;
       document.getElementById('noPaid').value   = order.paid ? 'true' : 'false';
       document.getElementById('noStatus').value = order.status || 'confirmed';
+      document.getElementById('noDate').value    = (order.createdAt || '').slice(0, 10);
       document.getElementById('noProductRows').innerHTML = '';
       const items = order.items || [];
       if (items.length) items.forEach(it => addOrderProductRow(it.id, it.qty));
@@ -1634,6 +1639,8 @@
       // Strip all whitespace from the phone, then validate
       const phone = document.getElementById('noPhone').value.replace(/\s+/g, '');
       const altPhone = document.getElementById('noAltPhone').value.replace(/\s+/g, '');
+      const dateVal  = document.getElementById('noDate').value;
+      const createdAtISO = dateVal ? new Date(dateVal + 'T12:00:00').toISOString() : new Date().toISOString();
 
       if (!name || !phone) { showNoErr(msg, '⚠️ Name and phone are required.'); return; }
       if (!/^\+?\d{10,15}$/.test(phone)) {
@@ -1672,6 +1679,7 @@
         total,
         status:   document.getElementById('noStatus').value,
         paid:     document.getElementById('noPaid').value === 'true',
+        createdAt: createdAtISO,
         updatedAt: new Date().toISOString()
       };
 
@@ -1683,7 +1691,6 @@
           data.source    = 'admin';   // marks as manual/admin order
           data.tracking  = null;
           data.orderNo   = await nextOrderNo();
-          data.createdAt = new Date().toISOString();
           await addDoc(collection(db, 'orders'), data);
           toast('✅ Order saved!');
         }
@@ -1767,9 +1774,8 @@
       repProductRows = Object.entries(byProduct)
         .map(([name, v]) => ({ name, ...v }))
         .sort((a, b) => b.revenue - a.revenue);
-      const prodTotal = repProductRows.reduce((s, r) => s + r.revenue, 0) || 1;
       document.getElementById('repProductBody').innerHTML = repProductRows.length
-        ? repProductRows.map(r => `<tr><td>${r.name}</td><td style="text-align:center">${r.qty}</td><td style="text-align:right">${fmt(r.revenue)}</td><td style="text-align:right">${Math.round(r.revenue / prodTotal * 100)}%</td></tr>`).join('')
+        ? repProductRows.map(r => { const unit = r.qty ? Math.round(r.revenue / r.qty) : 0; return `<tr><td>${r.name}</td><td style="text-align:center">${r.qty}</td><td style="text-align:right">${fmt(unit)}</td><td style="text-align:right"><strong>${fmt(r.revenue)}</strong></td></tr>`; }).join('')
         : '<tr><td colspan="4" class="loading">No products in this range.</td></tr>';
     };
 
@@ -1777,8 +1783,8 @@
       const nl = String.fromCharCode(10);
       let csv = 'Monthly Summary' + nl + 'Month,Orders,Items,Revenue' + nl;
       csv += repMonthlyRows.map(r => `${r.label},${r.orders},${r.items},${r.revenue}`).join(nl);
-      csv += nl + nl + 'Product Split' + nl + 'Product,Qty Sold,Revenue' + nl;
-      csv += repProductRows.map(r => `"${String(r.name).replace(/"/g, '""')}",${r.qty},${r.revenue}`).join(nl);
+      csv += nl + nl + 'Product Split' + nl + 'Product,Qty,Price Per Unit,Total' + nl;
+      csv += repProductRows.map(r => `"${String(r.name).replace(/"/g, '""')}",${r.qty},${r.qty ? Math.round(r.revenue / r.qty) : 0},${r.revenue}`).join(nl);
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

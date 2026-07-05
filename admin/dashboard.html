@@ -430,7 +430,7 @@
       <!-- Customer Details -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:1rem">
         <div class="mfg"><label>Customer Name *</label><input id="noName" placeholder="Full name" style="text-transform:uppercase"/></div>
-        <div class="mfg"><label>Phone *</label><input id="noPhone" placeholder="+91 00000 00000"/></div>
+        <div class="mfg"><label>Phone *</label><input id="noPhone" placeholder="+91 00000 00000" oninput="autofillFromPhone()"/></div>
         <div class="mfg" style="grid-column:1/-1"><label>Address</label><input id="noAddress" placeholder="Delivery address" style="text-transform:uppercase"/></div>
         <div class="mfg"><label>Email</label><input id="noEmail" type="email" placeholder="email@example.com"/></div>
         <div class="mfg"><label>Notes</label><input id="noNotes" placeholder="Special instructions" style="text-transform:uppercase"/></div>
@@ -689,6 +689,8 @@
     }
 
     const escapeHtml = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+    // Normalise a phone to its last 10 digits so +91 / spacing variants match
+    const normPhone = (p) => String(p ?? '').replace(/\D/g, '').slice(-10);
 
     function buildReceiptHtml(o) {
       const fmt   = n => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -1260,11 +1262,12 @@
         const map  = {};
         snap.docs.forEach(d => {
           const o = d.data();
-          if (!o.phone) return;
-          if (!map[o.phone]) {
-            map[o.phone] = {
+          const key = normPhone(o.phone);
+          if (!key) return;
+          if (!map[key]) {
+            map[key] = {
               name:     o.name || '—',
-              phone:    o.phone,
+              phone:    o.phone || key,
               email:    o.email || '—',
               address:  o.address || '—',
               orders:   0,
@@ -1272,10 +1275,16 @@
               lastOrder: o.createdAt || ''
             };
           }
-          map[o.phone].orders++;
-          map[o.phone].spent += o.total || 0;
-          // Track most recent order date
-          if (o.createdAt > map[o.phone].lastOrder) map[o.phone].lastOrder = o.createdAt;
+          map[key].orders++;
+          map[key].spent += o.total || 0;
+          // Keep the most recent order's details as the customer's display record
+          if ((o.createdAt || '') > map[key].lastOrder) {
+            map[key].lastOrder = o.createdAt || '';
+            if (o.name)    map[key].name    = o.name;
+            if (o.address) map[key].address = o.address;
+            if (o.email)   map[key].email   = o.email;
+            if (o.phone)   map[key].phone   = o.phone;
+          }
         });
         allCustomers = Object.values(map);
         renderCustomers(currentCustomerSort);
@@ -1543,6 +1552,19 @@
       const discount  = parseFloat(document.getElementById('noDiscount').value) || 0;
       const total     = Math.max(0, subtotal + shipping - discount);
       document.getElementById('noTotal').textContent = `₹${total}`;
+    };
+
+    // Auto-fill name/address/email from a returning customer's most recent order.
+    // Only fills empty fields, so anything already typed is preserved.
+    window.autofillFromPhone = () => {
+      const key = normPhone(document.getElementById('noPhone').value);
+      if (key.length < 10) return;
+      const match = allOrders.find(o => normPhone(o.phone) === key); // allOrders is newest-first
+      if (!match) return;
+      const setIfEmpty = (id, val) => { const el = document.getElementById(id); if (el && !el.value.trim() && val) el.value = val; };
+      setIfEmpty('noName', match.name);
+      setIfEmpty('noAddress', match.address);
+      setIfEmpty('noEmail', match.email);
     };
 
     const showNoErr = (msg, text) => {

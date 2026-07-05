@@ -399,15 +399,15 @@
   <div class="modal-overlay" id="newOrderModal">
     <div class="modal" style="max-width:600px;width:100%">
       <button class="modal-close" onclick="closeModal('newOrderModal')">×</button>
-      <div class="modal-title">➕ New Manual Order</div>
+      <div class="modal-title" id="noModalTitle">➕ New Manual Order</div>
 
       <!-- Customer Details -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:1rem">
-        <div class="mfg"><label>Customer Name *</label><input id="noName" placeholder="Full name"/></div>
+        <div class="mfg"><label>Customer Name *</label><input id="noName" placeholder="Full name" style="text-transform:uppercase"/></div>
         <div class="mfg"><label>Phone *</label><input id="noPhone" placeholder="+91 00000 00000"/></div>
-        <div class="mfg" style="grid-column:1/-1"><label>Address</label><input id="noAddress" placeholder="Delivery address"/></div>
+        <div class="mfg" style="grid-column:1/-1"><label>Address</label><input id="noAddress" placeholder="Delivery address" style="text-transform:uppercase"/></div>
         <div class="mfg"><label>Email</label><input id="noEmail" type="email" placeholder="email@example.com"/></div>
-        <div class="mfg"><label>Notes</label><input id="noNotes" placeholder="Special instructions"/></div>
+        <div class="mfg"><label>Notes</label><input id="noNotes" placeholder="Special instructions" style="text-transform:uppercase"/></div>
       </div>
 
       <!-- Product Selection -->
@@ -443,7 +443,6 @@
           <select id="noStatus">
             <option value="confirmed">Confirmed</option>
             <option value="new">New</option>
-            <option value="dispatched">Dispatched</option>
           </select>
         </div>
       </div>
@@ -559,9 +558,9 @@
             : `<span style="color:var(--stone);font-size:0.72rem">—</span>`;
           let actions = '';
           if (o.status === 'new') {
-            actions = `<button class="btn btn-sm btn-ghost" onclick="updateStatus('${o.id}','confirmed')">Confirm</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
+            actions = `<button class="btn btn-sm btn-ghost" onclick="updateStatus('${o.id}','confirmed')">Confirm</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
           } else if (o.status === 'confirmed') {
-            actions = `<button class="btn btn-sm btn-green" onclick="openDispatchModal('${o.id}')">Dispatch</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
+            actions = `<button class="btn btn-sm btn-green" onclick="openDispatchModal('${o.id}')">Dispatch</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
           } else if (o.status === 'dispatched') {
             actions = `<button class="btn btn-sm btn-blue" onclick="updateStatus('${o.id}','delivered')">Delivered</button>`;
           } else if (o.status === 'delivered') {
@@ -1204,14 +1203,21 @@
     // MANUAL ORDER
     // ══════════════════════════════
     let noProducts = []; // products for new order rows
+    let editingOrderId = null; // set when the modal is editing an existing order
 
-    window.openNewOrderModal = async () => {
-      // Load products if not loaded
+    // Ensure the product catalogue is available for the order rows
+    async function ensureProductsLoaded() {
       if (!allProducts.length) {
         const snap = await getDocs(collection(db, 'products'));
         allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       }
       noProducts = allProducts;
+    }
+
+    window.openNewOrderModal = async () => {
+      await ensureProductsLoaded();
+      editingOrderId = null;
+      document.getElementById('noModalTitle').textContent = '➕ New Manual Order';
       // Reset form
       ['noName','noPhone','noAddress','noEmail','noNotes'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('noShipping').value = 0;
@@ -1225,11 +1231,35 @@
       document.getElementById('newOrderModal').classList.add('open');
     };
 
-    window.addOrderProductRow = () => {
+    // Edit an existing (non-dispatched) order — reuses the New Order modal
+    window.openEditOrder = async (id) => {
+      await ensureProductsLoaded();
+      const order = allOrders.find(o => o.id === id);
+      if (!order) { toast('❌ Order not found'); return; }
+      editingOrderId = id;
+      document.getElementById('noModalTitle').textContent = '✏️ Edit Order';
+      document.getElementById('noName').value    = order.name    || '';
+      document.getElementById('noPhone').value   = order.phone   || '';
+      document.getElementById('noAddress').value = order.address || '';
+      document.getElementById('noEmail').value   = order.email   || '';
+      document.getElementById('noNotes').value   = order.notes   || '';
+      document.getElementById('noShipping').value = order.shipping || 0;
+      document.getElementById('noDiscount').value = order.discount || 0;
+      document.getElementById('noPaid').value   = order.paid ? 'true' : 'false';
+      document.getElementById('noStatus').value = order.status || 'confirmed';
+      document.getElementById('noProductRows').innerHTML = '';
+      const items = order.items || [];
+      if (items.length) items.forEach(it => addOrderProductRow(it.id, it.qty));
+      else addOrderProductRow();
+      document.getElementById('noMsg').style.display = 'none';
+      recalcNewOrder();
+      document.getElementById('newOrderModal').classList.add('open');
+    };
+
+    window.addOrderProductRow = (preId = null, preQty = 1) => {
       const container = document.getElementById('noProductRows');
-      const idx = container.children.length;
       const opts = noProducts.map(p =>
-        `<option value="${p.id}" data-price="${p.price}">${p.name} — ₹${p.price}</option>`
+        `<option value="${p.id}" data-price="${p.price}" ${preId === p.id ? 'selected' : ''}>${p.name} — ₹${p.price}</option>`
       ).join('');
       const row = document.createElement('div');
       row.style.cssText = 'display:grid;grid-template-columns:1fr 80px 80px 32px;gap:0.5rem;margin-bottom:0.5rem;align-items:center';
@@ -1237,7 +1267,7 @@
         <select class="no-product-select" onchange="recalcNewOrder()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0;width:100%">
           ${opts}
         </select>
-        <input type="number" class="no-qty-input" value="1" min="1" oninput="recalcNewOrder()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;text-align:center;width:100%"/>
+        <input type="number" class="no-qty-input" value="${preQty}" min="1" oninput="recalcNewOrder()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;text-align:center;width:100%"/>
         <span class="no-row-total" style="font-size:0.85rem;font-weight:600;color:var(--moss);text-align:right">₹0</span>
         <button onclick="this.parentElement.remove();recalcNewOrder()" style="background:#c0392b;color:white;border:none;cursor:pointer;width:28px;height:28px;font-size:1rem;display:flex;align-items:center;justify-content:center">×</button>`;
       container.appendChild(row);
@@ -1260,67 +1290,73 @@
       document.getElementById('noTotal').textContent = `₹${total}`;
     };
 
+    const showNoErr = (msg, text) => {
+      msg.textContent = text;
+      msg.style.cssText = 'display:block;color:#c0392b;font-size:0.8rem';
+    };
+
     window.saveNewOrder = async () => {
-      const name    = document.getElementById('noName').value.trim();
-      const phone   = document.getElementById('noPhone').value.trim();
-      const msg     = document.getElementById('noMsg');
+      const msg   = document.getElementById('noMsg');
+      // Uppercase the free-text customer columns
+      const name  = document.getElementById('noName').value.trim().toUpperCase();
+      // Strip all whitespace from the phone, then validate
+      const phone = document.getElementById('noPhone').value.replace(/\s+/g, '');
 
-      if (!name || !phone) {
-        msg.textContent = '⚠️ Name and phone are required.';
-        msg.style.cssText = 'display:block;color:#c0392b;font-size:0.8rem';
-        return;
-      }
-
-      const rows = document.querySelectorAll('#noProductRows > div');
-      if (!rows.length) {
-        msg.textContent = '⚠️ Add at least one product.';
-        msg.style.cssText = 'display:block;color:#c0392b;font-size:0.8rem';
+      if (!name || !phone) { showNoErr(msg, '⚠️ Name and phone are required.'); return; }
+      if (!/^\+?\d{10,15}$/.test(phone)) {
+        showNoErr(msg, '⚠️ Enter a valid phone number (10–15 digits, optional leading +).');
         return;
       }
 
       const items = [];
-      rows.forEach(row => {
-        const sel      = row.querySelector('.no-product-select');
-        const qty      = parseInt(row.querySelector('.no-qty-input').value) || 0;
-        const price    = parseFloat(sel.selectedOptions[0]?.dataset.price) || 0;
-        const prodId   = sel.value;
-        const prodName = sel.selectedOptions[0]?.text.split(' — ')[0] || '';
-        if (qty > 0) items.push({ id: prodId, name: prodName, price, qty, subtotal: price * qty });
+      document.querySelectorAll('#noProductRows > div').forEach(row => {
+        const sel  = row.querySelector('.no-product-select');
+        const qty  = parseInt(row.querySelector('.no-qty-input').value) || 0;
+        const prod = allProducts.find(p => p.id === sel.value);
+        if (prod && qty > 0) items.push({ id: prod.id, name: prod.name, price: prod.price, qty, subtotal: prod.price * qty });
       });
+      if (!items.length) { showNoErr(msg, '⚠️ Add at least one product.'); return; }
 
       const shippingVal = parseFloat(document.getElementById('noShipping').value) || 0;
-      const discountVal  = parseFloat(document.getElementById('noDiscount').value) || 0;
-      const subtotal     = items.reduce((s, i) => s + i.subtotal, 0);
-      const total        = Math.max(0, subtotal + shippingVal - discountVal);
+      const discountVal = parseFloat(document.getElementById('noDiscount').value) || 0;
+      const subtotal    = items.reduce((s, i) => s + i.subtotal, 0);
+      const total       = Math.max(0, subtotal + shippingVal - discountVal);
 
       msg.textContent = 'Saving…';
       msg.style.cssText = 'display:block;color:var(--moss);font-size:0.8rem';
 
+      const data = {
+        name,
+        phone,
+        email:    document.getElementById('noEmail').value.trim(),
+        address:  document.getElementById('noAddress').value.trim().toUpperCase(),
+        notes:    document.getElementById('noNotes').value.trim().toUpperCase(),
+        items,
+        subtotal,
+        shipping: shippingVal,
+        discount: discountVal,
+        total,
+        status:   document.getElementById('noStatus').value,
+        paid:     document.getElementById('noPaid').value === 'true',
+        updatedAt: new Date().toISOString()
+      };
+
       try {
-        await addDoc(collection(db, 'orders'), {
-          name,
-          phone,
-          email:     document.getElementById('noEmail').value.trim(),
-          address:   document.getElementById('noAddress').value.trim(),
-          notes:     document.getElementById('noNotes').value.trim(),
-          items,
-          subtotal,
-          shipping:  shippingVal,
-          discount:  discountVal,
-          total,
-          status:    document.getElementById('noStatus').value,
-          paid:      document.getElementById('noPaid').value === 'true',
-          source:    'admin',   // marks as manual/admin order
-          tracking:  null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
-        toast('✅ Order saved!');
+        if (editingOrderId) {
+          await updateDoc(doc(db, 'orders', editingOrderId), data);
+          toast('✅ Order updated!');
+        } else {
+          data.source    = 'admin';   // marks as manual/admin order
+          data.tracking  = null;
+          data.createdAt = new Date().toISOString();
+          await addDoc(collection(db, 'orders'), data);
+          toast('✅ Order saved!');
+        }
+        editingOrderId = null;
         closeModal('newOrderModal');
         loadOrders();
       } catch (err) {
-        msg.textContent = '❌ Error: ' + err.message;
-        msg.style.cssText = 'display:block;color:#c0392b;font-size:0.8rem';
+        showNoErr(msg, '❌ Error: ' + err.message);
       }
     };
 

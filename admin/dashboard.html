@@ -157,6 +157,7 @@
         <div><div class="page-title">Orders</div><div class="page-sub">All customer orders</div></div>
         <div style="display:flex;gap:0.6rem">
           <button class="btn btn-green" onclick="openNewOrderModal()">➕ New Order</button>
+          <button class="btn btn-ghost" onclick="showPackingSummary()">📦 Packing</button>
           <button class="btn btn-ghost" onclick="printOrdersSheet()">🖨️ Print Sheet</button>
           <button class="btn btn-primary" onclick="loadOrders()">↻ Refresh</button>
         </div>
@@ -432,6 +433,25 @@
       </div>
     </div>
 
+  </div>
+
+  <!-- PACKING SUMMARY MODAL -->
+  <div class="modal-overlay" id="packingModal">
+    <div class="modal" style="max-width:520px;width:100%">
+      <button class="modal-close" onclick="closeModal('packingModal')">×</button>
+      <div class="modal-title">📦 Packing Summary</div>
+      <div id="packingInfo" style="font-size:0.8rem;color:var(--stone);margin-bottom:0.9rem"></div>
+      <div class="table-wrap" style="max-height:55vh;overflow:auto">
+        <table>
+          <thead><tr><th>Product</th><th style="text-align:right">Qty to Pack</th></tr></thead>
+          <tbody id="packingBody"></tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:0.8rem;margin-top:1rem">
+        <button class="btn btn-primary" onclick="printPackingSummary()">🖨️ Print</button>
+        <button class="btn btn-ghost" onclick="closeModal('packingModal')">Close</button>
+      </div>
+    </div>
   </div>
 
   <!-- DISPATCH MODAL -->
@@ -728,6 +748,58 @@
       if (!confirm('Permanently delete this order? This cannot be undone.')) return;
       try { await deleteDoc(doc(db, 'orders', id)); toast('🗑️ Order deleted'); loadOrders(); }
       catch (err) { toast('❌ ' + err.message); }
+    };
+
+    // ── Packing summary: product → total qty across all undispatched orders ──
+    let packingRows = [];
+    window.showPackingSummary = () => {
+      const undispatched = allOrders.filter(o => ['new', 'confirmed', 'ready'].includes(o.status));
+      const byProduct = {};
+      undispatched.forEach(o => (o.items || []).forEach(i => {
+        const key = i.name || i.id || 'Unknown';
+        byProduct[key] = (byProduct[key] || 0) + (i.qty || 0);
+      }));
+      packingRows = Object.entries(byProduct).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty);
+      const totalItems = packingRows.reduce((s, r) => s + r.qty, 0);
+      document.getElementById('packingInfo').textContent =
+        `${undispatched.length} undispatched order${undispatched.length !== 1 ? 's' : ''} (New / Confirmed / Ready) · ${totalItems} item${totalItems !== 1 ? 's' : ''} to pack`;
+      document.getElementById('packingBody').innerHTML = packingRows.length
+        ? packingRows.map(r => `<tr><td>${escapeHtml(r.name)}</td><td style="text-align:right"><strong>${r.qty}</strong></td></tr>`).join('') +
+          `<tr><td style="font-weight:700;border-top:2px solid rgba(92,61,46,0.25)">Total</td><td style="text-align:right;font-weight:700;border-top:2px solid rgba(92,61,46,0.25)">${totalItems}</td></tr>`
+        : '<tr><td colspan="2" class="loading">No undispatched orders to pack.</td></tr>';
+      document.getElementById('packingModal').classList.add('open');
+    };
+
+    window.printPackingSummary = () => {
+      if (!packingRows.length) { toast('Nothing to pack'); return; }
+      const win = window.open('', '_blank', 'width=600,height=800');
+      if (!win) { toast('⚠️ Allow pop-ups to print'); return; }
+      const total = packingRows.reduce((s, r) => s + r.qty, 0);
+      const when = new Date().toLocaleString('en-IN', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      const rows = packingRows.map(r => `<tr><td>${escapeHtml(r.name)}</td><td class="num">${r.qty}</td></tr>`).join('');
+      win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Packing Summary</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;color:#000;padding:28px;font-size:14px}
+  h1{font-size:20px;letter-spacing:1px}
+  .meta{font-size:12px;color:#555;margin:4px 0 18px}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;letter-spacing:1px;text-transform:uppercase;border-bottom:2px solid #000;padding:8px 6px}
+  td{padding:8px 6px;border-bottom:1px solid #ddd}
+  .num{text-align:right}
+  tfoot td{font-weight:700;border-top:2px solid #000;border-bottom:none}
+  @media print{ body{padding:0} @page{margin:16mm} }
+</style></head>
+<body onload="setTimeout(function(){window.print()},200)">
+  <h1>PACKING SUMMARY</h1>
+  <div class="meta">Undispatched orders (New / Confirmed / Ready) &nbsp;·&nbsp; ${when}</div>
+  <table>
+    <thead><tr><th>Product</th><th class="num">Qty to Pack</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr><td>Total</td><td class="num">${total}</td></tr></tfoot>
+  </table>
+</body></html>`);
+      win.document.close();
     };
 
     // ── Receipt / Invoice (print → Save as PDF) ──
@@ -1849,7 +1921,7 @@ ${RECEIPT_CSS}
       a.click(); URL.revokeObjectURL(url);
     };
 
-    ['dispatchModal','stockModal','newOrderModal'].forEach(id => {
+    ['dispatchModal','stockModal','newOrderModal','packingModal'].forEach(id => {
       document.getElementById(id).addEventListener('click', e => { if (e.target === document.getElementById(id)) closeModal(id); });
     });
   </script>

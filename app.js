@@ -37,7 +37,7 @@ const COURIER_URLS = {
 const COURIER_MANUAL = ['ST Courier', 'India Post'];
 
 const STATUS_LABEL = {
-  new: '🟡 Order Received', confirmed: '🔵 Confirmed',
+  new: '🟡 Order Received', confirmed: '🔵 Confirmed', ready: '📦 Ready for Dispatch',
   dispatched: '🚚 Dispatched', delivered: '✅ Delivered', cancelled: '❌ Cancelled'
 };
 

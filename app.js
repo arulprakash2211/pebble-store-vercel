@@ -4,7 +4,7 @@
    ═══════════════════════════════════════ */
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, getDocs, addDoc, doc, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, collection, getDocs, addDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
@@ -414,16 +414,12 @@ function buildOrder() {
   };
 }
 
-// ── Sequential order number via an atomic counter (starts at 1000) ──
+// ── Next order number = highest existing orderNo + 1 (starts at 1000) ──
 async function nextOrderNo() {
-  const counterRef = doc(db, 'counters', 'orders');
-  return await runTransaction(db, async (tx) => {
-    const snap = await tx.get(counterRef);
-    const current = snap.exists() ? (snap.data().current || 999) : 999;
-    const next = current + 1;
-    tx.set(counterRef, { current: next }, { merge: true });
-    return next;
-  });
+  const snap = await getDocs(collection(db, 'orders'));
+  let max = 999;
+  snap.forEach(d => { const n = d.data().orderNo; if (typeof n === 'number' && n > max) max = n; });
+  return max + 1;
 }
 
 // ── Save order to Firestore ──

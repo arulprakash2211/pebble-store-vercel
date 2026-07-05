@@ -766,7 +766,35 @@
       return lines.join('<br/>');
     };
 
-    function buildReceiptHtml(o) {
+    // Shared receipt element styles (used full-size for the single receipt and scaled for the sheet)
+    const RECEIPT_CSS = `
+  .lblhead{display:flex;justify-content:space-between;gap:24px;border-bottom:2px solid #000;padding-bottom:16px;margin-bottom:16px}
+  .to{flex:1;text-align:right;border-left:2px solid #000;padding-left:24px}
+  .lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#000;margin-bottom:5px}
+  .to-name{font-size:20px;font-weight:700;color:#000;margin-bottom:5px;letter-spacing:0.5px}
+  .to-addr{font-size:15px;line-height:1.5;color:#000;margin-left:auto;max-width:360px}
+  .to-phone{font-size:14px;margin-top:7px;color:#000;font-weight:600}
+  .from{text-align:left;max-width:320px}
+  .from-name{font-size:13px;font-weight:700;color:#000;letter-spacing:1px}
+  .from-addr{font-size:15px;color:#000;line-height:1.5;margin-top:2px;text-transform:uppercase}
+  .from-phone{font-size:14px;color:#000;margin-top:3px;font-weight:600}
+  .orderbar{font-size:13px;color:#000;font-weight:700;letter-spacing:0.5px;margin-bottom:12px}
+  .listing{position:relative}
+  .watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:75%;max-width:440px;opacity:0.10;pointer-events:none}
+  .listing table,.listing .totals{position:relative;z-index:1}
+  table{width:100%;border-collapse:collapse;margin-bottom:16px}
+  th{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#000;border-bottom:1.5px solid #000;padding:8px 10px;text-align:left}
+  td{padding:8px 10px;border-bottom:1px solid #ccc}
+  .num{text-align:right}
+  th.num{text-align:right}
+  .totals{margin-left:auto;width:280px}
+  .totals .row{display:flex;justify-content:space-between;padding:5px 10px}
+  .totals .grand{border-top:2px solid #000;margin-top:6px;padding-top:10px;font-size:16px;font-weight:700;color:#000}
+  .foot{margin-top:30px;text-align:center;font-size:11px;color:#000;border-top:1px solid #ccc;padding-top:16px;line-height:1.6}
+`;
+
+    // Inner receipt body — shared by the single receipt and each print-sheet cell
+    function receiptBody(o) {
       const fmt   = n => '₹' + Number(n || 0).toLocaleString('en-IN');
       const items = o.items || [];
       const subtotal = o.subtotal != null ? o.subtotal : items.reduce((s, i) => s + (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0)), 0);
@@ -786,41 +814,7 @@
           <td class="num">${i.qty}</td>
           <td class="num">${fmt(i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0))}</td>
         </tr>`).join('');
-
-      return `<!DOCTYPE html><html><head><meta charset="utf-8"/>
-<title>Label · ${escapeHtml(o.name)} · #${escapeHtml(String(orderNo))}</title>
-<style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Helvetica Neue',Arial,sans-serif;color:#000;padding:32px;font-size:13px}
-  .rc{max-width:720px;margin:0 auto}
-  .lblhead{display:flex;justify-content:space-between;gap:24px;border-bottom:2px solid #000;padding-bottom:16px;margin-bottom:16px}
-  .to{flex:1;text-align:right;border-left:2px solid #000;padding-left:24px}
-  .lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#000;margin-bottom:5px}
-  .to .lbl{color:#000}
-  .to-name{font-size:20px;font-weight:700;color:#000;margin-bottom:5px;letter-spacing:0.5px}
-  .to-addr{font-size:15px;line-height:1.5;color:#000;margin-left:auto;max-width:360px}
-  .to-phone{font-size:14px;margin-top:7px;color:#000;font-weight:600}
-  .from{text-align:left;max-width:320px}
-  .listing{position:relative}
-  .watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:75%;max-width:440px;opacity:0.10;pointer-events:none}
-  .listing table,.listing .totals{position:relative;z-index:1}
-  .from-name{font-size:13px;font-weight:700;color:#000;letter-spacing:1px}
-  .from-addr{font-size:15px;color:#000;line-height:1.5;margin-top:2px;text-transform:uppercase}
-  .from-phone{font-size:14px;color:#000;margin-top:3px;font-weight:600}
-  .orderbar{font-size:13px;color:#000;font-weight:700;letter-spacing:0.5px;margin-bottom:12px}
-  table{width:100%;border-collapse:collapse;margin-bottom:16px}
-  th{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#000;border-bottom:1.5px solid #000;padding:8px 10px;text-align:left}
-  td{padding:8px 10px;border-bottom:1px solid #ccc}
-  .num{text-align:right}
-  th.num{text-align:right}
-  .totals{margin-left:auto;width:280px}
-  .totals .row{display:flex;justify-content:space-between;padding:5px 10px}
-  .totals .grand{border-top:2px solid #000;margin-top:6px;padding-top:10px;font-size:16px;font-weight:700;color:#000}
-  .foot{margin-top:30px;text-align:center;font-size:11px;color:#000;border-top:1px solid #ccc;padding-top:16px;line-height:1.6}
-  @media print{ body{padding:0} @page{margin:16mm} }
-</style></head>
-<body onload="setTimeout(function(){window.print()},250)">
-  <div class="rc">
+      return `
     <div class="lblhead">
       <div class="from">
         <div class="lbl">From</div>
@@ -851,8 +845,22 @@
       </div>
     </div>
     ${o.notes ? `<div style="margin-top:18px;font-size:12px;color:#000"><strong>Notes:</strong> ${escapeHtml(o.notes)}</div>` : ''}
-    <div class="foot">Thank you for shopping with Pebble Store 🌿<br/>Curated with love • Packed with care.</div>
-  </div>
+    <div class="foot">Thank you for shopping with Pebble Store 🌿<br/>Curated with love • Packed with care.</div>`;
+    }
+
+    function buildReceiptHtml(o) {
+      const orderNo = o.orderNo != null ? o.orderNo : o.id;
+      return `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>Label · ${escapeHtml(o.name)} · #${escapeHtml(String(orderNo))}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;color:#000;padding:32px;font-size:13px}
+  .rc{max-width:720px;margin:0 auto}
+${RECEIPT_CSS}
+  @media print{ body{padding:0} @page{margin:16mm} }
+</style></head>
+<body onload="setTimeout(function(){window.print()},250)">
+  <div class="rc">${receiptBody(o)}</div>
 </body></html>`;
     }
 
@@ -865,44 +873,7 @@
       win.document.close();
     };
 
-    // ── Batch sheet: 4 compact receipts per A4 page ──
-    function buildReceiptCard(o) {
-      const fmt   = n => '₹' + Number(n || 0).toLocaleString('en-IN');
-      const items = o.items || [];
-      const subtotal = o.subtotal != null ? o.subtotal : items.reduce((s, i) => s + (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0)), 0);
-      const shipping = o.shipping || 0;
-      const discount = o.discount || 0;
-      const total    = o.total != null ? o.total : Math.max(0, subtotal + shipping - discount);
-      const orderNo  = o.orderNo != null ? o.orderNo : o.id;
-      const toPhone  = normPhone(o.phone) || o.phone || '';
-      const altPhone = o.altPhone ? (normPhone(o.altPhone) || o.altPhone) : '';
-      const date = o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : '—';
-      const itemLines = items.map(i =>
-        `<div class="ci"><span>${escapeHtml(i.name)} ×${i.qty}</span><span>${fmt(i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0))}</span></div>`
-      ).join('');
-      return `<div class="card">
-        <img class="cwatermark" src="${STORE.logo}" alt="" onerror="this.style.display='none'"/>
-        <div class="chead">
-          <div class="cfrom">
-            <div class="cfrom-lbl">From</div>
-            <div><strong>${STORE.name}</strong><br/>${addrLines('Konganapuram, Salem - 637102')}<br/>${PHONE_ICON}${STORE.phone}</div>
-          </div>
-          <div class="cto">
-            <div class="clbl">Deliver To</div>
-            <div class="cto-name">${escapeHtml(o.name)}</div>
-            <div class="cto-addr">${escapeHtml(o.address || '—')}</div>
-            <div class="cto-phone">${PHONE_ICON}${escapeHtml(toPhone)}</div>
-            ${altPhone ? `<div class="cto-phone" style="font-weight:400">${PHONE_ICON}${escapeHtml(altPhone)} (alt)</div>` : ''}
-          </div>
-        </div>
-        <div class="cmeta">Order #${escapeHtml(String(orderNo))} · ${date}</div>
-        <div class="citems">${itemLines || '<div class="ci"><span>No items</span><span></span></div>'}</div>
-        <div class="ci small"><span>Shipping</span><span>${fmt(shipping)}</span></div>
-        ${discount ? `<div class="ci small"><span>Discount</span><span>−${fmt(discount)}</span></div>` : ''}
-        <div class="ctotal"><span>Total</span><span>${fmt(total)}</span></div>
-      </div>`;
-    }
-
+    // ── Batch sheet: 4 full receipts per A4 page (same layout as the single receipt, scaled) ──
     window.printOrdersSheet = () => {
       const orders = selectedOrderIds.size
         ? allOrders.filter(o => selectedOrderIds.has(o.id))
@@ -912,34 +883,20 @@
       if (!win) { toast('⚠️ Allow pop-ups to print'); return; }
       const pages = [];
       for (let i = 0; i < orders.length; i += 4) pages.push(orders.slice(i, i + 4));
-      const body = pages.map(g => `<div class="page">${g.map(buildReceiptCard).join('')}</div>`).join('');
+      const body = pages.map(g => `<div class="page">${g.map(o => `<div class="cell"><div class="rc">${receiptBody(o)}</div></div>`).join('')}</div>`).join('');
       win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>Order Receipts (${orders.length})</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:'Helvetica Neue',Arial,sans-serif;color:#000}
-  .page{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6mm;height:281mm;page-break-after:always}
+  .page{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:5mm;height:283mm;page-break-after:always}
   .page:last-child{page-break-after:auto}
-  .card{border:1px solid #000;border-radius:3px;padding:6mm;display:flex;flex-direction:column;overflow:hidden;font-size:11px;position:relative}
-  .cwatermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;opacity:0.10;pointer-events:none;z-index:0}
-  .card > div{position:relative;z-index:1}
-  .chead{display:flex;justify-content:space-between;gap:8px;border-bottom:1.5px solid #000;padding-bottom:6px;margin-bottom:6px}
-  .cto{flex:1;text-align:right}
-  .clbl{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:#000;margin-bottom:2px}
-  .cto-name{font-size:14px;font-weight:700;color:#000;letter-spacing:0.3px}
-  .cto-addr{font-size:11px;line-height:1.35;color:#000}
-  .cto-phone{font-size:11px;margin-top:2px;font-weight:600}
-  .cfrom{text-align:left;max-width:150px;font-size:11px;color:#000;line-height:1.35;text-transform:uppercase}
-  .cfrom .clogo{height:30px;object-fit:contain;margin:0 0 3px 0;display:block}
-  .cfrom-lbl{font-size:7px;letter-spacing:1px;text-transform:uppercase;color:#000}
-  .cmeta{font-size:10px;color:#000;font-weight:600;margin-bottom:5px}
-  .citems{flex:1;border-top:1px dashed #ccc;padding-top:6px;overflow:hidden}
-  .ci{display:flex;justify-content:space-between;padding:2px 0}
-  .ci.small{color:#000;font-size:10px}
-  .ctotal{display:flex;justify-content:space-between;border-top:1.5px solid #000;margin-top:6px;padding-top:6px;font-weight:700;font-size:13px;color:#000}
-  @page{size:A4;margin:8mm}
+  .cell{border:1px solid #000;overflow:hidden;position:relative}
+  .cell .rc{transform:scale(0.5);transform-origin:top left;width:200%;padding:6mm}
+${RECEIPT_CSS}
+  @page{size:A4;margin:6mm}
 </style></head>
-<body onload="setTimeout(function(){window.print()},250)">${body}</body></html>`);
+<body onload="setTimeout(function(){window.print()},300)">${body}</body></html>`);
       win.document.close();
     };
     window.openDispatchModal = (id) => {

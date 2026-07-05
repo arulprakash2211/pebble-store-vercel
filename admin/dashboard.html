@@ -721,10 +721,11 @@
     // ── Receipt / Invoice (print → Save as PDF) ──
     const STORE = {
       name:    'PEBBLE STORE',
-      address: '10-4-4 Munsip Kadu, Rangampalayam, Konganapuram - 637102',
+      address: '10-4-4 Munsip Kadu, Rangampalayam, Konganapuram, Salem - 637102',
       phone:   '9791240655',
       logo:    location.origin + '/images/logo.png'
     };
+    const PHONE_ICON = '<svg width="11" height="11" viewBox="0 0 24 24" fill="#000" style="vertical-align:-1px;margin-right:3px"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.6.1.4 0 .8-.3 1L6.6 10.8z"/></svg>';
 
     // Next order number = highest existing orderNo + 1 (starts at 1000)
     async function nextOrderNo() {
@@ -798,14 +799,14 @@
         <div class="lbl">From</div>
         <div class="from-name">${STORE.name}</div>
         <div class="from-addr">${STORE.address}</div>
-        <div class="from-phone">Phone: ${STORE.phone}</div>
+        <div class="from-phone">${PHONE_ICON}${STORE.phone}</div>
       </div>
       <div class="to">
         <div class="lbl">Deliver To</div>
         <div class="to-name">${escapeHtml(o.name)}</div>
         <div class="to-addr">${escapeHtml(o.address || '—')}</div>
-        <div class="to-phone">${escapeHtml(toPhone)}</div>
-        ${altPhone ? `<div class="to-phone" style="font-weight:400;font-size:13px">Alt: ${escapeHtml(altPhone)}</div>` : ''}
+        <div class="to-phone">${PHONE_ICON}${escapeHtml(toPhone)}</div>
+        ${altPhone ? `<div class="to-phone" style="font-weight:400;font-size:13px">${PHONE_ICON}${escapeHtml(altPhone)} (alt)</div>` : ''}
       </div>
     </div>
     <div class="orderbar">Order #${escapeHtml(String(orderNo))} &nbsp;·&nbsp; ${date}</div>
@@ -857,14 +858,14 @@
         <div class="chead">
           <div class="cfrom">
             <div class="cfrom-lbl">From</div>
-            <div><strong>${STORE.name}</strong><br/>Konganapuram - 637102<br/>${STORE.phone}</div>
+            <div><strong>${STORE.name}</strong><br/>Konganapuram, Salem - 637102<br/>${PHONE_ICON}${STORE.phone}</div>
           </div>
           <div class="cto">
             <div class="clbl">Deliver To</div>
             <div class="cto-name">${escapeHtml(o.name)}</div>
             <div class="cto-addr">${escapeHtml(o.address || '—')}</div>
-            <div class="cto-phone">${escapeHtml(toPhone)}</div>
-            ${altPhone ? `<div class="cto-phone" style="font-weight:400">Alt: ${escapeHtml(altPhone)}</div>` : ''}
+            <div class="cto-phone">${PHONE_ICON}${escapeHtml(toPhone)}</div>
+            ${altPhone ? `<div class="cto-phone" style="font-weight:400">${PHONE_ICON}${escapeHtml(altPhone)} (alt)</div>` : ''}
           </div>
         </div>
         <div class="cmeta">Order #${escapeHtml(String(orderNo))} · ${date}</div>

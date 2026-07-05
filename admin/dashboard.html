@@ -891,12 +891,14 @@ ${RECEIPT_CSS}
   body{font-family:'Helvetica Neue',Arial,sans-serif;color:#000}
   .page{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:5mm;height:283mm;page-break-after:always}
   .page:last-child{page-break-after:auto}
-  .cell{border:1px solid #000;overflow:hidden;position:relative}
-  .cell .rc{transform:scale(0.5);transform-origin:top left;width:200%;padding:6mm}
+  .cell{border:1px solid #000;overflow:hidden;display:flex;justify-content:center;align-items:flex-start;padding:4mm}
+  .cell .rc{width:680px;flex:none;transform-origin:top center}
 ${RECEIPT_CSS}
   @page{size:A4;margin:6mm}
 </style></head>
-<body onload="setTimeout(function(){window.print()},300)">${body}</body></html>`);
+<body>${body}
+<script>(function(){function fit(){document.querySelectorAll('.cell').forEach(function(c){var rc=c.querySelector('.rc');if(!rc)return;rc.style.transform='none';var s=Math.min((c.clientWidth-16)/rc.offsetWidth,(c.clientHeight-16)/rc.offsetHeight);rc.style.transform='scale('+s+')';});setTimeout(function(){window.print();},250);}window.addEventListener('load',fit);})();<\/script>
+</body></html>`);
       win.document.close();
     };
     window.openDispatchModal = (id) => {

@@ -765,6 +765,7 @@
     </div>
     <div class="orderbar">Order #${escapeHtml(String(orderNo))} &nbsp;·&nbsp; ${date}</div>
     <div class="listing">
+      <img class="watermark" src="${STORE.logo}" alt="" onerror="this.style.display='none'"/>
       <table>
         <thead><tr><th>Item</th><th class="num">Price</th><th class="num">Qty</th><th class="num">Amount</th></tr></thead>
         <tbody>${rows || '<tr><td colspan="4" style="text-align:center;color:#000">No items</td></tr>'}</tbody>
@@ -807,6 +808,7 @@
         `<div class="ci"><span>${escapeHtml(i.name)} ×${i.qty}</span><span>${fmt(i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0))}</span></div>`
       ).join('');
       return `<div class="card">
+        <img class="cwatermark" src="${STORE.logo}" alt="" onerror="this.style.display='none'"/>
         <div class="chead">
           <div class="cfrom">
             <div class="cfrom-lbl">From</div>
@@ -845,7 +847,9 @@
   body{font-family:'Helvetica Neue',Arial,sans-serif;color:#000}
   .page{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6mm;height:281mm;page-break-after:always}
   .page:last-child{page-break-after:auto}
-  .card{border:1px solid #000;border-radius:3px;padding:6mm;display:flex;flex-direction:column;overflow:hidden;font-size:11px}
+  .card{border:1px solid #000;border-radius:3px;padding:6mm;display:flex;flex-direction:column;overflow:hidden;font-size:11px;position:relative}
+  .cwatermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;opacity:0.10;pointer-events:none;z-index:0}
+  .card > div{position:relative;z-index:1}
   .chead{display:flex;justify-content:space-between;gap:8px;border-bottom:1.5px solid #000;padding-bottom:6px;margin-bottom:6px}
   .cto{flex:1;text-align:right}
   .clbl{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:#000;margin-bottom:2px}

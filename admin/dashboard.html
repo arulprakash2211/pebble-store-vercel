@@ -143,6 +143,7 @@
     <button class="nav-item" onclick="showSection('products',this)"><span>🧼</span> Products</button>
     <button class="nav-item" onclick="showSection('stock',this)"><span>📈</span> Stock</button>
     <button class="nav-item" onclick="showSection('customers',this)"><span>👤</span> Customers</button>
+    <button class="nav-item" onclick="showSection('reports',this)"><span>📊</span> Reports</button>
     <div class="sidebar-footer">
       <button class="signout-btn" onclick="doSignOut()">⬅ Sign Out</button>
     </div>
@@ -378,6 +379,47 @@
       </div>
     </div>
 
+    <!-- REPORTS -->
+    <div class="section" id="section-reports">
+      <div class="page-header">
+        <div><div class="page-title">Reports</div><div class="page-sub">Sales summary & product split</div></div>
+        <div style="display:flex;gap:0.6rem">
+          <button class="btn btn-ghost" onclick="exportReportsCSV()">⬇ Export CSV</button>
+          <button class="btn btn-primary" onclick="loadReports()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:0.8rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:1.2rem;padding:0.8rem;background:var(--cream)">
+        <div class="fg"><label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone)">From</label><input type="date" id="repFrom" onchange="renderReports()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"/></div>
+        <div class="fg"><label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone)">To</label><input type="date" id="repTo" onchange="renderReports()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"/></div>
+        <button class="btn btn-ghost btn-sm" onclick="resetReportFilter()">Clear dates</button>
+        <span id="repRangeInfo" style="font-size:0.75rem;color:var(--stone);margin-left:auto"></span>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label">Revenue</div><div class="stat-value green" id="repRevenue">—</div></div>
+        <div class="stat-card"><div class="stat-label">Orders</div><div class="stat-value" id="repOrders">—</div></div>
+        <div class="stat-card"><div class="stat-label">Items Sold</div><div class="stat-value" id="repItems">—</div></div>
+        <div class="stat-card"><div class="stat-label">Avg Order</div><div class="stat-value clay" id="repAvg">—</div></div>
+      </div>
+
+      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.6rem">Monthly Summary</div>
+      <div class="table-wrap" style="margin-bottom:1.6rem">
+        <table>
+          <thead><tr><th>Month</th><th style="text-align:center">Orders</th><th style="text-align:center">Items</th><th style="text-align:right">Revenue</th></tr></thead>
+          <tbody id="repMonthlyBody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+
+      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.6rem">Product Split</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Product</th><th style="text-align:center">Qty Sold</th><th style="text-align:right">Revenue</th><th style="text-align:right">Share</th></tr></thead>
+          <tbody id="repProductBody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 
   <!-- DISPATCH MODAL -->
@@ -524,6 +566,7 @@
       if (name === 'products')  { loadProductsList(); loadBulkTable(); }
       if (name === 'stock')     loadStockTable();
       if (name === 'customers') loadCustomers();
+      if (name === 'reports')   loadReports();
     };
 
     // ── Product tab switch ──
@@ -1650,6 +1693,97 @@
       } catch (err) {
         showNoErr(msg, '❌ Error: ' + err.message);
       }
+    };
+
+    // ══════════════════════════════
+    // REPORTS
+    // ══════════════════════════════
+    let reportOrders = [];
+    let repMonthlyRows = [], repProductRows = [];
+
+    window.loadReports = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'orders'));
+        reportOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderReports();
+      } catch (err) {
+        document.getElementById('repMonthlyBody').innerHTML = `<tr><td colspan="4" class="loading">Error: ${err.message}</td></tr>`;
+      }
+    };
+
+    window.resetReportFilter = () => {
+      document.getElementById('repFrom').value = '';
+      document.getElementById('repTo').value = '';
+      renderReports();
+    };
+
+    window.renderReports = () => {
+      const from = document.getElementById('repFrom').value;   // yyyy-mm-dd or ''
+      const to   = document.getElementById('repTo').value;
+      let orders = reportOrders.filter(o => o.status !== 'cancelled');
+      if (from) orders = orders.filter(o => (o.createdAt || '') >= from);
+      if (to)   orders = orders.filter(o => (o.createdAt || '') <= to + 'T23:59:59');
+
+      const fmt = n => '₹' + Number(n || 0).toLocaleString('en-IN');
+      const revenue   = orders.reduce((s, o) => s + (o.total || 0), 0);
+      const itemsSold = orders.reduce((s, o) => s + (o.items || []).reduce((t, i) => t + (i.qty || 0), 0), 0);
+      const count     = orders.length;
+      const avg       = count ? Math.round(revenue / count) : 0;
+
+      document.getElementById('repRevenue').textContent = fmt(revenue);
+      document.getElementById('repOrders').textContent  = count;
+      document.getElementById('repItems').textContent   = itemsSold;
+      document.getElementById('repAvg').textContent     = fmt(avg);
+      document.getElementById('repRangeInfo').textContent =
+        (from || to) ? `${from || '…'} → ${to || '…'} · excludes cancelled` : 'All time · excludes cancelled';
+
+      // Monthly breakdown
+      const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const byMonth = {};
+      orders.forEach(o => {
+        const d = new Date(o.createdAt);
+        const key = isNaN(d.getTime()) ? '0000-00' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        (byMonth[key] = byMonth[key] || { orders: 0, items: 0, revenue: 0 });
+        byMonth[key].orders++;
+        byMonth[key].revenue += o.total || 0;
+        byMonth[key].items   += (o.items || []).reduce((t, i) => t + (i.qty || 0), 0);
+      });
+      repMonthlyRows = Object.keys(byMonth).sort().reverse().map(k => {
+        const [y, m] = k.split('-');
+        return { label: k === '0000-00' ? 'Unknown' : `${MON[parseInt(m) - 1]} ${y}`, ...byMonth[k] };
+      });
+      document.getElementById('repMonthlyBody').innerHTML = repMonthlyRows.length
+        ? repMonthlyRows.map(r => `<tr><td><strong>${r.label}</strong></td><td style="text-align:center">${r.orders}</td><td style="text-align:center">${r.items}</td><td style="text-align:right"><strong>${fmt(r.revenue)}</strong></td></tr>`).join('')
+        : '<tr><td colspan="4" class="loading">No orders in this range.</td></tr>';
+
+      // Product split
+      const byProduct = {};
+      orders.forEach(o => (o.items || []).forEach(i => {
+        const key = i.name || i.id || 'Unknown';
+        (byProduct[key] = byProduct[key] || { qty: 0, revenue: 0 });
+        byProduct[key].qty     += i.qty || 0;
+        byProduct[key].revenue += (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0));
+      }));
+      repProductRows = Object.entries(byProduct)
+        .map(([name, v]) => ({ name, ...v }))
+        .sort((a, b) => b.revenue - a.revenue);
+      const prodTotal = repProductRows.reduce((s, r) => s + r.revenue, 0) || 1;
+      document.getElementById('repProductBody').innerHTML = repProductRows.length
+        ? repProductRows.map(r => `<tr><td>${r.name}</td><td style="text-align:center">${r.qty}</td><td style="text-align:right">${fmt(r.revenue)}</td><td style="text-align:right">${Math.round(r.revenue / prodTotal * 100)}%</td></tr>`).join('')
+        : '<tr><td colspan="4" class="loading">No products in this range.</td></tr>';
+    };
+
+    window.exportReportsCSV = () => {
+      const nl = String.fromCharCode(10);
+      let csv = 'Monthly Summary' + nl + 'Month,Orders,Items,Revenue' + nl;
+      csv += repMonthlyRows.map(r => `${r.label},${r.orders},${r.items},${r.revenue}`).join(nl);
+      csv += nl + nl + 'Product Split' + nl + 'Product,Qty Sold,Revenue' + nl;
+      csv += repProductRows.map(r => `"${String(r.name).replace(/"/g, '""')}",${r.qty},${r.revenue}`).join(nl);
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'pebble-store-report.csv';
+      a.click(); URL.revokeObjectURL(url);
     };
 
     ['dispatchModal','stockModal','newOrderModal'].forEach(id => {

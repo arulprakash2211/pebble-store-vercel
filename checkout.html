@@ -283,8 +283,17 @@
 
     async function saveOrderToFirestore(data, paymentMethod, status = 'new', paid = false) {
       const orderId = 'ORD-' + Date.now();
+      // Sequential order number = highest existing orderNo + 1 (starts at 1000)
+      let orderNo = null;
+      try {
+        const snap = await getDocs(collection(db, 'orders'));
+        let max = 999;
+        snap.forEach(d => { const n = d.data().orderNo; if (typeof n === 'number' && n > max) max = n; });
+        orderNo = max + 1;
+      } catch (e) { console.warn('Order number assignment failed:', e); }
       await addDoc(collection(db, 'orders'), {
         orderId,
+        orderNo,
         name:          data.name,
         phone:         data.phone,
         email:         data.email,

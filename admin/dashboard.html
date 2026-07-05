@@ -155,6 +155,7 @@
         <div><div class="page-title">Orders</div><div class="page-sub">All customer orders</div></div>
         <div style="display:flex;gap:0.6rem">
           <button class="btn btn-green" onclick="openNewOrderModal()">➕ New Order</button>
+          <button class="btn btn-ghost" onclick="printOrdersSheet()">🖨️ Print Sheet</button>
           <button class="btn btn-primary" onclick="loadOrders()">↻ Refresh</button>
         </div>
       </div>
@@ -540,6 +541,7 @@
     // ORDERS
     // ══════════════════════════════
     let allOrders = [];
+    let filteredOrders = [];
 
     window.applyOrderFilters = () => {
       const search = (document.getElementById('orderSearch')?.value || '').toLowerCase().trim();
@@ -556,6 +558,7 @@
       if (paid === 'paid')   filtered = filtered.filter(o => o.paid);
       if (paid === 'unpaid') filtered = filtered.filter(o => !o.paid);
 
+      filteredOrders = filtered;
       renderOrdersTable(filtered);
       const countEl = document.getElementById('orderCount');
       if (countEl) countEl.textContent = `${filtered.length} of ${allOrders.length} orders`;
@@ -642,7 +645,8 @@
     const STORE = {
       name:    'PEBBLE STORE',
       address: '10-4-4 Munsip Kadu, Rangampalayam, Konganapuram - 637102',
-      phone:   '9791240655'
+      phone:   '9791240655',
+      logo:    location.origin + '/images/logo.png'
     };
 
     const escapeHtml = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
@@ -672,7 +676,8 @@
   body{font-family:'Helvetica Neue',Arial,sans-serif;color:#2b1f14;padding:32px;font-size:13px}
   .rc{max-width:720px;margin:0 auto}
   .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #5c3d2e;padding-bottom:16px;margin-bottom:22px}
-  .brand h1{font-size:22px;color:#5c3d2e;letter-spacing:2px}
+  .brand .logo{height:60px;object-fit:contain;display:block;margin-bottom:8px}
+  .brand h1{font-size:16px;color:#5c3d2e;letter-spacing:2px}
   .brand p{font-size:12px;color:#7a6a58;line-height:1.5;margin-top:6px;max-width:280px}
   .doc{text-align:right}
   .doc h2{font-size:16px;letter-spacing:3px;text-transform:uppercase;color:#4a5c3a}
@@ -699,6 +704,7 @@
   <div class="rc">
     <div class="head">
       <div class="brand">
+        <img src="${STORE.logo}" alt="${STORE.name}" class="logo" onerror="this.style.display='none'"/>
         <h1>${STORE.name}</h1>
         <p>${STORE.address}<br/>Phone: ${STORE.phone}</p>
       </div>
@@ -711,14 +717,6 @@
       <div class="box">
         <div class="lbl">Bill To</div>
         <div class="val"><strong>${escapeHtml(o.name)}</strong><br/>${escapeHtml(o.address || '—')}<br/>${escapeHtml(o.phone || '')}${o.email ? '<br/>' + escapeHtml(o.email) : ''}</div>
-      </div>
-      <div class="box" style="text-align:right">
-        <div class="lbl">Status</div>
-        <div class="val">
-          ${escapeHtml((o.status || '').toUpperCase())}
-          &nbsp;<span class="badge ${o.paid ? 'paid' : 'unpaid'}">${o.paid ? 'PAID' : 'UNPAID'}</span>
-          ${o.tracking ? `<div style="margin-top:8px;font-size:12px">${escapeHtml(o.tracking.courier)}<br/><span style="font-family:monospace">${escapeHtml(o.tracking.trackingId)}</span></div>` : ''}
-        </div>
       </div>
     </div>
     <table>
@@ -743,6 +741,62 @@
       const win = window.open('', '_blank', 'width=820,height=920');
       if (!win) { toast('⚠️ Allow pop-ups to print the receipt'); return; }
       win.document.write(buildReceiptHtml(o));
+      win.document.close();
+    };
+
+    // ── Batch sheet: 4 compact receipts per A4 page ──
+    function buildReceiptCard(o) {
+      const fmt   = n => '₹' + Number(n || 0).toLocaleString('en-IN');
+      const items = o.items || [];
+      const subtotal = o.subtotal != null ? o.subtotal : items.reduce((s, i) => s + (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0)), 0);
+      const shipping = o.shipping || 0;
+      const discount = o.discount || 0;
+      const total    = o.total != null ? o.total : Math.max(0, subtotal + shipping - discount);
+      const date = o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : '—';
+      const itemLines = items.map(i =>
+        `<div class="ci"><span>${escapeHtml(i.name)} ×${i.qty}</span><span>${fmt(i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0))}</span></div>`
+      ).join('');
+      return `<div class="card">
+        <div class="ch"><span class="cbrand"><img src="${STORE.logo}" class="clogo" alt="" onerror="this.style.display='none'"/><span class="cn">${STORE.name}</span></span><span class="cp">${STORE.phone}</span></div>
+        <div class="cmeta">#${escapeHtml(o.id)} · ${date}</div>
+        <div class="cbill"><strong>${escapeHtml(o.name)}</strong> · ${escapeHtml(o.phone || '')}<br/>${escapeHtml(o.address || '')}</div>
+        <div class="citems">${itemLines || '<div class="ci"><span>No items</span><span></span></div>'}</div>
+        ${shipping ? `<div class="ci small"><span>Shipping</span><span>${fmt(shipping)}</span></div>` : ''}
+        ${discount ? `<div class="ci small"><span>Discount</span><span>−${fmt(discount)}</span></div>` : ''}
+        <div class="ctotal"><span>Total</span><span>${fmt(total)}</span></div>
+      </div>`;
+    }
+
+    window.printOrdersSheet = () => {
+      const orders = filteredOrders.length ? filteredOrders : allOrders;
+      if (!orders.length) { toast('No orders to print'); return; }
+      const win = window.open('', '_blank', 'width=900,height=1000');
+      if (!win) { toast('⚠️ Allow pop-ups to print'); return; }
+      const pages = [];
+      for (let i = 0; i < orders.length; i += 4) pages.push(orders.slice(i, i + 4));
+      const body = pages.map(g => `<div class="page">${g.map(buildReceiptCard).join('')}</div>`).join('');
+      win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>Order Receipts (${orders.length})</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;color:#2b1f14}
+  .page{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6mm;height:281mm;page-break-after:always}
+  .page:last-child{page-break-after:auto}
+  .card{border:1px solid #d9cfc3;border-radius:3px;padding:6mm;display:flex;flex-direction:column;overflow:hidden;font-size:11px}
+  .ch{display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #5c3d2e;padding-bottom:4px;margin-bottom:5px}
+  .cbrand{display:flex;align-items:center;gap:5px}
+  .clogo{height:22px;object-fit:contain}
+  .cn{font-size:14px;font-weight:700;letter-spacing:1px;color:#5c3d2e}
+  .cp{font-size:10px;color:#7a6a58}
+  .cmeta{font-size:10px;color:#8a7968;margin-bottom:6px}
+  .cbill{font-size:11px;line-height:1.4;margin-bottom:8px}
+  .citems{flex:1;border-top:1px dashed #ddd;padding-top:6px;overflow:hidden}
+  .ci{display:flex;justify-content:space-between;padding:2px 0}
+  .ci.small{color:#7a6a58;font-size:10px}
+  .ctotal{display:flex;justify-content:space-between;border-top:1.5px solid #5c3d2e;margin-top:6px;padding-top:6px;font-weight:700;font-size:13px;color:#4a5c3a}
+  @page{size:A4;margin:8mm}
+</style></head>
+<body onload="setTimeout(function(){window.print()},250)">${body}</body></html>`);
       win.document.close();
     };
     window.openDispatchModal = (id) => {

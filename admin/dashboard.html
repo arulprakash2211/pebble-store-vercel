@@ -963,12 +963,14 @@ ${RECEIPT_CSS}
   body{font-family:'Helvetica Neue',Arial,sans-serif;color:#000}
   .page{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:5mm;height:283mm;page-break-after:always}
   .page:last-child{page-break-after:auto}
-  .cell{border:1px solid #000;overflow:hidden;min-width:0;min-height:0}
-  .cell .rc{transform:scale(0.46);transform-origin:top left;width:217%;padding:6mm}
+  .cell{border:1px solid #000;overflow:hidden;min-width:0;min-height:0;position:relative}
+  .cell .rc{position:absolute;top:5mm;left:5mm;width:640px;transform-origin:top left}
 ${RECEIPT_CSS}
   @page{size:A4;margin:6mm}
 </style></head>
-<body onload="setTimeout(function(){window.print()},300)">${body}</body></html>`);
+<body>${body}
+<script>(function(){function fit(){document.querySelectorAll('.cell').forEach(function(c){var rc=c.querySelector('.rc');if(!rc)return;rc.style.transform='none';var aw=c.clientWidth-40,ah=c.clientHeight-40;var s=Math.min(aw/rc.offsetWidth,ah/rc.offsetHeight);rc.style.transform='scale('+s+')';});setTimeout(function(){window.print();},300);}window.addEventListener('load',fit);})();<\/script>
+</body></html>`);
       win.document.close();
     };
     window.openDispatchModal = (id) => {

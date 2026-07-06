@@ -955,22 +955,23 @@ ${RECEIPT_CSS}
       if (!win) { toast('⚠️ Allow pop-ups to print'); return; }
       const pages = [];
       for (let i = 0; i < orders.length; i += 4) pages.push(orders.slice(i, i + 4));
-      const body = pages.map(g => `<div class="page">${g.map(o => `<div class="cell"><div class="a4"><div class="rc">${receiptBody(o)}</div></div></div>`).join('')}</div>`).join('');
+      const body = pages.map(g => `<div class="page">${g.map(o => `<div class="cell"><div class="rc">${receiptBody(o)}</div></div>`).join('')}</div>`).join('');
       win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>Order Receipts (${orders.length})</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:'Helvetica Neue',Arial,sans-serif;color:#000}
-  .page{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;height:285mm;page-break-after:always}
+  /* Four receipts per A4: 2×2 quarters, each auto-scaled to fit */
+  .page{overflow:hidden;height:281mm;page-break-after:always}
   .page:last-child{page-break-after:auto}
-  .cell{overflow:hidden;min-width:0;min-height:0;border:1px dashed #bbb}
-  /* Each quarter holds a full A4 page scaled down to fit (a quarter = half of A4 per side) */
-  .a4{width:210mm;min-height:297mm;padding:14mm;background:#fff;transform:scale(0.47);transform-origin:top left}
-  .a4 .rc{width:100%}
+  .cell{float:left;width:50%;height:140mm;position:relative;overflow:hidden;border:1px dashed #999}
+  .cell .rc{position:absolute;top:6mm;left:6mm;width:720px;transform-origin:top left}
 ${RECEIPT_CSS}
   @page{size:A4;margin:6mm}
 </style></head>
-<body onload="setTimeout(function(){window.print()},300)">${body}</body></html>`);
+<body>${body}
+<script>(function(){function fit(){document.querySelectorAll('.cell').forEach(function(c){var rc=c.querySelector('.rc');if(!rc)return;rc.style.transform='none';var sc=Math.min((c.clientWidth-44)/rc.offsetWidth,(c.clientHeight-44)/rc.offsetHeight);rc.style.transform='scale('+sc+')';});setTimeout(function(){window.print();},300);}window.addEventListener('load',fit);})();<\/script>
+</body></html>`);
       win.document.close();
     };
     window.openDispatchModal = (id) => {

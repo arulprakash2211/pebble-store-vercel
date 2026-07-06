@@ -965,13 +965,11 @@ ${RECEIPT_CSS}
   .page{overflow:hidden;height:281mm;page-break-after:always}
   .page:last-child{page-break-after:auto}
   .cell{float:left;width:50%;height:140mm;position:relative;overflow:hidden;border:1px dashed #999}
-  .cell .rc{position:absolute;top:6mm;left:6mm;width:720px;transform-origin:top left}
+  .cell .rc{position:absolute;top:4mm;left:4mm;width:720px;transform:scale(0.47);transform-origin:top left}
 ${RECEIPT_CSS}
   @page{size:A4;margin:6mm}
 </style></head>
-<body>${body}
-<script>(function(){function fit(){document.querySelectorAll('.cell').forEach(function(c){var rc=c.querySelector('.rc');if(!rc)return;rc.style.transform='none';var sc=Math.min((c.clientWidth-44)/rc.offsetWidth,(c.clientHeight-44)/rc.offsetHeight);rc.style.transform='scale('+sc+')';});setTimeout(function(){window.print();},300);}window.addEventListener('load',fit);})();<\/script>
-</body></html>`);
+<body onload="setTimeout(function(){window.print()},300)">${body}</body></html>`);
       win.document.close();
     };
     window.openDispatchModal = (id) => {

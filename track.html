@@ -238,6 +238,7 @@
           if (d.success) {
             order.tracking.rawStatus = d.rawStatus;
             order.tracking.details   = d.details;
+            order.tracking.events    = d.events || [];
             order.tracking.fetchedAt = d.fetchedAt;
             if (d.mappedStatus) order.status = d.mappedStatus;
           }
@@ -256,11 +257,24 @@
         const courierUrl = COURIER_URLS[courier] ? COURIER_URLS[courier](trackingId) : null;
         const isManual = COURIER_MANUAL && COURIER_MANUAL.includes(courier);
         const { rawStatus, details, fetchedAt } = order.tracking;
+        const events = order.tracking.events || [];
+        const timelineHtml = events.length
+          ? `<div style="margin:0.7rem 0 0.3rem">
+               <div style="font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--stone);margin-bottom:0.6rem">Tracking History</div>
+               ${events.map((e, idx) => `
+                 <div style="border-left:2px solid ${idx === 0 ? 'var(--moss)' : 'rgba(92,61,46,0.2)'};padding:0 0 0.7rem 0.9rem;margin-left:0.3rem;position:relative">
+                   <div style="position:absolute;left:-6px;top:3px;width:10px;height:10px;border-radius:50%;background:${idx === 0 ? 'var(--moss)' : 'rgba(92,61,46,0.35)'}"></div>
+                   <div style="font-size:0.84rem;color:var(--dark);font-weight:${idx === 0 ? '600' : '500'}">${e.activity || ''}</div>
+                   ${e.location ? `<div style="font-size:0.76rem;color:var(--light-text)">${e.location}</div>` : ''}
+                   <div style="font-size:0.7rem;color:var(--stone)">${e.datetime || ''}</div>
+                 </div>`).join('')}
+             </div>`
+          : (details ? `<div class="result-row"><span class="result-label">Details</span><span class="result-val" style="font-size:0.78rem">${details}</span></div>` : '');
         const liveStatusHtml = rawStatus
           ? `<div class="result-row"><span class="result-label">Live Status</span><span class="result-val" style="color:var(--moss);font-weight:600">📍 ${rawStatus}</span></div>
-             ${details ? `<div class="result-row"><span class="result-label">Details</span><span class="result-val" style="font-size:0.78rem">${details}</span></div>` : ''}
+             ${timelineHtml}
              ${fetchedAt ? `<div style="font-size:0.7rem;color:var(--stone);padding:0.3rem 0.5rem">Last checked: ${new Date(fetchedAt).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'})}</div>` : ''}`
-          : '';
+          : timelineHtml;
         trackingSection = `${liveStatusHtml}
           <div class="result-row">
             <span class="result-label">Courier</span>

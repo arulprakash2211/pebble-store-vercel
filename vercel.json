@@ -6,6 +6,8 @@
   ],
   "routes": [
     { "src": "/api/cron-track",      "dest": "/api/cron-track.js" },
+    { "src": "/api/order-lookup",    "dest": "/api/order-lookup.js" },
+    { "src": "/api/next-order-no",   "dest": "/api/next-order-no.js" },
     { "src": "/api/track",           "dest": "/api/track.js" },
     { "src": "/api/products",        "dest": "/api/products.js" },
     { "src": "/api/orders",          "dest": "/api/orders.js" },

@@ -4,7 +4,7 @@
    ═══════════════════════════════════════ */
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, getDocs, addDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, collection, getDocs, addDoc, query, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
@@ -510,6 +510,7 @@ function buildOrder() {
   return {
     name:      document.getElementById('custName').value.trim(),
     phone:     document.getElementById('phone').value.trim(),
+    phoneNorm: normPhone(document.getElementById('phone').value),
     email:     document.getElementById('email').value.trim(),
     address:   document.getElementById('address').value.trim(),
     notes:     document.getElementById('notes').value.trim(),
@@ -524,11 +525,11 @@ function buildOrder() {
 }
 
 // ── Next order number = highest existing orderNo + 1 (starts at 1000) ──
+// O(1): reads only the single highest-numbered order instead of the whole collection.
 async function nextOrderNo() {
-  const snap = await getDocs(collection(db, 'orders'));
-  let max = 999;
-  snap.forEach(d => { const n = d.data().orderNo; if (typeof n === 'number' && n > max) max = n; });
-  return max + 1;
+  const snap = await getDocs(query(collection(db, 'orders'), orderBy('orderNo', 'desc'), limit(1)));
+  const top = snap.docs[0]?.data()?.orderNo;
+  return (typeof top === 'number' ? top : 999) + 1;
 }
 
 // ── Save order to Firestore ──

@@ -275,20 +275,49 @@ async function loadProducts() {
     ).join('');
 
     filtersEl.querySelectorAll('.filter-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        filtersEl.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        renderProducts(allProducts.filter(p => p.category === btn.dataset.cat));
-      });
+      btn.addEventListener('click', () => selectCategory(btn.dataset.cat));
     });
 
     // Start with first category (Soaps)
-    renderProducts(allProducts.filter(p => p.category === sorted[0]));
+    selectCategory(sorted[0]);
     updateCartNav();
   } catch (err) {
     grid.innerHTML = `<p style="color:var(--clay);grid-column:1/-1">⚠️ Could not load products. Please refresh.</p>`;
     console.error(err);
   }
+}
+
+// ── Select a top-level category: highlight tab, build subcategory sidebar, render grid ──
+function selectCategory(cat) {
+  const filtersEl = document.getElementById('categoryFilters');
+  if (filtersEl) filtersEl.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
+  renderSubcatSidebar(cat);
+  renderProducts(allProducts.filter(p => p.category === cat));
+}
+
+// ── Left sidebar: subcategories of the chosen category (hidden if none) ──
+function renderSubcatSidebar(cat) {
+  const sidebar = document.getElementById('subcatSidebar');
+  if (!sidebar) return;
+  const inCat = allProducts.filter(p => p.category === cat);
+  const subs = [...new Set(inCat.map(p => (p.subcategory || '').trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+  if (!subs.length) { sidebar.hidden = true; sidebar.innerHTML = ''; return; }
+  sidebar.hidden = false;
+  const esc = s => String(s).replace(/"/g, '&quot;');
+  sidebar.innerHTML =
+    `<div class="subcat-title">${cat}</div>` +
+    `<button class="subcat-btn active" data-sub="">All</button>` +
+    subs.map(s => `<button class="subcat-btn" data-sub="${esc(s)}">${s}</button>`).join('');
+  sidebar.querySelectorAll('.subcat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sidebar.querySelectorAll('.subcat-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const sub = btn.dataset.sub;
+      renderProducts(allProducts.filter(p =>
+        p.category === cat && (!sub || (p.subcategory || '').trim() === sub)));
+    });
+  });
 }
 
 // ── Render product cards ──

@@ -159,6 +159,7 @@
           <button class="btn btn-green" onclick="openNewOrderModal()">➕ New Order</button>
           <button class="btn btn-ghost" onclick="showPackingSummary()">📦 Packing</button>
           <button class="btn btn-ghost" onclick="printOrdersSheet()">🖨️ Print Sheet</button>
+          <button class="btn btn-ghost" onclick="refreshAllStatuses()">🔄 Refresh Statuses</button>
           <button class="btn btn-primary" onclick="loadOrders()">↻ Refresh</button>
         </div>
       </div>
@@ -760,6 +761,30 @@
         if (data.success) { toast(`📍 ${data.rawStatus || 'Status updated'}`); loadOrders(); }
         else { toast('❌ ' + (data.error || 'Could not fetch status')); }
       } catch (err) { toast('❌ ' + err.message); }
+    };
+    // Manually refresh live status for every dispatched order (same as the scheduled job)
+    window.refreshAllStatuses = async () => {
+      const dispatched = allOrders.filter(o => o.status === 'dispatched' && o.tracking && o.tracking.trackingId && o.tracking.courier);
+      if (!dispatched.length) { toast('No dispatched orders to refresh'); return; }
+      toast(`🔄 Refreshing ${dispatched.length} order${dispatched.length !== 1 ? 's' : ''}…`);
+      let checked = 0, delivered = 0;
+      const CONCURRENCY = 4;
+      for (let i = 0; i < dispatched.length; i += CONCURRENCY) {
+        await Promise.all(dispatched.slice(i, i + CONCURRENCY).map(async (o) => {
+          try {
+            const r = await fetch('/api/track', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ orderId: o.id, trackingId: o.tracking.trackingId, courier: o.tracking.courier })
+            });
+            const d = await r.json();
+            if (d && d.success && d.mappedStatus === 'delivered') delivered++;
+          } catch (_) {}
+          checked++;
+        }));
+      }
+      toast(`✅ Checked ${checked} · ${delivered} delivered`);
+      loadOrders();
     };
     window.cancelOrder = async (id) => {
       if (!confirm('Cancel this order?')) return;

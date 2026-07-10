@@ -27,13 +27,18 @@ const normPhone = (p) => String(p ?? '').replace(/\D/g, '').slice(-10);
 
 // Grouped products: products sharing a productGroup show as one card with a size selector
 const groupVariants = {}; // gid -> [variant product ids]
+const activeVariant = {}; // gid -> currently selected variant id
 const displayName = (p) => p && p.productGroup ? `${p.productGroup}${p.variant ? ' — ' + p.variant : ''}` : (p ? p.name : '');
-const selectedVariantId = (gid) => {
-  const s = document.getElementById('vsel-' + gid);
-  if (s) return s.value;
-  const arr = groupVariants[gid];
-  return arr && arr[0];
-};
+const selectedVariantId = (gid) => activeVariant[gid] || (groupVariants[gid] && groupVariants[gid][0]);
+
+// Inject styling for the variant buttons once
+(function () {
+  if (document.getElementById('variant-btn-style')) return;
+  const st = document.createElement('style');
+  st.id = 'variant-btn-style';
+  st.textContent = '.variant-btns{display:flex;flex-wrap:wrap;margin:0.5rem 0 0.2rem}.variant-btn{padding:0.35rem 0.7rem;margin:0 0.4rem 0.4rem 0;border:1.5px solid rgba(92,61,46,0.35);background:var(--warm-white,#faf8f3);color:var(--bark,#5c3d2e);font-family:inherit;font-size:0.8rem;cursor:pointer;border-radius:3px;transition:all .15s}.variant-btn:hover{border-color:var(--bark,#5c3d2e)}.variant-btn.active{background:var(--bark,#5c3d2e);color:#fff;border-color:var(--bark,#5c3d2e)}';
+  document.head.appendChild(st);
+})();
 
 
 // ══════════════════════════════
@@ -305,13 +310,12 @@ function renderProducts(products) {
   grid.innerHTML = groups.map(g => {
     const gid = g.key.replace(/[^a-zA-Z0-9]/g, '_');
     groupVariants[gid] = g.variants.map(v => v.id);
+    activeVariant[gid] = g.variants[0].id;
     const multi = g.variants.length > 1;
     const sel  = g.variants[0];
     const qty  = cart[sel.id] || 0;
     const variantSelect = multi
-      ? `<select class="variant-select" id="vsel-${gid}" onchange="onVariantChange('${gid}')" onclick="event.stopPropagation()" style="width:100%;margin:0.4rem 0;padding:0.45rem 0.6rem;border:1.5px solid rgba(92,61,46,0.25);background:var(--warm-white);font-family:'Jost',sans-serif;font-size:0.85rem;color:var(--dark)">
-            ${g.variants.map(v => `<option value="${v.id}" data-price="${v.price}">${v.variant || v.name}</option>`).join('')}
-          </select>`
+      ? `<div class="variant-btns" id="vbtns-${gid}">${g.variants.map((v, idx) => `<button type="button" class="variant-btn${idx === 0 ? ' active' : ''}" data-id="${v.id}" data-price="${v.price}" onclick="event.stopPropagation();selectVariant('${gid}','${v.id}')">${v.variant || v.name}</button>`).join('')}</div>`
       : '';
     return `
       <div class="product-card" data-group="${gid}">
@@ -344,14 +348,18 @@ function renderProducts(products) {
   }).join('');
 }
 
-// Variant switched → reflect that variant's price and cart state
-window.onVariantChange = function(gid) {
-  const s = document.getElementById('vsel-' + gid);
-  const opt = s && s.selectedOptions[0];
-  if (!opt) return;
-  const id = s.value;
+// Variant button tapped → mark it active and reflect its price + cart state
+window.selectVariant = function(gid, id) {
+  activeVariant[gid] = id;
+  let price = '';
+  const wrap = document.getElementById('vbtns-' + gid);
+  if (wrap) wrap.querySelectorAll('.variant-btn').forEach(b => {
+    const on = b.dataset.id === id;
+    b.classList.toggle('active', on);
+    if (on) price = b.dataset.price;
+  });
   const priceEl = document.getElementById('price-' + gid);
-  if (priceEl) priceEl.textContent = '₹' + opt.dataset.price;
+  if (priceEl && price !== '') priceEl.textContent = '₹' + price;
   const qty = cart[id] || 0;
   const qtyEl = document.getElementById('qty-' + gid);
   const btnEl = document.getElementById('btn-' + gid);

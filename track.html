@@ -119,7 +119,10 @@
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-    import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getFirestore, collection, getDocs, query, where } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    // Normalise a phone to its last 10 digits so +91 / spacing variants match
+    const normPhone = (p) => String(p ?? '').replace(/\D/g, '').slice(-10);
 
     const firebaseConfig = {
       apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
@@ -169,10 +172,10 @@
 
       showLoading();
       try {
-        const snap = await getDocs(collection(db, 'orders'));
-        const cleanPhone = phone.replace(/\s/g, '');
+        // Targeted query on the normalised phone field — no full-collection download
+        const norm = normPhone(phone);
+        const snap = await getDocs(query(collection(db, 'orders'), where('phoneNorm', '==', norm)));
         const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-          .filter(o => o.phone && o.phone.replace(/\s/g, '') === cleanPhone)
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
         if (!orders.length) {
@@ -210,9 +213,9 @@
 
       showLoading();
       try {
-        const snap = await getDocs(collection(db, 'orders'));
-        const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const order = orders.find(o => o.tracking?.trackingId === trackId);
+        // Targeted query on the tracking id — no full-collection download
+        const snap = await getDocs(query(collection(db, 'orders'), where('tracking.trackingId', '==', trackId)));
+        const order = snap.docs.map(d => ({ id: d.id, ...d.data() }))[0];
 
         if (!order) {
           showError('No order found with this tracking ID. Please check and try again.');

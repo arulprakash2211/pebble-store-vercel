@@ -515,6 +515,9 @@
 
       <!-- Product Selection -->
       <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--stone);font-weight:500;margin-bottom:0.6rem">Products</div>
+      <select id="noCatFilter" onchange="filterOrderProducts()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0;width:100%;margin-bottom:0.6rem">
+        <option value="">All Categories</option>
+      </select>
       <div id="noProductRows" style="margin-bottom:0.8rem"></div>
       <button class="btn btn-ghost btn-sm" onclick="addOrderProductRow()" style="margin-bottom:1rem;width:100%">➕ Add Product</button>
 
@@ -752,21 +755,28 @@
 
     // ── Packing summary: product → total qty across all undispatched orders ──
     let packingRows = [];
+    let packingLabel = '';
     window.showPackingSummary = () => {
-      const undispatched = allOrders.filter(o => ['new', 'confirmed', 'ready'].includes(o.status));
+      // Use the selected orders if any are ticked; otherwise all undispatched orders
+      const useSelected = selectedOrderIds.size > 0;
+      const orders = useSelected
+        ? allOrders.filter(o => selectedOrderIds.has(o.id))
+        : allOrders.filter(o => ['new', 'confirmed', 'ready'].includes(o.status));
       const byProduct = {};
-      undispatched.forEach(o => (o.items || []).forEach(i => {
+      orders.forEach(o => (o.items || []).forEach(i => {
         const key = i.name || i.id || 'Unknown';
         byProduct[key] = (byProduct[key] || 0) + (i.qty || 0);
       }));
       packingRows = Object.entries(byProduct).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty);
       const totalItems = packingRows.reduce((s, r) => s + r.qty, 0);
-      document.getElementById('packingInfo').textContent =
-        `${undispatched.length} undispatched order${undispatched.length !== 1 ? 's' : ''} (New / Confirmed / Ready) · ${totalItems} item${totalItems !== 1 ? 's' : ''} to pack`;
+      packingLabel = useSelected
+        ? `${orders.length} selected order${orders.length !== 1 ? 's' : ''}`
+        : `${orders.length} undispatched order${orders.length !== 1 ? 's' : ''} (New / Confirmed / Ready)`;
+      document.getElementById('packingInfo').textContent = `${packingLabel} · ${totalItems} item${totalItems !== 1 ? 's' : ''} to pack`;
       document.getElementById('packingBody').innerHTML = packingRows.length
         ? packingRows.map(r => `<tr><td>${escapeHtml(r.name)}</td><td style="text-align:right"><strong>${r.qty}</strong></td></tr>`).join('') +
           `<tr><td style="font-weight:700;border-top:2px solid rgba(92,61,46,0.25)">Total</td><td style="text-align:right;font-weight:700;border-top:2px solid rgba(92,61,46,0.25)">${totalItems}</td></tr>`
-        : '<tr><td colspan="2" class="loading">No undispatched orders to pack.</td></tr>';
+        : '<tr><td colspan="2" class="loading">No orders to pack.</td></tr>';
       document.getElementById('packingModal').classList.add('open');
     };
 
@@ -792,7 +802,7 @@
 </style></head>
 <body onload="setTimeout(function(){window.print()},200)">
   <h1>PACKING SUMMARY</h1>
-  <div class="meta">Undispatched orders (New / Confirmed / Ready) &nbsp;·&nbsp; ${when}</div>
+  <div class="meta">${packingLabel} &nbsp;·&nbsp; ${when}</div>
   <table>
     <thead><tr><th>Product</th><th class="num">Qty to Pack</th></tr></thead>
     <tbody>${rows}</tbody>
@@ -967,6 +977,9 @@ ${RECEIPT_CSS}
   .cell{float:left;width:50%;height:140mm;position:relative;overflow:hidden;border:1px dashed #999}
   .cell .rc{position:absolute;top:4mm;left:4mm;width:720px;transform:scale(0.47);transform-origin:top left}
 ${RECEIPT_CSS}
+  /* Bigger addresses on the print sheet only */
+  .cell .to-addr, .cell .from-addr{font-size:21px;line-height:1.45}
+  .cell .to-name{font-size:24px}
   @page{size:A4;margin:6mm}
 </style></head>
 <body onload="setTimeout(function(){window.print()},300)">${body}</body></html>`);
@@ -1599,6 +1612,30 @@ ${RECEIPT_CSS}
       noProducts = allProducts;
     }
 
+    // Populate the New Order category filter from the catalogue
+    function populateOrderCatFilter() {
+      const sel = document.getElementById('noCatFilter');
+      if (!sel) return;
+      const cats = [...new Set(noProducts.map(p => p.category).filter(Boolean))].sort();
+      sel.innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+      sel.value = '';
+    }
+
+    // Product <option> list for an order row, filtered by the chosen category
+    function orderProductOptions(preId) {
+      const cat = (document.getElementById('noCatFilter') || {}).value || '';
+      return noProducts.filter(p => !cat || p.category === cat)
+        .map(p => `<option value="${p.id}" data-price="${p.price}" ${preId === p.id ? 'selected' : ''}>${prodLabel(p)} — ₹${p.price}</option>`).join('');
+    }
+
+    // Category filter changed → re-populate every row's product dropdown
+    window.filterOrderProducts = () => {
+      document.querySelectorAll('#noProductRows .no-product-select').forEach(sel => {
+        sel.innerHTML = orderProductOptions(sel.value);
+      });
+      recalcNewOrder();
+    };
+
     window.openNewOrderModal = async () => {
       await ensureProductsLoaded();
       editingOrderId = null;
@@ -1614,6 +1651,7 @@ ${RECEIPT_CSS}
       document.getElementById('noProductRows').innerHTML = '';
       document.getElementById('noTotal').textContent = '₹0';
       document.getElementById('noMsg').style.display = 'none';
+      populateOrderCatFilter();
       addOrderProductRow();
       document.getElementById('newOrderModal').classList.add('open');
     };
@@ -1637,6 +1675,7 @@ ${RECEIPT_CSS}
       document.getElementById('noStatus').value = order.status || 'confirmed';
       document.getElementById('noDate').value    = (order.createdAt || '').slice(0, 10);
       document.getElementById('noProductRows').innerHTML = '';
+      populateOrderCatFilter();
       const items = order.items || [];
       if (items.length) items.forEach(it => addOrderProductRow(it.id, it.qty));
       else addOrderProductRow();
@@ -1647,9 +1686,7 @@ ${RECEIPT_CSS}
 
     window.addOrderProductRow = (preId = null, preQty = 1) => {
       const container = document.getElementById('noProductRows');
-      const opts = noProducts.map(p =>
-        `<option value="${p.id}" data-price="${p.price}" ${preId === p.id ? 'selected' : ''}>${prodLabel(p)} — ₹${p.price}</option>`
-      ).join('');
+      const opts = orderProductOptions(preId);
       const row = document.createElement('div');
       row.style.cssText = 'display:grid;grid-template-columns:1fr 80px 80px 32px;gap:0.5rem;margin-bottom:0.5rem;align-items:center';
       row.innerHTML = `

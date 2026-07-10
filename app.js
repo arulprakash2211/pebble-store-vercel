@@ -4,7 +4,7 @@
    ═══════════════════════════════════════ */
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, getDocs, addDoc, query, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, collection, getDocs, addDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
@@ -150,11 +150,12 @@ window.doTrackByPhone = async function() {
   el.innerHTML = '<p style="color:var(--light-text);font-style:italic;font-size:0.85rem">Looking up your order…</p>';
   el.style.display = 'block';
   try {
-    const snap = await getDocs(collection(db, 'orders'));
-    const c = normPhone(phone);
-    const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .filter(o => o.phone && normPhone(o.phone) === c)
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const resp = await fetch('/api/order-lookup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone })
+    });
+    const data = await resp.json();
+    const orders = (data && data.orders) || [];
     if (!orders.length) { showTrackError('No orders found for this phone number.'); return; }
     if (orders.length === 1) { await showTrackResult(orders[0]); return; }
 
@@ -189,9 +190,12 @@ window.doTrackById = async function() {
   el.innerHTML = '<p style="color:var(--light-text);font-style:italic;font-size:0.85rem">Looking up your order…</p>';
   el.style.display = 'block';
   try {
-    const snap = await getDocs(collection(db, 'orders'));
-    const order = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .find(o => o.tracking?.trackingId === trackId);
+    const resp = await fetch('/api/order-lookup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trackingId: trackId })
+    });
+    const data = await resp.json();
+    const order = ((data && data.orders) || [])[0];
     if (!order) { showTrackError('No order found with this tracking ID.'); return; }
     showTrackResult(order);
   } catch (err) { showTrackError('Something went wrong. Please try again.'); }
@@ -524,12 +528,12 @@ function buildOrder() {
   };
 }
 
-// ── Next order number = highest existing orderNo + 1 (starts at 1000) ──
-// O(1): reads only the single highest-numbered order instead of the whole collection.
+// ── Next order number assigned server-side (browser has no read access to orders) ──
 async function nextOrderNo() {
-  const snap = await getDocs(query(collection(db, 'orders'), orderBy('orderNo', 'desc'), limit(1)));
-  const top = snap.docs[0]?.data()?.orderNo;
-  return (typeof top === 'number' ? top : 999) + 1;
+  const resp = await fetch('/api/next-order-no');
+  const data = await resp.json();
+  if (typeof data.orderNo !== 'number') throw new Error('no order number');
+  return data.orderNo;
 }
 
 // ── Save order to Firestore ──

@@ -83,35 +83,69 @@ function extractTableData(html) {
 // ST COURIER
 // ════════════════════
 async function trackSTCourier(trackingId) {
+  // New stcourier.com flow (2025+): the tracking form stores the AWB in a
+  // server session via POST /track/doCheck, then the /track/shipment page
+  // renders the result. Three steps sharing one cookie — no captcha on tracking.
+  const BASE = 'https://stcourier.com';
+  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+  const getCookie = (res) => {
+    const arr = typeof res.headers.getSetCookie === 'function'
+      ? res.headers.getSetCookie()
+      : [res.headers.get('set-cookie')].filter(Boolean);
+    return arr.map(c => String(c).split(';')[0]).join('; ');
+  };
   try {
-    const res = await fetchPage(
-      `https://www.stcourier.com/tracking.php?trackid=${trackingId}`,
-      { headers: { 'Referer': 'https://www.stcourier.com/' } }
-    );
-    const html = await res.text();
-    const plainText = htmlToText(html);
-    const lower = html.toLowerCase();
+    // 1) Session cookie
+    const r1 = await fetch(`${BASE}/track/shipment`, { headers: { 'User-Agent': UA } });
+    const cookie = getCookie(r1);
 
-    // Check if not found
-    if (lower.includes('not found') || lower.includes('no record') || lower.includes('invalid awb')) {
+    // 2) Submit the AWB into the session
+    await fetch(`${BASE}/track/doCheck`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': UA,
+        'Cookie': cookie,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Referer': `${BASE}/track/shipment`
+      },
+      body: 'awb_no=' + encodeURIComponent(trackingId)
+    });
+
+    // 3) Reload the results page with the same session
+    const r3 = await fetch(`${BASE}/track/shipment`, { headers: { 'User-Agent': UA, 'Cookie': cookie } });
+    const html = await r3.text();
+
+    if (!html.includes(String(trackingId))) {
       return { success: false, error: 'Tracking ID not found on ST Courier. Please verify the ID.' };
     }
 
-    // Extract status
-    const { mapped, raw } = mapStatus(plainText);
+    // Pull all <td> cell texts, then read the value that follows each label
+    const cells = [];
+    const tdRe = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+    let m;
+    while ((m = tdRe.exec(html)) !== null) cells.push(htmlToText(m[1]).trim());
+    const after = (label) => {
+      const i = cells.findIndex(c => c.toLowerCase() === label.toLowerCase());
+      return i >= 0 && cells[i + 1] ? cells[i + 1] : '';
+    };
 
-    // Extract tracking events from table
-    const rows = extractTableData(html);
+    const status   = after('Current Status');
+    const booked   = after('Book Date/Time');
+    const delivered = after('Delivery Date/Time');
+    const origin   = after('Orgin SRC') || after('Origin SRC');
+    const dest     = after('Destination');
 
-    // Also try to find date/location patterns
-    const dateMatches = plainText.match(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/g) || [];
-    const details = rows.length > 0
-      ? rows.join(' → ')
-      : dateMatches.length > 0
-        ? `Last update: ${dateMatches[0]}`
-        : 'Status updated';
+    if (!status) return { success: false, error: 'No status found for this ST Courier AWB.' };
 
-    return { success: true, rawStatus: raw, mappedStatus: mapped, details };
+    const { mapped } = mapStatus(status);
+    const details = [
+      delivered && `Delivered: ${delivered}`,
+      !delivered && origin && dest && `${origin} → ${dest}`,
+      booked && `Booked: ${booked}`
+    ].filter(Boolean).join(' · ');
+
+    return { success: true, rawStatus: status, mappedStatus: mapped, details: details || 'Status updated' };
   } catch (err) {
     return { success: false, error: 'Could not reach ST Courier. Try again later.' };
   }

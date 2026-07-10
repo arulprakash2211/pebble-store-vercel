@@ -1885,7 +1885,26 @@ ${RECEIPT_CSS}
     // ══════════════════════════════
     let reportOrders = [];
     let repMonthlyRows = [], repProductRows = [], repCategoryRows = [];
-    let reportCatById = {}, reportCatByLabel = {};
+    let reportCatById = {}, reportCatByLabel = {}, reportGroupById = {}, reportVariantById = {};
+
+    // Derive a product's base group + variant from an order item — even when the
+    // stored name has no "—" (e.g. "Hibiscus Silky Shine Shampoo 210ml" or "... 210")
+    const SIZE_RE = /^(.*?)[\s,\-–—]+(\d+\s*(?:ml|g|gm|gms|gram|grams|kg|kgs|l|ltr|litre|pcs|nos|pack)?)\.?$/i;
+    function deriveGroupVariant(item) {
+      const name = String((item && (item.name || item.id)) || 'Unknown').trim();
+      if (item && reportGroupById[item.id]) {
+        return { group: reportGroupById[item.id], variant: reportVariantById[item.id] || '' };
+      }
+      if (name.includes(' — ')) {
+        const parts = name.split(' — ');
+        return { group: parts[0].trim(), variant: parts.slice(1).join(' — ').trim() };
+      }
+      const m = name.match(SIZE_RE);
+      if (m && m[1].trim().length >= 3 && /\d/.test(m[2])) {
+        return { group: m[1].trim(), variant: m[2].replace(/\s+/g, '') };
+      }
+      return { group: name, variant: '' };
+    }
 
     window.loadReports = async () => {
       try {
@@ -1895,10 +1914,11 @@ ${RECEIPT_CSS}
         ]);
         reportOrders = oSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         // Map order items back to a category (orders don't store category)
-        reportCatById = {}; reportCatByLabel = {};
+        reportCatById = {}; reportCatByLabel = {}; reportGroupById = {}; reportVariantById = {};
         pSnap.docs.forEach(d => {
           const p = { id: d.id, ...d.data() };
           if (p.category) { reportCatById[p.id] = p.category; reportCatByLabel[prodLabel(p)] = p.category; }
+          if (p.productGroup) { reportGroupById[p.id] = p.productGroup; reportVariantById[p.id] = p.variant || ''; }
         });
         renderReports();
       } catch (err) {
@@ -1938,7 +1958,7 @@ ${RECEIPT_CSS}
       orders.forEach(o => (o.items || []).forEach(i => {
         const rev = (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0));
         const cat = reportCatById[i.id] || reportCatByLabel[i.name] || 'Uncategorised';
-        const group = String(i.name || i.id || 'Unknown').split(' — ')[0];
+        const group = deriveGroupVariant(i).group;
         const c = (byCat[cat] = byCat[cat] || { qty: 0, revenue: 0, products: {} });
         c.qty += i.qty || 0; c.revenue += rev; catTotal += rev;
         const p = (c.products[group] = c.products[group] || { qty: 0, revenue: 0 });
@@ -1982,10 +2002,9 @@ ${RECEIPT_CSS}
       // Item names for grouped products are stored as "Group — Variant".
       const byGroup = {};
       orders.forEach(o => (o.items || []).forEach(i => {
-        const full = i.name || i.id || 'Unknown';
-        const parts = String(full).split(' — ');
-        const group = parts[0];
-        const variant = parts.slice(1).join(' — ');
+        const gv = deriveGroupVariant(i);
+        const group = gv.group;
+        const variant = gv.variant;
         const rev = (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0));
         const g = (byGroup[group] = byGroup[group] || { qty: 0, revenue: 0, variants: {} });
         g.qty += i.qty || 0; g.revenue += rev;

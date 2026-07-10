@@ -519,7 +519,10 @@
         <option value="">All Categories</option>
       </select>
       <div id="noProductRows" style="margin-bottom:0.8rem"></div>
-      <button class="btn btn-ghost btn-sm" onclick="addOrderProductRow()" style="margin-bottom:1rem;width:100%">➕ Add Product</button>
+      <div style="display:flex;gap:0.5rem;margin-bottom:1rem">
+        <button class="btn btn-ghost btn-sm" onclick="addOrderProductRow()" style="flex:1">➕ Add Product</button>
+        <button class="btn btn-ghost btn-sm" onclick="addCustomItemRow()" style="flex:1">✎ Custom Item</button>
+      </div>
 
       <!-- Order Summary -->
       <div style="background:var(--cream);padding:0.8rem 1rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center">
@@ -1677,8 +1680,14 @@ ${RECEIPT_CSS}
       document.getElementById('noProductRows').innerHTML = '';
       populateOrderCatFilter();
       const items = order.items || [];
-      if (items.length) items.forEach(it => addOrderProductRow(it.id, it.qty));
-      else addOrderProductRow();
+      if (items.length) {
+        items.forEach(it => {
+          if (it.custom || !allProducts.find(p => p.id === it.id)) addCustomItemRow(it.name, it.price, it.qty);
+          else addOrderProductRow(it.id, it.qty);
+        });
+      } else {
+        addOrderProductRow();
+      }
       document.getElementById('noMsg').style.display = 'none';
       recalcNewOrder();
       document.getElementById('newOrderModal').classList.add('open');
@@ -1700,12 +1709,30 @@ ${RECEIPT_CSS}
       recalcNewOrder();
     };
 
+    // Ad-hoc item: typed name + price (not from the catalogue)
+    window.addCustomItemRow = (preName = '', prePrice = '', preQty = 1) => {
+      const container = document.getElementById('noProductRows');
+      const row = document.createElement('div');
+      row.style.cssText = 'display:grid;grid-template-columns:1fr 70px 58px 60px 28px;gap:0.4rem;margin-bottom:0.5rem;align-items:center';
+      const inp = "font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;width:100%";
+      row.innerHTML = `
+        <input class="no-custom-name" value="${String(preName).replace(/"/g, '&quot;')}" placeholder="Custom item" oninput="recalcNewOrder()" style="${inp}"/>
+        <input type="number" class="no-custom-price" value="${prePrice}" min="0" placeholder="₹" oninput="recalcNewOrder()" style="${inp};text-align:right"/>
+        <input type="number" class="no-qty-input" value="${preQty}" min="1" oninput="recalcNewOrder()" style="${inp};text-align:center"/>
+        <span class="no-row-total" style="font-size:0.85rem;font-weight:600;color:var(--moss);text-align:right">₹0</span>
+        <button onclick="this.parentElement.remove();recalcNewOrder()" style="background:#c0392b;color:white;border:none;cursor:pointer;width:28px;height:28px;font-size:1rem;display:flex;align-items:center;justify-content:center">×</button>`;
+      container.appendChild(row);
+      recalcNewOrder();
+    };
+
     window.recalcNewOrder = () => {
       let subtotal = 0;
       document.querySelectorAll('#noProductRows > div').forEach(row => {
-        const sel = row.querySelector('.no-product-select');
         const qty = parseInt(row.querySelector('.no-qty-input').value) || 0;
-        const price = parseFloat(sel.selectedOptions[0]?.dataset.price) || 0;
+        const customPrice = row.querySelector('.no-custom-price');
+        let price;
+        if (customPrice) price = parseFloat(customPrice.value) || 0;
+        else { const sel = row.querySelector('.no-product-select'); price = parseFloat(sel && sel.selectedOptions[0] ? sel.selectedOptions[0].dataset.price : 0) || 0; }
         const lineTotal = price * qty;
         row.querySelector('.no-row-total').textContent = `₹${lineTotal}`;
         subtotal += lineTotal;
@@ -1753,10 +1780,17 @@ ${RECEIPT_CSS}
 
       const items = [];
       document.querySelectorAll('#noProductRows > div').forEach(row => {
-        const sel  = row.querySelector('.no-product-select');
-        const qty  = parseInt(row.querySelector('.no-qty-input').value) || 0;
-        const prod = allProducts.find(p => p.id === sel.value);
-        if (prod && qty > 0) items.push({ id: prod.id, name: prodLabel(prod), price: prod.price, qty, subtotal: prod.price * qty });
+        const qty = parseInt(row.querySelector('.no-qty-input').value) || 0;
+        const customName = row.querySelector('.no-custom-name');
+        if (customName) {
+          const nm = customName.value.trim();
+          const price = parseFloat(row.querySelector('.no-custom-price').value) || 0;
+          if (nm && qty > 0) items.push({ id: '', name: nm, price, qty, subtotal: price * qty, custom: true });
+        } else {
+          const sel = row.querySelector('.no-product-select');
+          const prod = sel && allProducts.find(p => p.id === sel.value);
+          if (prod && qty > 0) items.push({ id: prod.id, name: prodLabel(prod), price: prod.price, qty, subtotal: prod.price * qty });
+        }
       });
       if (!items.length) { showNoErr(msg, '⚠️ Add at least one product.'); return; }
 

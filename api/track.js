@@ -130,22 +130,43 @@ async function trackSTCourier(trackingId) {
       return i >= 0 && cells[i + 1] ? cells[i + 1] : '';
     };
 
-    const status   = after('Current Status');
-    const booked   = after('Book Date/Time');
+    const status    = after('Current Status');
+    const booked    = after('Book Date/Time');
     const delivered = after('Delivery Date/Time');
-    const origin   = after('Orgin SRC') || after('Origin SRC');
-    const dest     = after('Destination');
 
-    if (!status) return { success: false, error: 'No status found for this ST Courier AWB.' };
+    // Full scan history (timeline). Each event = two content divs (styled
+    // font-weight:400): first the date/time, then the activity + location.
+    const brToText = (h) => htmlToText(h.replace(/<br\s*\/?>/gi, ' | '));
+    const seg = html.slice(Math.max(0, html.indexOf('Status of AWB')));
+    const contentRe = /font-weight:400;">([\s\S]*?)<\/div>/gi;
+    const parts = [];
+    let c;
+    while ((c = contentRe.exec(seg)) !== null) parts.push(brToText(c[1]));
 
-    const { mapped } = mapStatus(status);
-    const details = [
-      delivered && `Delivered: ${delivered}`,
-      !delivered && origin && dest && `${origin} → ${dest}`,
-      booked && `Booked: ${booked}`
-    ].filter(Boolean).join(' · ');
+    const events = [];
+    for (let i = 0; i + 1 < parts.length; i += 2) {
+      if (!/\d{4}/.test(parts[i])) break;              // stop at end of timeline
+      const datetime = parts[i].replace(/\s*\|\s*/g, ' ').trim();
+      const rest = parts[i + 1].split('|').map(s => s.trim()).filter(Boolean);
+      const activity = rest[0] || '';
+      const location = rest.slice(1).join(' ').trim();
+      if (datetime || activity) events.push({ datetime, activity, location });
+      if (events.length >= 25) break;
+    }
 
-    return { success: true, rawStatus: status, mappedStatus: mapped, details: details || 'Status updated' };
+    const rawStatus = status || (events[0] && events[0].activity) || '';
+    if (!rawStatus && !events.length) {
+      return { success: false, error: 'No status found for this ST Courier AWB.' };
+    }
+    const { mapped } = mapStatus(rawStatus || 'in transit');
+
+    // Compact fallback text (for places that don't render the full timeline)
+    const latest = events[0];
+    const details = latest
+      ? `${latest.activity}${latest.location ? ' · ' + latest.location : ''} (${latest.datetime})`
+      : [delivered && `Delivered: ${delivered}`, booked && `Booked: ${booked}`].filter(Boolean).join(' · ');
+
+    return { success: true, rawStatus: rawStatus || (latest && latest.activity) || 'In Transit', mappedStatus: mapped, details: details || 'Status updated', events };
   } catch (err) {
     return { success: false, error: 'Could not reach ST Courier. Try again later.' };
   }
@@ -309,6 +330,7 @@ export default async function handler(req, res) {
     const updates = {
       'tracking.rawStatus':  result.rawStatus,
       'tracking.details':    result.details || '',
+      'tracking.events':     Array.isArray(result.events) ? result.events : [],
       'tracking.fetchedAt':  new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -325,6 +347,7 @@ export default async function handler(req, res) {
     rawStatus:    result.rawStatus,
     mappedStatus: result.mappedStatus,
     details:      result.details || '',
+    events:       Array.isArray(result.events) ? result.events : [],
     fetchedAt:    new Date().toISOString()
   });
 }

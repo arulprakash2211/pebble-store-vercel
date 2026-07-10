@@ -160,6 +160,7 @@
           <button class="btn btn-ghost" onclick="showPackingSummary()">📦 Packing</button>
           <button class="btn btn-ghost" onclick="printOrdersSheet()">🖨️ Print Sheet</button>
           <button class="btn btn-ghost" onclick="refreshAllStatuses()">🔄 Refresh Statuses</button>
+          <button class="btn btn-ghost" onclick="backfillPhoneNorm()" title="Run once: adds the phone-lookup index to older orders so customers can track them by phone">🔧 Rebuild Phone Index</button>
           <button class="btn btn-primary" onclick="loadOrders()">↻ Refresh</button>
         </div>
       </div>
@@ -202,6 +203,9 @@
           </tr></thead>
           <tbody id="ordersBody"><tr><td colspan="10" class="loading">Loading orders…</td></tr></tbody>
         </table>
+      </div>
+      <div style="text-align:center;margin-top:1rem">
+        <button id="loadMoreOrdersBtn" class="btn btn-ghost" onclick="loadMoreOrders()" style="display:none">↓ Load more orders</button>
       </div>
     </div>
 
@@ -400,8 +404,8 @@
       </div>
 
       <div style="display:flex;gap:0.8rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:1.2rem;padding:0.8rem;background:var(--cream)">
-        <div class="fg"><label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone)">From</label><input type="date" id="repFrom" onchange="renderReports()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"/></div>
-        <div class="fg"><label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone)">To</label><input type="date" id="repTo" onchange="renderReports()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"/></div>
+        <div class="fg"><label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone)">From</label><input type="date" id="repFrom" onchange="loadReports()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"/></div>
+        <div class="fg"><label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone)">To</label><input type="date" id="repTo" onchange="loadReports()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"/></div>
         <button class="btn btn-ghost btn-sm" onclick="resetReportFilter()">Clear dates</button>
         <span id="repRangeInfo" style="font-size:0.75rem;color:var(--stone);margin-left:auto"></span>
       </div>
@@ -573,7 +577,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-    import { getFirestore, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getFirestore, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit, where, startAfter, getCountFromServer } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
@@ -611,7 +615,7 @@
       if (name === 'products')  { loadProductsList(); loadBulkTable(); }
       if (name === 'stock')     loadStockTable();
       if (name === 'customers') loadCustomers();
-      if (name === 'reports')   loadReports();
+      if (name === 'reports')   { initReportDefaults(); loadReports(); }
     };
 
     // ── Product tab switch ──
@@ -680,20 +684,89 @@
       updateOrderCount();
     };
 
+    const ORDERS_PAGE_SIZE = 100;
+    let lastOrderDoc = null;      // Firestore cursor for "load more"
+    let ordersHasMore = false;
+
+    // Stat counts come from server-side aggregation (1 read each) so they stay
+    // accurate regardless of how many pages are loaded into the table.
+    async function refreshOrderStats() {
+      const ids = { statTotal: null, statNew: 'new', statConfirmed: 'confirmed', statReady: 'ready', statDispatched: 'dispatched', statDelivered: 'delivered' };
+      try {
+        await Promise.all(Object.entries(ids).map(async ([elId, status]) => {
+          const c = status
+            ? query(collection(db, 'orders'), where('status', '==', status))
+            : collection(db, 'orders');
+          const agg = await getCountFromServer(c);
+          const el = document.getElementById(elId);
+          if (el) el.textContent = agg.data().count;
+        }));
+      } catch (err) {
+        // Fallback: derive from whatever is loaded (older SDKs without aggregation)
+        const o = allOrders;
+        document.getElementById('statTotal').textContent      = o.length;
+        document.getElementById('statNew').textContent        = o.filter(x => x.status === 'new').length;
+        document.getElementById('statConfirmed').textContent  = o.filter(x => x.status === 'confirmed').length;
+        document.getElementById('statReady').textContent      = o.filter(x => x.status === 'ready').length;
+        document.getElementById('statDispatched').textContent = o.filter(x => x.status === 'dispatched').length;
+        document.getElementById('statDelivered').textContent  = o.filter(x => x.status === 'delivered').length;
+      }
+    }
+
+    function updateLoadMoreBtn() {
+      const btn = document.getElementById('loadMoreOrdersBtn');
+      if (btn) btn.style.display = ordersHasMore ? 'inline-block' : 'none';
+    }
+
     window.loadOrders = async () => {
       try {
-        const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+        lastOrderDoc = null; ordersHasMore = false;
+        const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(ORDERS_PAGE_SIZE));
         const snap = await getDocs(q);
         allOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const orders = allOrders;
-        document.getElementById('statTotal').textContent      = orders.length;
-        document.getElementById('statNew').textContent        = orders.filter(o => o.status === 'new').length;
-        document.getElementById('statConfirmed').textContent  = orders.filter(o => o.status === 'confirmed').length;
-        document.getElementById('statReady').textContent      = orders.filter(o => o.status === 'ready').length;
-        document.getElementById('statDispatched').textContent = orders.filter(o => o.status === 'dispatched').length;
-        document.getElementById('statDelivered').textContent  = orders.filter(o => o.status === 'delivered').length;
+        lastOrderDoc = snap.docs[snap.docs.length - 1] || null;
+        ordersHasMore = snap.docs.length === ORDERS_PAGE_SIZE;
+        updateLoadMoreBtn();
+        refreshOrderStats();
         applyOrderFilters();
-      } catch (err) { document.getElementById('ordersBody').innerHTML = `<tr><td colspan="8" class="loading">Error: ${err.message}</td></tr>`; }
+      } catch (err) { document.getElementById('ordersBody').innerHTML = `<tr><td colspan="10" class="loading">Error: ${err.message}</td></tr>`; }
+    };
+
+    // Append the next page of orders to the table (keeps current filters applied).
+    window.loadMoreOrders = async () => {
+      if (!lastOrderDoc) return;
+      const btn = document.getElementById('loadMoreOrdersBtn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+      try {
+        const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), startAfter(lastOrderDoc), limit(ORDERS_PAGE_SIZE));
+        const snap = await getDocs(q);
+        allOrders = allOrders.concat(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        lastOrderDoc = snap.docs[snap.docs.length - 1] || lastOrderDoc;
+        ordersHasMore = snap.docs.length === ORDERS_PAGE_SIZE;
+        applyOrderFilters();
+      } catch (err) { toast('❌ ' + err.message); }
+      finally { if (btn) { btn.disabled = false; btn.textContent = '↓ Load more orders'; } updateLoadMoreBtn(); }
+    };
+
+    // One-time migration: add the normalised `phoneNorm` field to older orders that
+    // predate the phone-index change, so customers can track them by phone.
+    // Reads the whole collection once (fine for a one-off), writes only where missing.
+    window.backfillPhoneNorm = async () => {
+      if (!confirm('Add the phone-lookup index to older orders? Run this once.')) return;
+      toast('🔧 Scanning orders…');
+      try {
+        const snap = await getDocs(collection(db, 'orders'));
+        let patched = 0;
+        for (const d of snap.docs) {
+          const o = d.data();
+          const norm = normPhone(o.phone);
+          if (norm && o.phoneNorm !== norm) {
+            await updateDoc(doc(db, 'orders', d.id), { phoneNorm: norm });
+            patched++;
+          }
+        }
+        toast(patched ? `✅ Indexed ${patched} order${patched !== 1 ? 's' : ''}` : '✅ All orders already indexed');
+      } catch (err) { toast('❌ ' + err.message); }
     };
 
     function renderOrdersTable(orders) {
@@ -768,7 +841,13 @@
     };
     // Manually refresh live status for every dispatched order (same as the scheduled job)
     window.refreshAllStatuses = async () => {
-      const dispatched = allOrders.filter(o => o.status === 'dispatched' && o.tracking && o.tracking.trackingId && o.tracking.courier);
+      // Query all dispatched orders directly — not limited to the loaded page.
+      let dispatched = [];
+      try {
+        const snap = await getDocs(query(collection(db, 'orders'), where('status', '==', 'dispatched')));
+        dispatched = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+          .filter(o => o.tracking && o.tracking.trackingId && o.tracking.courier);
+      } catch (err) { toast('❌ ' + err.message); return; }
       if (!dispatched.length) { toast('No dispatched orders to refresh'); return; }
       toast(`🔄 Refreshing ${dispatched.length} order${dispatched.length !== 1 ? 's' : ''}…`);
       let checked = 0, delivered = 0;
@@ -804,12 +883,19 @@
     // ── Packing summary: product → total qty across all undispatched orders ──
     let packingRows = [];
     let packingLabel = '';
-    window.showPackingSummary = () => {
-      // Use the selected orders if any are ticked; otherwise all undispatched orders
+    window.showPackingSummary = async () => {
+      // Use the selected orders if any are ticked; otherwise ALL undispatched orders
+      // (queried directly so it isn't limited to the currently-loaded page).
       const useSelected = selectedOrderIds.size > 0;
-      const orders = useSelected
-        ? allOrders.filter(o => selectedOrderIds.has(o.id))
-        : allOrders.filter(o => ['new', 'confirmed', 'ready'].includes(o.status));
+      let orders;
+      if (useSelected) {
+        orders = allOrders.filter(o => selectedOrderIds.has(o.id));
+      } else {
+        try {
+          const snap = await getDocs(query(collection(db, 'orders'), where('status', 'in', ['new', 'confirmed', 'ready'])));
+          orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } catch (err) { toast('❌ ' + err.message); return; }
+      }
       const byProduct = {};
       orders.forEach(o => (o.items || []).forEach(i => {
         const key = i.name || i.id || 'Unknown';
@@ -870,11 +956,11 @@
     const PHONE_ICON = '<svg width="11" height="11" viewBox="0 0 24 24" fill="#000" style="vertical-align:-1px;margin-right:3px"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.6.1.4 0 .8-.3 1L6.6 10.8z"/></svg>';
 
     // Next order number = highest existing orderNo + 1 (starts at 1000)
+    // O(1): reads only the single highest-numbered order instead of the whole collection.
     async function nextOrderNo() {
-      const snap = await getDocs(collection(db, 'orders'));
-      let max = 999;
-      snap.forEach(d => { const n = d.data().orderNo; if (typeof n === 'number' && n > max) max = n; });
-      return max + 1;
+      const snap = await getDocs(query(collection(db, 'orders'), orderBy('orderNo', 'desc'), limit(1)));
+      const top = snap.docs[0]?.data()?.orderNo;
+      return (typeof top === 'number' ? top : 999) + 1;
     }
 
     const escapeHtml = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
@@ -1796,10 +1882,16 @@ ${RECEIPT_CSS}
 
     // Auto-fill name/address/email from a returning customer's most recent order.
     // Only fills empty fields, so anything already typed is preserved.
-    window.autofillFromPhone = () => {
+    window.autofillFromPhone = async () => {
       const key = normPhone(document.getElementById('noPhone').value);
       if (key.length < 10) return;
-      const match = allOrders.find(o => normPhone(o.phone) === key); // allOrders is newest-first
+      // Targeted query on the normalised phone field — no full-collection download.
+      let match;
+      try {
+        const snap = await getDocs(query(collection(db, 'orders'), where('phoneNorm', '==', key)));
+        match = snap.docs.map(d => d.data())
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+      } catch (err) { return; }
       if (!match) return;
       const setIfEmpty = (id, val) => { const el = document.getElementById(id); if (el && !el.value.trim() && val) el.value = val; };
       setIfEmpty('noName', match.name);
@@ -1856,6 +1948,7 @@ ${RECEIPT_CSS}
       const data = {
         name,
         phone,
+        phoneNorm: normPhone(phone),
         altPhone,
         email:    document.getElementById('noEmail').value.trim(),
         address:  document.getElementById('noAddress').value.trim().toUpperCase(),
@@ -1916,10 +2009,30 @@ ${RECEIPT_CSS}
       return { group: name, variant: '' };
     }
 
+    // Default the report range to the current month once per session, so opening
+    // Reports only reads that month instead of the whole orders collection.
+    let reportsDefaultsSet = false;
+    window.initReportDefaults = () => {
+      if (reportsDefaultsSet) return;
+      reportsDefaultsSet = true;
+      const f = document.getElementById('repFrom');
+      if (f && !f.value) {
+        const n = new Date();
+        f.value = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-01`;
+      }
+    };
+
     window.loadReports = async () => {
       try {
+        // Build a date-range query from the filter inputs (empty range = all time).
+        const from = document.getElementById('repFrom').value;   // yyyy-mm-dd or ''
+        const to   = document.getElementById('repTo').value;
+        const cons = [];
+        if (from) cons.push(where('createdAt', '>=', from));
+        if (to)   cons.push(where('createdAt', '<=', to + 'T23:59:59.999Z'));
+        const oQuery = cons.length ? query(collection(db, 'orders'), ...cons) : collection(db, 'orders');
         const [oSnap, pSnap] = await Promise.all([
-          getDocs(collection(db, 'orders')),
+          getDocs(oQuery),
           getDocs(collection(db, 'products'))
         ]);
         reportOrders = oSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1939,7 +2052,7 @@ ${RECEIPT_CSS}
     window.resetReportFilter = () => {
       document.getElementById('repFrom').value = '';
       document.getElementById('repTo').value = '';
-      renderReports();
+      loadReports();  // re-query for all time
     };
 
     window.renderReports = () => {

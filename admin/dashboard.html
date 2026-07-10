@@ -160,7 +160,6 @@
           <button class="btn btn-ghost" onclick="showPackingSummary()">📦 Packing</button>
           <button class="btn btn-ghost" onclick="printOrdersSheet()">🖨️ Print Sheet</button>
           <button class="btn btn-ghost" onclick="refreshAllStatuses()">🔄 Refresh Statuses</button>
-          <button class="btn btn-ghost" onclick="backfillPhoneNorm()" title="Run once: adds the phone-lookup index to older orders so customers can track them by phone">🔧 Rebuild Phone Index</button>
           <button class="btn btn-primary" onclick="loadOrders()">↻ Refresh</button>
         </div>
       </div>
@@ -746,27 +745,6 @@
         applyOrderFilters();
       } catch (err) { toast('❌ ' + err.message); }
       finally { if (btn) { btn.disabled = false; btn.textContent = '↓ Load more orders'; } updateLoadMoreBtn(); }
-    };
-
-    // One-time migration: add the normalised `phoneNorm` field to older orders that
-    // predate the phone-index change, so customers can track them by phone.
-    // Reads the whole collection once (fine for a one-off), writes only where missing.
-    window.backfillPhoneNorm = async () => {
-      if (!confirm('Add the phone-lookup index to older orders? Run this once.')) return;
-      toast('🔧 Scanning orders…');
-      try {
-        const snap = await getDocs(collection(db, 'orders'));
-        let patched = 0;
-        for (const d of snap.docs) {
-          const o = d.data();
-          const norm = normPhone(o.phone);
-          if (norm && o.phoneNorm !== norm) {
-            await updateDoc(doc(db, 'orders', d.id), { phoneNorm: norm });
-            patched++;
-          }
-        }
-        toast(patched ? `✅ Indexed ${patched} order${patched !== 1 ? 's' : ''}` : '✅ All orders already indexed');
-      } catch (err) { toast('❌ ' + err.message); }
     };
 
     function renderOrdersTable(orders) {

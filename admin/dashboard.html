@@ -698,7 +698,7 @@
           const date  = new Date(o.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
           const items = (o.items || []).map(i => `${i.name} ×${i.qty}`).join('<br>');
           const trackingHtml = o.tracking
-            ? `<div style="font-size:0.75rem"><strong>${o.tracking.courier}</strong><br><span style="font-family:monospace;color:var(--moss)">${o.tracking.trackingId}</span></div>`
+            ? `<div style="font-size:0.75rem"><strong>${o.tracking.courier}</strong><br><span style="font-family:monospace;color:var(--moss)">${o.tracking.trackingId}</span>${o.tracking.rawStatus ? `<div style="font-size:0.7rem;color:var(--bark);margin-top:2px">📍 ${o.tracking.rawStatus}</div>` : ''}${o.tracking.details ? `<div style="font-size:0.66rem;color:var(--stone)">${o.tracking.details}</div>` : ''}</div>`
             : `<span style="color:var(--stone);font-size:0.72rem">—</span>`;
           let actions = '';
           if (o.status === 'new') {
@@ -708,7 +708,7 @@
           } else if (o.status === 'ready') {
             actions = `<button class="btn btn-sm btn-green" onclick="openDispatchModal('${o.id}')">Dispatch</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button><button class="btn btn-sm" style="margin-top:3px;background:var(--dark);color:var(--cream)" onclick="deleteOrder('${o.id}')">Delete</button>`;
           } else if (o.status === 'dispatched') {
-            actions = `<button class="btn btn-sm btn-blue" onclick="updateStatus('${o.id}','delivered')">Delivered</button>`;
+            actions = `${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" onclick="checkTrackStatus('${o.id}')">🔄 Check Status</button>` : ''}<button class="btn btn-sm btn-blue" style="margin-top:3px" onclick="updateStatus('${o.id}','delivered')">Delivered</button>`;
           } else if (o.status === 'delivered') {
             actions = `<span style="font-size:0.72rem;color:var(--moss)">✓ Complete</span>`;
           } else if (o.status === 'cancelled') {
@@ -744,6 +744,22 @@
     window.updateStatus = async (id, status) => {
       try { await updateDoc(doc(db, 'orders', id), { status, updatedAt: new Date().toISOString() }); toast(`✅ Order marked as ${status}`); loadOrders(); }
       catch (err) { toast('❌ ' + err.message); }
+    };
+    // Fetch live courier status via /api/track (which also saves it + marks delivered)
+    window.checkTrackStatus = async (id) => {
+      const o = allOrders.find(x => x.id === id);
+      if (!o || !o.tracking || !o.tracking.trackingId) { toast('No tracking info on this order'); return; }
+      toast(`🔄 Checking ${o.tracking.courier || 'courier'}…`);
+      try {
+        const res = await fetch('/api/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: o.id, trackingId: o.tracking.trackingId, courier: o.tracking.courier })
+        });
+        const data = await res.json();
+        if (data.success) { toast(`📍 ${data.rawStatus || 'Status updated'}`); loadOrders(); }
+        else { toast('❌ ' + (data.error || 'Could not fetch status')); }
+      } catch (err) { toast('❌ ' + err.message); }
     };
     window.cancelOrder = async (id) => {
       if (!confirm('Cancel this order?')) return;

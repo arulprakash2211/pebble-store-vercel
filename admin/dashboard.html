@@ -1184,9 +1184,8 @@ Thank you for shopping with Pebble Store 🌿`;
       document.getElementById('waTo').textContent =
         `To: ${order.name || 'Customer'}${waPhone ? '  ·  +' + waPhone : '  ·  (no phone number on order)'}`;
       document.getElementById('waMessage').value = msg;
-      document.getElementById('waQR').style.display = 'none';
-      document.getElementById('waQRCode').innerHTML = '';
       document.getElementById('whatsappModal').classList.add('open');
+      waShowQR();   // show the QR by default
     };
     function waLink() {
       const text = encodeURIComponent(document.getElementById('waMessage').value);

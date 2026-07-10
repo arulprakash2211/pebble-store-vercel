@@ -118,23 +118,8 @@
   </footer>
 
   <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-    import { getFirestore, collection, getDocs, query, where } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-
-    // Normalise a phone to its last 10 digits so +91 / spacing variants match
-    const normPhone = (p) => String(p ?? '').replace(/\D/g, '').slice(-10);
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
-      authDomain: "pebble-store-70889.firebaseapp.com",
-      projectId: "pebble-store-70889",
-      storageBucket: "pebble-store-70889.firebasestorage.app",
-      messagingSenderId: "611731436877",
-      appId: "1:611731436877:web:eee0ef64cd8b4b86467304"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db  = getFirestore(app);
+    // Order lookups now go through /api/order-lookup (server-side); no direct
+    // Firestore access is needed on this page.
 
     // Courier tracking URLs
     const COURIER_MANUAL = ['ST Courier', 'India Post'];
@@ -172,11 +157,14 @@
 
       showLoading();
       try {
-        // Targeted query on the normalised phone field — no full-collection download
-        const norm = normPhone(phone);
-        const snap = await getDocs(query(collection(db, 'orders'), where('phoneNorm', '==', norm)));
-        const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        // Server-side lookup — the browser has no direct read access to orders.
+        const resp = await fetch('/api/order-lookup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone })
+        });
+        const data = await resp.json();
+        const orders = (data && data.orders) || [];
 
         if (!orders.length) {
           showError('No orders found for this phone number. Please check and try again.');
@@ -213,9 +201,14 @@
 
       showLoading();
       try {
-        // Targeted query on the tracking id — no full-collection download
-        const snap = await getDocs(query(collection(db, 'orders'), where('tracking.trackingId', '==', trackId)));
-        const order = snap.docs.map(d => ({ id: d.id, ...d.data() }))[0];
+        // Server-side lookup — the browser has no direct read access to orders.
+        const resp = await fetch('/api/order-lookup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trackingId: trackId })
+        });
+        const data = await resp.json();
+        const order = ((data && data.orders) || [])[0];
 
         if (!order) {
           showError('No order found with this tracking ID. Please check and try again.');

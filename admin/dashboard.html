@@ -137,6 +137,7 @@
       .form-row,.form-row.three{grid-template-columns:1fr}
     }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -480,6 +481,27 @@
       <div style="display:flex;gap:0.8rem;margin-top:0.5rem">
         <button class="btn btn-green" style="flex:1" onclick="confirmDispatch()">✓ Confirm Dispatch</button>
         <button class="btn btn-ghost" onclick="closeModal('dispatchModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- WHATSAPP SEND (after dispatch) -->
+  <div class="modal-overlay" id="whatsappModal">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal('whatsappModal')">×</button>
+      <div class="modal-title">💬 Send Dispatch Update on WhatsApp</div>
+      <div id="waTo" style="font-size:0.82rem;color:var(--stone);margin-bottom:0.6rem"></div>
+      <div class="mfg"><label>Message (edit if needed)</label>
+        <textarea id="waMessage" style="width:100%;min-height:170px;font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.65rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;resize:vertical"></textarea>
+      </div>
+      <div style="display:flex;gap:0.8rem;margin-top:0.3rem;flex-wrap:wrap">
+        <button class="btn btn-green" onclick="waOpenWeb()">🌐 Open WhatsApp Web</button>
+        <button class="btn btn-ghost" onclick="waShowQR()">📱 Show QR (scan on phone)</button>
+        <button class="btn btn-ghost" onclick="closeModal('whatsappModal')">Done</button>
+      </div>
+      <div id="waQR" style="display:none;text-align:center;margin-top:1rem">
+        <div id="waQRCode" style="display:inline-block;padding:12px;background:#fff;border:1px solid rgba(92,61,46,0.15)"></div>
+        <div style="font-size:0.75rem;color:var(--stone);margin-top:0.5rem;max-width:280px;margin-left:auto;margin-right:auto">Scan with your phone's camera → opens WhatsApp with this message ready to send to the customer.</div>
       </div>
     </div>
   </div>
@@ -1124,14 +1146,62 @@ ${RECEIPT_CSS}
       const courier = sel === 'other' ? document.getElementById('courierOther').value.trim() : sel;
       const trackingId = document.getElementById('trackingId').value.trim();
       if (!courier || !trackingId) { toast('⚠️ Select courier and enter tracking ID'); return; }
+      const order = allOrders.find(x => x.id === currentDispatchOrderId) || {};
       try {
         await updateDoc(doc(db, 'orders', currentDispatchOrderId), {
           status: 'dispatched',
           tracking: { courier, trackingId, dispatchedAt: new Date().toISOString() },
           updatedAt: new Date().toISOString()
         });
-        toast('✅ Order dispatched!'); closeModal('dispatchModal'); loadOrders();
+        toast('✅ Order dispatched!');
+        closeModal('dispatchModal');
+        loadOrders();
+        // Offer to send the dispatch update to the customer on WhatsApp
+        openWhatsAppSend(order, courier, trackingId);
       } catch (err) { toast('❌ ' + err.message); }
+    };
+
+    // ── WhatsApp dispatch message (2 ways to send: Web link or QR to scan) ──
+    let waPhone = '';   // international format, e.g. 919791240655
+    window.openWhatsAppSend = (order, courier, trackingId) => {
+      const digits = normPhone(order.phone);
+      waPhone = digits.length === 10 ? '91' + digits : digits;
+      const items = (order.items || []).map(i => `• ${i.name} x${i.qty}`).join('\n');
+      const trackUrl = `${location.origin}/track.html${digits ? '?phone=' + digits : ''}`;
+      const msg =
+`Hi ${order.name || ''}, your Pebble Store order${order.orderNo != null ? ' #' + order.orderNo : ''} has been dispatched! 📦
+
+Courier: ${courier}
+Tracking ID: ${trackingId}
+
+Items:
+${items}
+Total: ₹${order.total != null ? order.total : ''}
+
+Track your order: ${trackUrl}
+
+Thank you for shopping with Pebble Store 🌿`;
+      document.getElementById('waTo').textContent =
+        `To: ${order.name || 'Customer'}${waPhone ? '  ·  +' + waPhone : '  ·  (no phone number on order)'}`;
+      document.getElementById('waMessage').value = msg;
+      document.getElementById('waQR').style.display = 'none';
+      document.getElementById('waQRCode').innerHTML = '';
+      document.getElementById('whatsappModal').classList.add('open');
+    };
+    function waLink() {
+      const text = encodeURIComponent(document.getElementById('waMessage').value);
+      return `https://wa.me/${waPhone}?text=${text}`;
+    }
+    window.waOpenWeb = () => {
+      if (!waPhone) { toast('⚠️ No phone number on this order'); return; }
+      window.open(waLink(), '_blank');
+    };
+    window.waShowQR = () => {
+      if (!waPhone) { toast('⚠️ No phone number on this order'); return; }
+      const box = document.getElementById('waQRCode');
+      box.innerHTML = '';
+      new QRCode(box, { text: waLink(), width: 220, height: 220, correctLevel: QRCode.CorrectLevel.L });
+      document.getElementById('waQR').style.display = 'block';
     };
 
     // ══════════════════════════════
@@ -2162,7 +2232,7 @@ ${RECEIPT_CSS}
       a.click(); URL.revokeObjectURL(url);
     };
 
-    ['dispatchModal','stockModal','newOrderModal','packingModal'].forEach(id => {
+    ['dispatchModal','stockModal','newOrderModal','packingModal','whatsappModal'].forEach(id => {
       document.getElementById(id).addEventListener('click', e => { if (e.target === document.getElementById(id)) closeModal(id); });
     });
   </script>

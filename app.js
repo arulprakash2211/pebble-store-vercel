@@ -91,6 +91,7 @@ async function showTrackResult(order) {
       if (trackData.success) {
         order.tracking.rawStatus = trackData.rawStatus;
         order.tracking.details   = trackData.details;
+        order.tracking.events    = trackData.events || [];
         order.tracking.fetchedAt = trackData.fetchedAt;
         if (trackData.mappedStatus) order.status = trackData.mappedStatus;
         statusLabel = trackData.rawStatus || STATUS_LABEL[order.status] || order.status;
@@ -105,8 +106,21 @@ async function showTrackResult(order) {
     const { courier, trackingId, rawStatus, details, fetchedAt } = order.tracking;
     const url = COURIER_URLS[courier] ? COURIER_URLS[courier](trackingId) : null;
     const isManual = COURIER_MANUAL && COURIER_MANUAL.includes(courier);
+    const events = order.tracking.events || [];
     const fetchedTime = fetchedAt ? `<div style="font-size:0.7rem;color:var(--stone);margin-top:0.3rem">Last checked: ${new Date(fetchedAt).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'})}</div>` : '';
-    const liveStatus = rawStatus ? `<div style="font-size:0.85rem;color:var(--moss);font-weight:600;margin-top:0.4rem">📍 ${rawStatus}</div>${details ? `<div style="font-size:0.75rem;color:var(--light-text);margin-top:0.2rem">${details}</div>` : ''}${fetchedTime}` : '';
+    const timeline = events.length
+      ? `<div style="margin-top:0.6rem">
+           <div style="font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--stone);margin-bottom:0.5rem">Tracking History</div>
+           ${events.map((e, idx) => `
+             <div style="border-left:2px solid ${idx === 0 ? 'var(--moss)' : 'rgba(92,61,46,0.2)'};padding:0 0 0.6rem 0.8rem;margin-left:0.3rem;position:relative">
+               <div style="position:absolute;left:-6px;top:3px;width:10px;height:10px;border-radius:50%;background:${idx === 0 ? 'var(--moss)' : 'rgba(92,61,46,0.35)'}"></div>
+               <div style="font-size:0.82rem;color:var(--dark);font-weight:${idx === 0 ? '600' : '500'}">${e.activity || ''}</div>
+               ${e.location ? `<div style="font-size:0.74rem;color:var(--light-text)">${e.location}</div>` : ''}
+               <div style="font-size:0.7rem;color:var(--stone)">${e.datetime || ''}</div>
+             </div>`).join('')}
+         </div>`
+      : (details ? `<div style="font-size:0.75rem;color:var(--light-text);margin-top:0.2rem">${details}</div>` : '');
+    const liveStatus = rawStatus ? `<div style="font-size:0.85rem;color:var(--moss);font-weight:600;margin-top:0.4rem">📍 ${rawStatus}</div>${timeline}${fetchedTime}` : '';
     trackingHtml = `
       <div style="margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid rgba(92,61,46,0.1)">
         <div style="font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--stone);margin-bottom:0.4rem">Courier Details</div>

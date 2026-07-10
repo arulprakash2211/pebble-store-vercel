@@ -1,6 +1,11 @@
 {
   "version": 2,
+  "crons": [
+    { "path": "/api/cron-track", "schedule": "30 8 * * *" },
+    { "path": "/api/cron-track", "schedule": "30 14 * * *" }
+  ],
   "routes": [
+    { "src": "/api/cron-track",      "dest": "/api/cron-track.js" },
     { "src": "/api/track",           "dest": "/api/track.js" },
     { "src": "/api/products",        "dest": "/api/products.js" },
     { "src": "/api/orders",          "dest": "/api/orders.js" },

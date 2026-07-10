@@ -36,7 +36,7 @@ const selectedVariantId = (gid) => activeVariant[gid] || (groupVariants[gid] && 
   if (document.getElementById('variant-btn-style')) return;
   const st = document.createElement('style');
   st.id = 'variant-btn-style';
-  st.textContent = '.variant-btns{display:flex;flex-wrap:wrap;margin:0.5rem 0 0.2rem}.variant-btn{padding:0.35rem 0.7rem;margin:0 0.4rem 0.4rem 0;border:1.5px solid rgba(92,61,46,0.35);background:var(--warm-white,#faf8f3);color:var(--bark,#5c3d2e);font-family:inherit;font-size:0.8rem;cursor:pointer;border-radius:3px;transition:all .15s}.variant-btn:hover{border-color:var(--bark,#5c3d2e)}.variant-btn.active{background:var(--bark,#5c3d2e);color:#fff;border-color:var(--bark,#5c3d2e)}';
+  st.textContent = '.variant-btns{display:flex;flex-wrap:wrap;margin:0.5rem 0 0.2rem}.variant-btn{padding:0.35rem 0.7rem;margin:0 0.4rem 0.4rem 0;border:1.5px solid rgba(92,61,46,0.35);background:var(--warm-white,#faf8f3);color:var(--bark,#5c3d2e);font-family:inherit;font-size:0.8rem;cursor:pointer;border-radius:3px;transition:all .15s}.variant-btn:hover{border-color:var(--bark,#5c3d2e)}.variant-btn.active{background:var(--bark,#5c3d2e);color:#fff;border-color:var(--bark,#5c3d2e)}.variant-size-single{display:inline-block;padding:0.35rem 0.7rem;border:1.5px solid rgba(92,61,46,0.35);background:var(--warm-white,#faf8f3);color:var(--bark,#5c3d2e);font-size:0.8rem;border-radius:3px}';
   document.head.appendChild(st);
 })();
 
@@ -316,7 +316,7 @@ function renderProducts(products) {
     const qty  = cart[sel.id] || 0;
     const variantSelect = multi
       ? `<div class="variant-btns" id="vbtns-${gid}">${g.variants.map((v, idx) => `<button type="button" class="variant-btn${idx === 0 ? ' active' : ''}" data-id="${v.id}" data-price="${v.price}" onclick="event.stopPropagation();selectVariant('${gid}','${v.id}')">${v.variant || v.name}</button>`).join('')}</div>`
-      : '';
+      : (sel.variant ? `<div class="variant-btns"><span class="variant-size-single">${sel.variant}</span></div>` : '');
     return `
       <div class="product-card" data-group="${gid}">
         <div class="product-img ${sel.colorClass || 'pi1'}">

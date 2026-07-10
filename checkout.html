@@ -124,7 +124,7 @@
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-    import { getFirestore, collection, getDocs, addDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getFirestore, collection, getDocs, addDoc, query, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
@@ -284,18 +284,19 @@
     async function saveOrderToFirestore(data, paymentMethod, status = 'new', paid = false) {
       const orderId = 'ORD-' + Date.now();
       // Sequential order number = highest existing orderNo + 1 (starts at 1000)
+      // O(1): reads only the single highest-numbered order.
       let orderNo = null;
       try {
-        const snap = await getDocs(collection(db, 'orders'));
-        let max = 999;
-        snap.forEach(d => { const n = d.data().orderNo; if (typeof n === 'number' && n > max) max = n; });
-        orderNo = max + 1;
+        const snap = await getDocs(query(collection(db, 'orders'), orderBy('orderNo', 'desc'), limit(1)));
+        const top = snap.docs[0] && snap.docs[0].data().orderNo;
+        orderNo = (typeof top === 'number' ? top : 999) + 1;
       } catch (e) { console.warn('Order number assignment failed:', e); }
       await addDoc(collection(db, 'orders'), {
         orderId,
         orderNo,
         name:          data.name,
         phone:         data.phone,
+        phoneNorm:     String(data.phone || '').replace(/\D/g, '').slice(-10),
         email:         data.email,
         address:       data.address,
         notes:         data.notes,

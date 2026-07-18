@@ -729,6 +729,7 @@
       if (status) filtered = filtered.filter(o => o.status === status);
       if (paid === 'paid')   filtered = filtered.filter(o => o.paid);
       if (paid === 'unpaid') filtered = filtered.filter(o => !o.paid);
+      if (priorityOnly)      filtered = filtered.filter(o => o.priority);
 
       filteredOrders = filtered;
       renderOrdersTable(filtered);
@@ -868,7 +869,7 @@
           return `<tr class="${ageClass}">
             <td style="text-align:center"><input type="checkbox" class="order-check" value="${o.id}" ${selectedOrderIds.has(o.id) ? 'checked' : ''} onclick="toggleOrderSelect('${o.id}',this)"/></td>
             <td style="white-space:nowrap;font-size:0.78rem">${date}<br><span style="color:var(--stone);font-size:0.72rem">#${o.orderNo != null ? o.orderNo : '—'}</span></td>
-            <td><strong>${o.name}</strong>${o.source === 'admin' ? ' <span style="font-size:0.62rem;background:#e8d5ff;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">ADMIN</span>' : ''}<br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
+            <td>${o.priority ? '<span title="Priority order">⭐ </span>' : ''}<strong>${o.name}</strong>${o.source === 'admin' ? ' <span style="font-size:0.62rem;background:#e8d5ff;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">ADMIN</span>' : ''}<br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
             <td>${normPhone(o.phone) || o.phone || ''}</td>
             <td class="order-items">${items}</td>
             <td><strong>₹${o.total}</strong></td>

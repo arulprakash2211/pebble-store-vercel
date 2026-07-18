@@ -1113,20 +1113,21 @@ ${RECEIPT_CSS}
 
       // Address list in 2 columns for all the same orders (after the receipts)
       const addrCards = orders.map(o => {
-        const orderNo  = o.orderNo != null ? o.orderNo : o.id;
         const toPhone  = normPhone(o.phone) || o.phone || '';
         const altPhone = o.altPhone ? (normPhone(o.altPhone) || o.altPhone) : '';
         const addr     = escapeHtml(o.address || '—').replace(/,\s*/g, '<br>');
         return `<div class="addr-card">
-          <div class="addr-no">Order #${escapeHtml(String(orderNo))}</div>
+          <div class="addr-no">TO</div>
           <div class="addr-name">${escapeHtml(o.name || '')}</div>
           <div class="addr-body">${addr}</div>
           <div class="addr-phone">Ph: ${escapeHtml(toPhone)}${altPhone ? ' / ' + escapeHtml(altPhone) : ''}</div>
         </div>`;
       }).join('');
+      // Pad the last row with empty cells so the grid lines run fully across
+      const addrPad = '<div class="addr-card empty"></div>'.repeat((3 - (orders.length % 3)) % 3);
       const addressSheet = `<div class="addr-sheet">
         <h2 class="addr-title">Delivery Addresses (${orders.length})</h2>
-        <div class="addr-cols">${addrCards}</div>
+        <div class="addr-cols">${addrCards}${addrPad}</div>
       </div>`;
 
       const body = receiptPages + addressSheet;
@@ -1147,11 +1148,14 @@ ${RECEIPT_CSS}
   /* 2-column delivery address list (starts on a fresh page after receipts) */
   .addr-sheet{page-break-before:always;padding:2mm}
   .addr-title{font-size:16px;font-weight:700;margin-bottom:6mm}
-  /* Grid so both columns line up row-by-row → straight horizontal cut lines */
-  .addr-cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5mm 6mm;align-items:stretch}
-  .addr-card{page-break-inside:avoid;break-inside:avoid;border:1px solid #333;border-radius:2mm;padding:3mm;margin:0;min-height:38mm;overflow:hidden}
+  /* Shared grid lines (no separate boxes): outer top+left on the container,
+     right+bottom on each cell → 4 vertical lines + 1 horizontal line per row */
+  .addr-cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;align-items:stretch;border-top:1px solid #333;border-left:1px solid #333}
+  .addr-card{page-break-inside:avoid;break-inside:avoid;border-right:1px solid #333;border-bottom:1px solid #333;padding:3mm;margin:0;min-height:38mm;overflow:hidden}
+  .addr-card.empty{min-height:0}
   .addr-sheet .addr-name{font-size:14px}
   .addr-sheet .addr-body,.addr-sheet .addr-phone{font-size:12px}
+  .addr-sheet .addr-no{font-weight:700;color:#000}
   .addr-no{font-size:11px;color:#333;margin-bottom:1mm}
   .addr-name{font-size:15px;font-weight:700;margin-bottom:1mm}
   .addr-body{font-size:13px;line-height:1.5}

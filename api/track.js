@@ -35,6 +35,12 @@ async function fetchPage(url, options = {}) {
 // ── Map status text to our order status ──
 function mapStatus(text) {
   const t = text.toLowerCase();
+  // Undelivered / failed attempt — MUST be checked before 'delivered'
+  // ("undelivered" contains the substring "delivered"). ST uses "UD - ..." codes.
+  if (t.includes('undelivered') || t.includes('un-delivered') || t.includes('not delivered') ||
+      t.includes('un delivered') || t.startsWith('ud -') || t.startsWith('ud-')) {
+    return { mapped: 'dispatched', raw: 'Undelivered — attempt failed ⚠️' };
+  }
   if (t.includes('delivered'))         return { mapped: 'delivered',  raw: 'Delivered ✅' };
   if (t.includes('out for delivery'))  return { mapped: 'dispatched', raw: 'Out for Delivery 🚚' };
   if (t.includes('reached'))           return { mapped: 'dispatched', raw: 'Reached Destination 📍' };

@@ -78,7 +78,10 @@ async function showTrackResult(order) {
 
   // Auto-fetch ST Courier status on demand
   const SUPPORTED_COURIERS = ['ST Courier', 'DTDC', 'Professional Courier', 'India Post'];
-  if (SUPPORTED_COURIERS.includes(order.tracking?.courier) && order.tracking?.trackingId && order.status !== 'delivered') {
+  // Re-fetch unless delivered AND the timeline already shows a genuine delivery
+  // (so a stale "undelivered" timeline on a delivered order self-corrects on view).
+  const finalDelivered = (order.tracking?.events || []).some(e => /delivered/i.test(e.activity || '') && !/un-?\s*delivered/i.test(e.activity || ''));
+  if (SUPPORTED_COURIERS.includes(order.tracking?.courier) && order.tracking?.trackingId && (order.status !== 'delivered' || !finalDelivered)) {
     el.innerHTML = '<p style="color:var(--light-text);font-style:italic;font-size:0.85rem">Fetching live status from ST Courier…</p>';
     el.style.display = 'block';
     try {

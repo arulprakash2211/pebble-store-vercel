@@ -1109,7 +1109,27 @@ ${RECEIPT_CSS}
       if (!win) { toast('⚠️ Allow pop-ups to print'); return; }
       const pages = [];
       for (let i = 0; i < orders.length; i += 4) pages.push(orders.slice(i, i + 4));
-      const body = pages.map(g => `<div class="page">${g.map(o => `<div class="cell"><div class="rc">${receiptBody(o)}</div></div>`).join('')}</div>`).join('');
+      const receiptPages = pages.map(g => `<div class="page">${g.map(o => `<div class="cell"><div class="rc">${receiptBody(o)}</div></div>`).join('')}</div>`).join('');
+
+      // Address list in 2 columns for all the same orders (after the receipts)
+      const addrCards = orders.map(o => {
+        const orderNo  = o.orderNo != null ? o.orderNo : o.id;
+        const toPhone  = normPhone(o.phone) || o.phone || '';
+        const altPhone = o.altPhone ? (normPhone(o.altPhone) || o.altPhone) : '';
+        const addr     = escapeHtml(o.address || '—').replace(/,\s*/g, '<br>');
+        return `<div class="addr-card">
+          <div class="addr-no">Order #${escapeHtml(String(orderNo))}</div>
+          <div class="addr-name">${escapeHtml(o.name || '')}</div>
+          <div class="addr-body">${addr}</div>
+          <div class="addr-phone">Ph: ${escapeHtml(toPhone)}${altPhone ? ' / ' + escapeHtml(altPhone) : ''}</div>
+        </div>`;
+      }).join('');
+      const addressSheet = `<div class="addr-sheet">
+        <h2 class="addr-title">Delivery Addresses (${orders.length})</h2>
+        <div class="addr-cols">${addrCards}</div>
+      </div>`;
+
+      const body = receiptPages + addressSheet;
       win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>Order Receipts (${orders.length})</title>
 <style>
@@ -1124,6 +1144,18 @@ ${RECEIPT_CSS}
   /* Bigger addresses on the print sheet only */
   .cell .to-addr, .cell .from-addr{font-size:21px;line-height:1.45}
   .cell .to-name{font-size:24px}
+  /* 2-column delivery address list (starts on a fresh page after receipts) */
+  .addr-sheet{page-break-before:always;padding:2mm}
+  .addr-title{font-size:16px;font-weight:700;margin-bottom:6mm}
+  /* Grid so both columns line up row-by-row → straight horizontal cut lines */
+  .addr-cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5mm 6mm;align-items:stretch}
+  .addr-card{page-break-inside:avoid;break-inside:avoid;border:1px solid #333;border-radius:2mm;padding:3mm;margin:0;min-height:38mm;overflow:hidden}
+  .addr-sheet .addr-name{font-size:14px}
+  .addr-sheet .addr-body,.addr-sheet .addr-phone{font-size:12px}
+  .addr-no{font-size:11px;color:#333;margin-bottom:1mm}
+  .addr-name{font-size:15px;font-weight:700;margin-bottom:1mm}
+  .addr-body{font-size:13px;line-height:1.5}
+  .addr-phone{font-size:13px;margin-top:1.5mm}
   @page{size:A4;margin:6mm}
 </style></head>
 <body onload="setTimeout(function(){window.print()},300)">${body}</body></html>`);

@@ -163,10 +163,6 @@
         <div style="display:flex;gap:0.6rem">
           <button class="btn btn-green" onclick="openNewOrderModal()">➕ New Order</button>
           <button class="btn btn-ghost" onclick="showPackingSummary()">📦 Packing</button>
-          <select id="addrPrintMode" title="Address format on the print sheet" style="font-family:'Jost',sans-serif;font-size:0.72rem;padding:0.4rem 0.5rem;border:1px solid rgba(92,61,46,0.3);background:var(--warm-white);color:var(--bark);border-radius:2px">
-            <option value="fields" selected>Addr: Specific</option>
-            <option value="whole">Addr: Whole</option>
-          </select>
           <button class="btn btn-ghost" onclick="printOrdersSheet()">🖨️ Print Sheet</button>
           <button class="btn btn-ghost" onclick="refreshAllStatuses()">🔄 Refresh Statuses</button>
           <button class="btn btn-primary" onclick="loadOrders()">↻ Refresh</button>
@@ -1129,8 +1125,9 @@ ${RECEIPT_CSS}
       for (let i = 0; i < orders.length; i += 4) pages.push(orders.slice(i, i + 4));
       const receiptPages = pages.map(g => `<div class="page">${g.map(o => `<div class="cell"><div class="rc">${receiptBody(o)}</div></div>`).join('')}</div>`).join('');
 
-      // Address list in 2 columns for all the same orders (after the receipts)
-      const addrPrintMode = document.getElementById('addrPrintMode')?.value || 'whole';
+      // Address list (after the receipts): structured fields, with automatic
+      // fallback to the consolidated whole address for legacy orders.
+      const addrPrintMode = 'fields';
       const addrCell = (o) => {
         if (!o) return '<td class="addr-cell empty"></td>';
         const toPhone  = normPhone(o.phone) || o.phone || '';

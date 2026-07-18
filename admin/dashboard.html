@@ -164,8 +164,8 @@
           <button class="btn btn-green" onclick="openNewOrderModal()">➕ New Order</button>
           <button class="btn btn-ghost" onclick="showPackingSummary()">📦 Packing</button>
           <select id="addrPrintMode" title="Address format on the print sheet" style="font-family:'Jost',sans-serif;font-size:0.72rem;padding:0.4rem 0.5rem;border:1px solid rgba(92,61,46,0.3);background:var(--warm-white);color:var(--bark);border-radius:2px">
+            <option value="fields" selected>Addr: Specific</option>
             <option value="whole">Addr: Whole</option>
-            <option value="fields">Addr: Specific</option>
           </select>
           <button class="btn btn-ghost" onclick="printOrdersSheet()">🖨️ Print Sheet</button>
           <button class="btn btn-ghost" onclick="refreshAllStatuses()">🔄 Refresh Statuses</button>
@@ -544,11 +544,11 @@
         <div style="grid-column:1/-1">
           <label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);font-weight:500;display:block;margin-bottom:0.4rem">Address</label>
           <div style="display:flex;gap:0.4rem;margin-bottom:0.6rem">
-            <button type="button" class="ostab addr-mode-btn active" data-amode="whole" onclick="setAddrMode('whole')">Whole Address</button>
-            <button type="button" class="ostab addr-mode-btn" data-amode="fields" onclick="setAddrMode('fields')">Specific Fields</button>
+            <button type="button" class="ostab addr-mode-btn" data-amode="whole" onclick="setAddrMode('whole')">Whole Address</button>
+            <button type="button" class="ostab addr-mode-btn active" data-amode="fields" onclick="setAddrMode('fields')">Specific Fields</button>
           </div>
-          <div id="noAddrWhole" class="mfg" style="margin-bottom:0"><input id="noAddress" placeholder="Delivery address" style="text-transform:uppercase"/></div>
-          <div id="noAddrFields" style="display:none;grid-template-columns:1fr 1fr;gap:0.6rem 0.8rem">
+          <div id="noAddrWhole" class="mfg" style="display:none;margin-bottom:0"><input id="noAddress" placeholder="Delivery address" style="text-transform:uppercase"/></div>
+          <div id="noAddrFields" style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem 0.8rem">
             <div class="mfg" style="grid-column:1/-1;margin-bottom:0"><label>House / Street</label><input id="noAddrLine" style="text-transform:uppercase"/></div>
             <div class="mfg" style="grid-column:1/-1;margin-bottom:0"><label>Area / Landmark</label><input id="noAddrArea" style="text-transform:uppercase"/></div>
             <div class="mfg" style="margin-bottom:0"><label>City / Town</label><input id="noAddrCity" style="text-transform:uppercase"/></div>
@@ -815,7 +815,7 @@
           } else if (o.status === 'dispatched') {
             actions = `${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" onclick="checkTrackStatus('${o.id}')">🔄 Check Status</button>` : ''}<button class="btn btn-sm btn-blue" style="margin-top:3px" onclick="updateStatus('${o.id}','delivered')">Delivered</button>`;
           } else if (o.status === 'delivered') {
-            actions = `<span style="font-size:0.72rem;color:var(--moss)">✓ Complete</span>`;
+            actions = `<span style="font-size:0.72rem;color:var(--moss)">✓ Complete</span>${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="checkTrackStatus('${o.id}')">🔄 Refresh Tracking</button>` : ''}`;
           } else if (o.status === 'cancelled') {
             actions = `<span style="font-size:0.72rem;color:#c0392b">✗ Cancelled</span>`;
           }
@@ -1906,7 +1906,7 @@ Thank you for shopping with Pebble Store 🌿`;
       document.getElementById('noModalTitle').textContent = '➕ New Manual Order';
       // Reset form
       ['noName','noPhone','noAltPhone','noAddress','noEmail','noNotes','noAddrLine','noAddrArea','noAddrCity','noAddrState','noAddrPincode'].forEach(id => document.getElementById(id).value = '');
-      setAddrMode('whole');
+      setAddrMode('fields');
       const _t = new Date();
       document.getElementById('noDate').value = new Date(_t.getTime() - _t.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
       document.getElementById('noShipping').value = 0;

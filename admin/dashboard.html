@@ -163,6 +163,10 @@
         <div style="display:flex;gap:0.6rem">
           <button class="btn btn-green" onclick="openNewOrderModal()">➕ New Order</button>
           <button class="btn btn-ghost" onclick="showPackingSummary()">📦 Packing</button>
+          <select id="addrPrintMode" title="Address format on the print sheet" style="font-family:'Jost',sans-serif;font-size:0.72rem;padding:0.4rem 0.5rem;border:1px solid rgba(92,61,46,0.3);background:var(--warm-white);color:var(--bark);border-radius:2px">
+            <option value="whole">Addr: Whole</option>
+            <option value="fields">Addr: Specific</option>
+          </select>
           <button class="btn btn-ghost" onclick="printOrdersSheet()">🖨️ Print Sheet</button>
           <button class="btn btn-ghost" onclick="refreshAllStatuses()">🔄 Refresh Statuses</button>
           <button class="btn btn-primary" onclick="loadOrders()">↻ Refresh</button>
@@ -537,7 +541,21 @@
         <div class="mfg" style="grid-column:1/-1"><label>Customer Name *</label><input id="noName" placeholder="Full name" style="text-transform:uppercase"/></div>
         <div class="mfg"><label>Phone *</label><input id="noPhone" placeholder="00000 00000" oninput="autofillFromPhone()"/></div>
         <div class="mfg"><label>Alternate Phone</label><input id="noAltPhone" placeholder="Optional"/></div>
-        <div class="mfg" style="grid-column:1/-1"><label>Address</label><input id="noAddress" placeholder="Delivery address" style="text-transform:uppercase"/></div>
+        <div style="grid-column:1/-1">
+          <label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);font-weight:500;display:block;margin-bottom:0.4rem">Address</label>
+          <div style="display:flex;gap:0.4rem;margin-bottom:0.6rem">
+            <button type="button" class="ostab addr-mode-btn active" data-amode="whole" onclick="setAddrMode('whole')">Whole Address</button>
+            <button type="button" class="ostab addr-mode-btn" data-amode="fields" onclick="setAddrMode('fields')">Specific Fields</button>
+          </div>
+          <div id="noAddrWhole" class="mfg" style="margin-bottom:0"><input id="noAddress" placeholder="Delivery address" style="text-transform:uppercase"/></div>
+          <div id="noAddrFields" style="display:none;grid-template-columns:1fr 1fr;gap:0.6rem 0.8rem">
+            <div class="mfg" style="grid-column:1/-1;margin-bottom:0"><label>House / Street</label><input id="noAddrLine" style="text-transform:uppercase"/></div>
+            <div class="mfg" style="grid-column:1/-1;margin-bottom:0"><label>Area / Landmark</label><input id="noAddrArea" style="text-transform:uppercase"/></div>
+            <div class="mfg" style="margin-bottom:0"><label>City / Town</label><input id="noAddrCity" style="text-transform:uppercase"/></div>
+            <div class="mfg" style="margin-bottom:0"><label>District / State</label><input id="noAddrState" style="text-transform:uppercase"/></div>
+            <div class="mfg" style="margin-bottom:0"><label>Pincode</label><input id="noAddrPincode" inputmode="numeric"/></div>
+          </div>
+        </div>
         <div class="mfg"><label>Email</label><input id="noEmail" type="email" placeholder="email@example.com"/></div>
         <div class="mfg"><label>Notes</label><input id="noNotes" placeholder="Special instructions" style="text-transform:uppercase"/></div>
       </div>
@@ -1112,22 +1130,39 @@ ${RECEIPT_CSS}
       const receiptPages = pages.map(g => `<div class="page">${g.map(o => `<div class="cell"><div class="rc">${receiptBody(o)}</div></div>`).join('')}</div>`).join('');
 
       // Address list in 2 columns for all the same orders (after the receipts)
-      const addrCards = orders.map(o => {
+      const addrPrintMode = document.getElementById('addrPrintMode')?.value || 'whole';
+      const addrCell = (o) => {
+        if (!o) return '<td class="addr-cell empty"></td>';
         const toPhone  = normPhone(o.phone) || o.phone || '';
         const altPhone = o.altPhone ? (normPhone(o.altPhone) || o.altPhone) : '';
-        const addr     = escapeHtml(o.address || '—').replace(/,\s*/g, '<br>');
-        return `<div class="addr-card">
+        const hasFields = o.addrLine || o.addrArea || o.addrCity || o.addrState || o.addrPincode;
+        let addr;
+        if (addrPrintMode === 'fields' && hasFields) {
+          // Structured fields (existing/consolidated-only orders fall back below)
+          addr = [
+            o.addrLine, o.addrArea,
+            [o.addrCity, o.addrState].filter(Boolean).join(', '),
+            o.addrPincode ? ('PIN: ' + o.addrPincode) : ''
+          ].map(s => escapeHtml(String(s || '').trim())).filter(Boolean).join('<br>');
+        } else {
+          addr = escapeHtml(o.address || '—').replace(/,\s*/g, '<br>');
+        }
+        return `<td class="addr-cell">
           <div class="addr-no">TO</div>
           <div class="addr-name">${escapeHtml(o.name || '')}</div>
           <div class="addr-body">${addr}</div>
           <div class="addr-phone">Ph: ${escapeHtml(toPhone)}${altPhone ? ' / ' + escapeHtml(altPhone) : ''}</div>
-        </div>`;
-      }).join('');
-      // Pad the last row with empty cells so the grid lines run fully across
-      const addrPad = '<div class="addr-card empty"></div>'.repeat((3 - (orders.length % 3)) % 3);
+        </td>`;
+      };
+      // 3 per row in a real <table> — rows keep together across pages so no
+      // single address is ever split between two pages.
+      let addrRows = '';
+      for (let i = 0; i < orders.length; i += 3) {
+        addrRows += `<tr>${[orders[i], orders[i + 1], orders[i + 2]].map(addrCell).join('')}</tr>`;
+      }
       const addressSheet = `<div class="addr-sheet">
         <h2 class="addr-title">Delivery Addresses (${orders.length})</h2>
-        <div class="addr-cols">${addrCards}${addrPad}</div>
+        <table class="addr-table">${addrRows}</table>
       </div>`;
 
       const body = receiptPages + addressSheet;
@@ -1145,21 +1180,17 @@ ${RECEIPT_CSS}
   /* Bigger addresses on the print sheet only */
   .cell .to-addr, .cell .from-addr{font-size:21px;line-height:1.45}
   .cell .to-name{font-size:24px}
-  /* 2-column delivery address list (starts on a fresh page after receipts) */
+  /* 3-column delivery address list (starts on a fresh page after receipts).
+     Uses a real <table> so rows keep together — an address never splits pages. */
   .addr-sheet{page-break-before:always;padding:2mm}
   .addr-title{font-size:16px;font-weight:700;margin-bottom:6mm}
-  /* Shared grid lines (no separate boxes): outer top+left on the container,
-     right+bottom on each cell → 4 vertical lines + 1 horizontal line per row */
-  .addr-cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;align-items:stretch;border-top:1px solid #333;border-left:1px solid #333}
-  .addr-card{page-break-inside:avoid;break-inside:avoid;border-right:1px solid #333;border-bottom:1px solid #333;padding:3mm;margin:0;min-height:38mm;overflow:hidden}
-  .addr-card.empty{min-height:0}
-  .addr-sheet .addr-name{font-size:14px}
-  .addr-sheet .addr-body,.addr-sheet .addr-phone{font-size:12px}
-  .addr-sheet .addr-no{font-weight:700;color:#000}
-  .addr-no{font-size:11px;color:#333;margin-bottom:1mm}
-  .addr-name{font-size:15px;font-weight:700;margin-bottom:1mm}
-  .addr-body{font-size:13px;line-height:1.5}
-  .addr-phone{font-size:13px;margin-top:1.5mm}
+  .addr-table{width:100%;border-collapse:collapse;table-layout:fixed}
+  .addr-table tr{page-break-inside:avoid;break-inside:avoid}
+  .addr-cell{width:33.33%;border:1px solid #333;padding:3mm;vertical-align:top;height:38mm;page-break-inside:avoid;break-inside:avoid;overflow:hidden}
+  .addr-no{font-size:11px;font-weight:700;color:#000;margin-bottom:1mm}
+  .addr-name{font-size:14px;font-weight:700;margin-bottom:1mm}
+  .addr-body{font-size:12px;line-height:1.5}
+  .addr-phone{font-size:12px;margin-top:1.5mm}
   @page{size:A4;margin:6mm}
 </style></head>
 <body onload="setTimeout(function(){window.print()},300)">${body}</body></html>`);
@@ -1874,7 +1905,8 @@ Thank you for shopping with Pebble Store 🌿`;
       editingOrderId = null;
       document.getElementById('noModalTitle').textContent = '➕ New Manual Order';
       // Reset form
-      ['noName','noPhone','noAltPhone','noAddress','noEmail','noNotes'].forEach(id => document.getElementById(id).value = '');
+      ['noName','noPhone','noAltPhone','noAddress','noEmail','noNotes','noAddrLine','noAddrArea','noAddrCity','noAddrState','noAddrPincode'].forEach(id => document.getElementById(id).value = '');
+      setAddrMode('whole');
       const _t = new Date();
       document.getElementById('noDate').value = new Date(_t.getTime() - _t.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
       document.getElementById('noShipping').value = 0;
@@ -1900,6 +1932,14 @@ Thank you for shopping with Pebble Store 🌿`;
       document.getElementById('noPhone').value    = order.phone    || '';
       document.getElementById('noAltPhone').value = order.altPhone || '';
       document.getElementById('noAddress').value  = order.address  || '';
+      document.getElementById('noAddrLine').value    = order.addrLine    || '';
+      document.getElementById('noAddrArea').value    = order.addrArea    || '';
+      document.getElementById('noAddrCity').value    = order.addrCity    || '';
+      document.getElementById('noAddrState').value   = order.addrState   || '';
+      document.getElementById('noAddrPincode').value = order.addrPincode || '';
+      // Show structured mode only if this order was saved with structured fields
+      const hasFields = order.addrLine || order.addrArea || order.addrCity || order.addrState || order.addrPincode;
+      setAddrMode(hasFields ? 'fields' : 'whole');
       document.getElementById('noEmail').value   = order.email   || '';
       document.getElementById('noNotes').value   = order.notes   || '';
       document.getElementById('noShipping').value = order.shipping || 0;
@@ -1974,6 +2014,21 @@ Thank you for shopping with Pebble Store 🌿`;
     };
 
     // Auto-fill name/address/email from a returning customer's most recent order.
+    // Toggle the order-form address between a single "whole" field and structured fields
+    window.setAddrMode = (mode) => {
+      document.querySelectorAll('.addr-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.amode === mode));
+      document.getElementById('noAddrWhole').style.display  = mode === 'whole'  ? 'block' : 'none';
+      document.getElementById('noAddrFields').style.display = mode === 'fields' ? 'grid'  : 'none';
+    };
+    // Join structured parts into one consolidated address string
+    function consolidateAddr(line, area, city, state, pincode) {
+      const parts = [line, area, city, state].map(s => (s || '').trim()).filter(Boolean);
+      let s = parts.join(', ');
+      const pin = (pincode || '').trim();
+      if (pin) s += (s ? ' - ' : '') + pin;
+      return s;
+    }
+
     // Only fills empty fields, so anything already typed is preserved.
     window.autofillFromPhone = async () => {
       const key = normPhone(document.getElementById('noPhone').value);
@@ -1988,9 +2043,20 @@ Thank you for shopping with Pebble Store 🌿`;
       if (!match) return;
       const setIfEmpty = (id, val) => { const el = document.getElementById(id); if (el && !el.value.trim() && val) el.value = val; };
       setIfEmpty('noName', match.name);
-      setIfEmpty('noAddress', match.address);
       setIfEmpty('noEmail', match.email);
       setIfEmpty('noAltPhone', match.altPhone);
+      const matchHasFields = match.addrLine || match.addrArea || match.addrCity || match.addrState || match.addrPincode;
+      if (matchHasFields) {
+        setIfEmpty('noAddrLine', match.addrLine);
+        setIfEmpty('noAddrArea', match.addrArea);
+        setIfEmpty('noAddrCity', match.addrCity);
+        setIfEmpty('noAddrState', match.addrState);
+        setIfEmpty('noAddrPincode', match.addrPincode);
+        setAddrMode('fields');
+      } else {
+        setIfEmpty('noAddress', match.address);
+        setAddrMode('whole');
+      }
     };
 
     const showNoErr = (msg, text) => {
@@ -2030,6 +2096,18 @@ Thank you for shopping with Pebble Store 🌿`;
       });
       if (!items.length) { showNoErr(msg, '⚠️ Add at least one product.'); return; }
 
+      // Address: structured fields or a single whole address (consolidated for compatibility)
+      const addrModeFields = document.querySelector('.addr-mode-btn[data-amode="fields"]')?.classList.contains('active');
+      const upper = id => document.getElementById(id).value.trim().toUpperCase();
+      const addrLine = addrModeFields ? upper('noAddrLine') : '';
+      const addrArea = addrModeFields ? upper('noAddrArea') : '';
+      const addrCity = addrModeFields ? upper('noAddrCity') : '';
+      const addrState = addrModeFields ? upper('noAddrState') : '';
+      const addrPincode = addrModeFields ? document.getElementById('noAddrPincode').value.trim() : '';
+      const address = addrModeFields
+        ? consolidateAddr(addrLine, addrArea, addrCity, addrState, addrPincode)
+        : document.getElementById('noAddress').value.trim().toUpperCase();
+
       const shippingVal = parseFloat(document.getElementById('noShipping').value) || 0;
       const discountVal = parseFloat(document.getElementById('noDiscount').value) || 0;
       const subtotal    = items.reduce((s, i) => s + i.subtotal, 0);
@@ -2044,7 +2122,8 @@ Thank you for shopping with Pebble Store 🌿`;
         phoneNorm: normPhone(phone),
         altPhone,
         email:    document.getElementById('noEmail').value.trim(),
-        address:  document.getElementById('noAddress').value.trim().toUpperCase(),
+        address,
+        addrLine, addrArea, addrCity, addrState, addrPincode,
         notes:    document.getElementById('noNotes').value.trim().toUpperCase(),
         items,
         subtotal,

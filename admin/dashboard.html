@@ -56,6 +56,10 @@
     .ostab{padding:0.42rem 0.9rem;border:1.5px solid rgba(92,61,46,0.25);background:var(--warm-white);color:var(--stone);font-family:'Jost',sans-serif;font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;cursor:pointer;border-radius:2px;transition:all 0.2s}
     .ostab:hover{border-color:var(--bark);color:var(--bark)}
     .ostab.active{background:var(--bark);color:var(--cream);border-color:var(--bark)}
+    .ostab-ct{font-weight:600;opacity:0.85}
+    /* Age highlight for pending orders */
+    .row-age-warn   td{background:#fff8e1 !important}
+    .row-age-danger td{background:#fdecea !important}
     .btn-green{background:var(--moss);color:white}.btn-green:hover{background:#3a4a2e}
     .btn-red{background:#c0392b;color:white}.btn-red:hover{background:#a93226}
     .btn-clay{background:var(--clay);color:white}.btn-clay:hover{background:#8a6640}
@@ -189,11 +193,11 @@
         <input type="text" id="orderSearch" placeholder="🔍 Search by name or phone…" oninput="applyOrderFilters()"
           style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none;min-width:220px"/>
         <div class="order-status-tabs">
-          <button class="ostab active" onclick="setOrderStatus(this,'')">All</button>
-          <button class="ostab" onclick="setOrderStatus(this,'new')">New</button>
-          <button class="ostab" onclick="setOrderStatus(this,'confirmed')">Confirmed</button>
-          <button class="ostab" onclick="setOrderStatus(this,'ready')">Ready for Dispatch</button>
-          <button class="ostab" onclick="setOrderStatus(this,'dispatched')">Dispatched</button>
+          <button class="ostab active" onclick="setOrderStatus(this,'')">All <span id="ocAll" class="ostab-ct"></span></button>
+          <button class="ostab" onclick="setOrderStatus(this,'new')">New <span id="ocNew" class="ostab-ct"></span></button>
+          <button class="ostab" onclick="setOrderStatus(this,'confirmed')">Confirmed <span id="ocConfirmed" class="ostab-ct"></span></button>
+          <button class="ostab" onclick="setOrderStatus(this,'ready')">Ready for Dispatch <span id="ocReady" class="ostab-ct"></span></button>
+          <button class="ostab" onclick="setOrderStatus(this,'dispatched')">Dispatched <span id="ocDispatched" class="ostab-ct"></span></button>
         </div>
         <select id="orderFilterPaid" onchange="applyOrderFilters()"
           style="font-family:'Jost',sans-serif;font-size:0.82rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none">
@@ -744,24 +748,29 @@
     // accurate regardless of how many pages are loaded into the table.
     async function refreshOrderStats() {
       const ids = { statTotal: null, statNew: 'new', statConfirmed: 'confirmed', statReady: 'ready', statDispatched: 'dispatched', statDelivered: 'delivered' };
+      // Which status-tab count span each stat card also feeds
+      const tabCt = { statTotal: 'ocAll', statNew: 'ocNew', statConfirmed: 'ocConfirmed', statReady: 'ocReady', statDispatched: 'ocDispatched' };
+      const setBoth = (elId, n) => {
+        const el = document.getElementById(elId); if (el) el.textContent = n;
+        const tc = tabCt[elId] && document.getElementById(tabCt[elId]); if (tc) tc.textContent = '(' + n + ')';
+      };
       try {
         await Promise.all(Object.entries(ids).map(async ([elId, status]) => {
           const c = status
             ? query(collection(db, 'orders'), where('status', '==', status))
             : collection(db, 'orders');
           const agg = await getCountFromServer(c);
-          const el = document.getElementById(elId);
-          if (el) el.textContent = agg.data().count;
+          setBoth(elId, agg.data().count);
         }));
       } catch (err) {
         // Fallback: derive from whatever is loaded (older SDKs without aggregation)
         const o = allOrders;
-        document.getElementById('statTotal').textContent      = o.length;
-        document.getElementById('statNew').textContent        = o.filter(x => x.status === 'new').length;
-        document.getElementById('statConfirmed').textContent  = o.filter(x => x.status === 'confirmed').length;
-        document.getElementById('statReady').textContent      = o.filter(x => x.status === 'ready').length;
-        document.getElementById('statDispatched').textContent = o.filter(x => x.status === 'dispatched').length;
-        document.getElementById('statDelivered').textContent  = o.filter(x => x.status === 'delivered').length;
+        setBoth('statTotal',      o.length);
+        setBoth('statNew',        o.filter(x => x.status === 'new').length);
+        setBoth('statConfirmed',  o.filter(x => x.status === 'confirmed').length);
+        setBoth('statReady',      o.filter(x => x.status === 'ready').length);
+        setBoth('statDispatched', o.filter(x => x.status === 'dispatched').length);
+        setBoth('statDelivered',  o.filter(x => x.status === 'delivered').length);
       }
     }
 
@@ -825,7 +834,14 @@
           }
           actions += `<button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="printReceipt('${o.id}')">🧾 Receipt</button>`;
           actions += `<button class="btn btn-sm" style="margin-top:3px;background:var(--dark);color:var(--cream)" onclick="deleteOrder('${o.id}')">Delete</button>`;
-          return `<tr>
+          // Age highlight: >5 days = light red, >3 days = yellow (skip delivered/cancelled)
+          let ageClass = '';
+          if (o.status !== 'delivered' && o.status !== 'cancelled' && o.createdAt) {
+            const days = (Date.now() - new Date(o.createdAt).getTime()) / 86400000;
+            if (days > 5)      ageClass = 'row-age-danger';
+            else if (days > 3) ageClass = 'row-age-warn';
+          }
+          return `<tr class="${ageClass}">
             <td style="text-align:center"><input type="checkbox" class="order-check" value="${o.id}" ${selectedOrderIds.has(o.id) ? 'checked' : ''} onclick="toggleOrderSelect('${o.id}',this)"/></td>
             <td style="white-space:nowrap;font-size:0.78rem">${date}<br><span style="color:var(--stone);font-size:0.72rem">#${o.orderNo != null ? o.orderNo : '—'}</span></td>
             <td><strong>${o.name}</strong>${o.source === 'admin' ? ' <span style="font-size:0.62rem;background:#e8d5ff;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">ADMIN</span>' : ''}<br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
@@ -2354,7 +2370,9 @@ Thank you for shopping with Pebble Store 🌿`;
       a.click(); URL.revokeObjectURL(url);
     };
 
-    ['dispatchModal','stockModal','newOrderModal','packingModal','whatsappModal'].forEach(id => {
+    // Click-outside closes these modals. NOT newOrderModal — it holds a lot of
+    // typed data, so accidental outside clicks must not discard it (use Cancel/✕).
+    ['dispatchModal','stockModal','packingModal','whatsappModal'].forEach(id => {
       document.getElementById(id).addEventListener('click', e => { if (e.target === document.getElementById(id)) closeModal(id); });
     });
   </script>

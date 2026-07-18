@@ -342,6 +342,7 @@ export default async function handler(req, res) {
     };
     if (result.mappedStatus === 'delivered') {
       updates.status = 'delivered';
+      updates.statusChangedAt = new Date().toISOString();
     }
     await db.collection('orders').doc(orderId).update(updates);
   } catch (err) {

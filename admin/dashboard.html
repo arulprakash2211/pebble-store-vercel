@@ -1154,16 +1154,19 @@ ${RECEIPT_CSS}
           <div class="addr-phone">Ph: ${escapeHtml(toPhone)}${altPhone ? ' / ' + escapeHtml(altPhone) : ''}</div>
         </td>`;
       };
+      // Only orders that actually have an address (consolidated or structured)
+      const hasAnyAddress = o => !!((o.address && o.address.trim()) || o.addrLine || o.addrArea || o.addrCity || o.addrState || o.addrPincode);
+      const addrOrders = orders.filter(hasAnyAddress);
       // 3 per row in a real <table> — rows keep together across pages so no
       // single address is ever split between two pages.
       let addrRows = '';
-      for (let i = 0; i < orders.length; i += 3) {
-        addrRows += `<tr>${[orders[i], orders[i + 1], orders[i + 2]].map(addrCell).join('')}</tr>`;
+      for (let i = 0; i < addrOrders.length; i += 3) {
+        addrRows += `<tr>${[addrOrders[i], addrOrders[i + 1], addrOrders[i + 2]].map(addrCell).join('')}</tr>`;
       }
-      const addressSheet = `<div class="addr-sheet">
-        <h2 class="addr-title">Delivery Addresses (${orders.length})</h2>
+      const addressSheet = addrOrders.length ? `<div class="addr-sheet">
+        <h2 class="addr-title">Delivery Addresses (${addrOrders.length})</h2>
         <table class="addr-table">${addrRows}</table>
-      </div>`;
+      </div>` : '';
 
       const body = receiptPages + addressSheet;
       win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>

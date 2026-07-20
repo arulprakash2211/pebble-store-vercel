@@ -521,6 +521,26 @@
     </div>
   </div>
 
+  <!-- PHOTO ZOOM + CROP → decode barcode from the chosen photo -->
+  <div class="modal-overlay" id="photoZoomModal">
+    <div class="modal" style="max-width:480px">
+      <button class="modal-close" onclick="pzClose()">×</button>
+      <div class="modal-title">🔍 Zoom to the Barcode</div>
+      <div id="pzViewport" style="position:relative;width:100%;height:52vh;overflow:hidden;background:#000;border-radius:4px;touch-action:none;cursor:grab">
+        <img id="pzImg" alt="" style="position:absolute;left:0;top:0;user-select:none;-webkit-user-drag:none;pointer-events:none"/>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.6rem;margin-top:0.6rem">
+        <span style="font-size:0.8rem;color:var(--stone)">Zoom</span>
+        <input type="range" id="pzZoom" min="1" max="8" step="0.05" value="1" oninput="pzSetZoom(this.value)" style="flex:1"/>
+      </div>
+      <div style="font-size:0.72rem;color:var(--stone);margin-top:0.3rem">Drag to move · zoom so the barcode fills the box, then Scan.</div>
+      <div style="display:flex;gap:0.8rem;margin-top:0.7rem">
+        <button class="btn btn-green" style="flex:1" onclick="pzScan()">🔍 Scan Barcode</button>
+        <button class="btn btn-ghost" onclick="pzClose()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- WHATSAPP SEND (after dispatch) -->
   <div class="modal-overlay" id="whatsappModal">
     <div class="modal">
@@ -1361,22 +1381,88 @@ ${RECEIPT_CSS}
       if (scanReader) { try { scanReader.reset(); } catch (_) {} scanReader = null; }
       document.getElementById('scanModal').classList.remove('open');
     };
-    // Decode a barcode from an uploaded / camera photo → fills the Tracking ID field
-    window.scanFromPhoto = async (ev) => {
+    // Chosen photo opens in a zoom/crop viewport so you can zoom into the barcode
+    window.scanFromPhoto = (ev) => {
       const file = ev.target.files && ev.target.files[0];
       ev.target.value = '';   // allow re-picking the same file
       if (!file) return;
       if (!window.ZXing || !ZXing.BrowserMultiFormatReader) { toast('⚠️ Scanner not ready — retry'); return; }
-      toast('🔎 Reading photo…');
-      const url = URL.createObjectURL(file);
+      pzOpen(URL.createObjectURL(file));
+    };
+
+    // ── Photo zoom/crop viewport ──
+    let pzScale = 1, pzFit = 1, pzTx = 0, pzTy = 0, pzUrl = null, pzWired = false;
+    const pzApply = () => {
+      const img = document.getElementById('pzImg');
+      img.style.width = (img.naturalWidth * pzScale) + 'px';
+      img.style.left = pzTx + 'px';
+      img.style.top  = pzTy + 'px';
+    };
+    const pzClamp = () => {
+      const vp = document.getElementById('pzViewport'), img = document.getElementById('pzImg');
+      const vw = vp.clientWidth, vh = vp.clientHeight;
+      const dw = img.naturalWidth * pzScale, dh = img.naturalHeight * pzScale;
+      pzTx = dw <= vw ? (vw - dw) / 2 : Math.min(0, Math.max(vw - dw, pzTx));
+      pzTy = dh <= vh ? (vh - dh) / 2 : Math.min(0, Math.max(vh - dh, pzTy));
+    };
+    window.pzSetZoom = (v) => {
+      const vp = document.getElementById('pzViewport');
+      const vw = vp.clientWidth, vh = vp.clientHeight, cx = vw / 2, cy = vh / 2;
+      const natX = (cx - pzTx) / pzScale, natY = (cy - pzTy) / pzScale;
+      pzScale = pzFit * parseFloat(v);
+      pzTx = cx - natX * pzScale; pzTy = cy - natY * pzScale;
+      pzClamp(); pzApply();
+    };
+    function pzOpen(url) {
+      pzUrl = url;
+      const modal = document.getElementById('photoZoomModal');
+      const img = document.getElementById('pzImg');
+      const vp = document.getElementById('pzViewport');
+      if (!pzWired) {
+        let drag = false, lx = 0, ly = 0;
+        vp.addEventListener('pointerdown', e => { drag = true; lx = e.clientX; ly = e.clientY; vp.style.cursor = 'grabbing'; vp.setPointerCapture(e.pointerId); });
+        vp.addEventListener('pointermove', e => { if (!drag) return; pzTx += e.clientX - lx; pzTy += e.clientY - ly; lx = e.clientX; ly = e.clientY; pzClamp(); pzApply(); });
+        const end = () => { drag = false; vp.style.cursor = 'grab'; };
+        vp.addEventListener('pointerup', end); vp.addEventListener('pointercancel', end);
+        pzWired = true;
+      }
+      img.onload = () => {
+        const vw = vp.clientWidth, vh = vp.clientHeight;
+        pzFit = Math.min(vw / img.naturalWidth, vh / img.naturalHeight);
+        pzScale = pzFit;
+        document.getElementById('pzZoom').value = 1;
+        pzClamp(); pzApply();
+      };
+      img.src = url;
+      modal.classList.add('open');
+    }
+    window.pzClose = () => {
+      document.getElementById('photoZoomModal').classList.remove('open');
+      if (pzUrl) { URL.revokeObjectURL(pzUrl); pzUrl = null; }
+    };
+    window.pzScan = async () => {
+      const vp = document.getElementById('pzViewport'), img = document.getElementById('pzImg');
+      const vw = vp.clientWidth, vh = vp.clientHeight;
+      // Source rectangle (natural px) currently visible in the viewport
+      let sx = (-pzTx) / pzScale, sy = (-pzTy) / pzScale;
+      let sw = vw / pzScale, sh = vh / pzScale;
+      sx = Math.max(0, Math.min(sx, img.naturalWidth));
+      sy = Math.max(0, Math.min(sy, img.naturalHeight));
+      sw = Math.min(sw, img.naturalWidth - sx);
+      sh = Math.min(sh, img.naturalHeight - sy);
+      const up = 2;   // render the crop larger for clearer decoding
+      const cv = document.createElement('canvas');
+      cv.width = Math.max(1, Math.round(sw * up)); cv.height = Math.max(1, Math.round(sh * up));
+      cv.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+      toast('🔎 Reading…');
       try {
-        const result = await makeBarcodeReader().decodeFromImageUrl(url);
+        const result = await makeBarcodeReader().decodeFromImageUrl(cv.toDataURL('image/png'));
         const code = String(result.getText ? result.getText() : (result.text || '')).replace(/\s+/g, '').trim();
-        if (code) { document.getElementById('trackingId').value = code; toast('✅ Scanned: ' + code); }
-        else toast('⚠️ No barcode detected in the photo');
+        if (code) { document.getElementById('trackingId').value = code; toast('✅ Scanned: ' + code); pzClose(); }
+        else toast('⚠️ No barcode detected — zoom closer and try again');
       } catch (e) {
-        toast('⚠️ No barcode found — try a clearer photo or type it');
-      } finally { URL.revokeObjectURL(url); }
+        toast('⚠️ No barcode found — zoom so the bars fill the box, then Scan');
+      }
     };
 
     window.confirmDispatch = async () => {
@@ -2544,6 +2630,7 @@ Thank you for shopping with Pebble Store 🌿`;
     });
     // Scanner: clicking outside stops the camera too
     document.getElementById('scanModal').addEventListener('click', e => { if (e.target.id === 'scanModal') stopScan(); });
+    document.getElementById('photoZoomModal').addEventListener('click', e => { if (e.target.id === 'photoZoomModal') pzClose(); });
   </script>
 </body>
 </html>

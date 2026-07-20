@@ -1363,38 +1363,56 @@ ${RECEIPT_CSS}
       }
       return s.replace(/\s+/g, '');
     }
-    let scanReader = null;
+    // Auto-scan loop: grab full-res frames from the live camera and decode each
+    // with the tuned reader. More reliable than ZXing's built-in video decode.
+    let scanStream = null, scanTimer = null, scanBusy = false, scanCanvas = null, scanDecoder = null;
     window.startScan = async () => {
       if (!window.ZXing || !ZXing.BrowserMultiFormatReader) { toast('⚠️ Scanner not ready — check your connection and retry'); return; }
       const modal = document.getElementById('scanModal');
       const video = document.getElementById('scanVideo');
       const msg   = document.getElementById('scanMsg');
-      msg.textContent = 'Point the rear camera at the barcode…';
+      msg.textContent = 'Point the camera at the barcode or QR — it scans automatically.';
       modal.classList.add('open');
       try {
-        scanReader = makeBarcodeReader();
-        await scanReader.decodeFromConstraints(
-          { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
-          video,
-          (result) => {
-            if (!result) return;
-            const raw  = result.getText ? result.getText() : (result.text || '');
-            const code = extractTrackingCode(raw);
-            if (code) {
-              document.getElementById('trackingId').value = code;
-              toast('✅ Scanned: ' + code);
-              stopScan();
-            }
-          }
-        );
+        scanStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false
+        });
+        video.srcObject = scanStream;
+        await video.play().catch(() => {});
+        scanCanvas = document.createElement('canvas');
+        scanDecoder = makeBarcodeReader();
+        scanTimer = setInterval(scanTick, 350);
       } catch (e) {
         msg.textContent = '⚠️ ' + (e && e.name === 'NotAllowedError'
           ? 'Camera permission denied. Allow camera access and retry.'
           : ('Camera error: ' + (e && e.message || e)));
       }
     };
+    async function scanTick() {
+      if (scanBusy || !scanDecoder) return;
+      const video = document.getElementById('scanVideo');
+      if (!video || !video.videoWidth) return;
+      scanBusy = true;
+      try {
+        scanCanvas.width = video.videoWidth; scanCanvas.height = video.videoHeight;
+        scanCanvas.getContext('2d').drawImage(video, 0, 0);
+        const result = await scanDecoder.decodeFromImageUrl(scanCanvas.toDataURL('image/jpeg', 0.9));
+        const code = extractTrackingCode(result.getText ? result.getText() : (result.text || ''));
+        if (code) {
+          document.getElementById('trackingId').value = code;
+          toast('✅ Scanned: ' + code);
+          stopScan();
+          return;
+        }
+      } catch (_) { /* no barcode in this frame — keep scanning */ }
+      finally { scanBusy = false; }
+    }
     window.stopScan = () => {
-      if (scanReader) { try { scanReader.reset(); } catch (_) {} scanReader = null; }
+      if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
+      if (scanStream) { try { scanStream.getTracks().forEach(t => t.stop()); } catch (_) {} scanStream = null; }
+      const video = document.getElementById('scanVideo'); if (video) video.srcObject = null;
+      scanDecoder = null; scanBusy = false;
       document.getElementById('scanModal').classList.remove('open');
     };
     // Grab a full-res still from the live camera → open the zoom viewport to decode it

@@ -1347,6 +1347,19 @@ ${RECEIPT_CSS}
       ]);
       return new ZXing.BrowserMultiFormatReader(hints);
     }
+    // A scan may return the plain barcode number OR the slip's QR (a tracking URL
+    // like ...?keyword=64388517616). Pull the tracking number out either way.
+    function extractTrackingCode(raw) {
+      const s = String(raw || '').trim();
+      if (!s) return '';
+      const m = s.match(/(?:keyword|awb_?no|awb|consignment|cn(?:no)?|track(?:ing)?(?:id|no)?)=([A-Za-z0-9]+)/i);
+      if (m) return m[1];
+      if (/^https?:\/\//i.test(s) || s.includes('/') || s.includes('=')) {
+        const nums = s.match(/\d{6,}/g);
+        if (nums && nums.length) return nums.sort((a, b) => b.length - a.length)[0];
+      }
+      return s.replace(/\s+/g, '');
+    }
     let scanReader = null;
     window.startScan = async () => {
       if (!window.ZXing || !ZXing.BrowserMultiFormatReader) { toast('⚠️ Scanner not ready — check your connection and retry'); return; }
@@ -1363,7 +1376,7 @@ ${RECEIPT_CSS}
           (result) => {
             if (!result) return;
             const raw  = result.getText ? result.getText() : (result.text || '');
-            const code = String(raw).replace(/\s+/g, '').trim();
+            const code = extractTrackingCode(raw);
             if (code) {
               document.getElementById('trackingId').value = code;
               toast('✅ Scanned: ' + code);
@@ -1457,7 +1470,7 @@ ${RECEIPT_CSS}
       toast('🔎 Reading…');
       try {
         const result = await makeBarcodeReader().decodeFromImageUrl(cv.toDataURL('image/png'));
-        const code = String(result.getText ? result.getText() : (result.text || '')).replace(/\s+/g, '').trim();
+        const code = extractTrackingCode(result.getText ? result.getText() : (result.text || ''));
         if (code) { document.getElementById('trackingId').value = code; toast('✅ Scanned: ' + code); pzClose(); }
         else toast('⚠️ No barcode detected — zoom closer and try again');
       } catch (e) {

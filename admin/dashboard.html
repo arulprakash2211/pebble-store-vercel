@@ -153,6 +153,7 @@
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 </head>
 <body>
 
@@ -493,11 +494,27 @@
         </select>
         <input type="text" id="courierOther" placeholder="Enter courier name" style="display:none;margin-top:0.5rem;font-family:'Jost',sans-serif;font-size:0.88rem;padding:0.65rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0;width:100%"/>
       </div>
-      <div class="mfg"><label>Tracking ID *</label><input id="trackingId" placeholder="e.g. 1234567890"/></div>
+      <div class="mfg"><label>Tracking ID *</label>
+        <div style="display:flex;gap:0.5rem">
+          <input id="trackingId" placeholder="e.g. 1234567890" style="flex:1"/>
+          <button type="button" class="btn btn-ghost" style="white-space:nowrap" onclick="startScan()">📷 Scan</button>
+        </div>
+      </div>
       <div style="display:flex;gap:0.8rem;margin-top:0.5rem">
         <button class="btn btn-green" style="flex:1" onclick="confirmDispatch()">✓ Confirm Dispatch</button>
         <button class="btn btn-ghost" onclick="closeModal('dispatchModal')">Cancel</button>
       </div>
+    </div>
+  </div>
+
+  <!-- BARCODE SCANNER (camera) for the tracking number -->
+  <div class="modal-overlay" id="scanModal">
+    <div class="modal" style="max-width:440px">
+      <button class="modal-close" onclick="stopScan()">×</button>
+      <div class="modal-title">📷 Scan Tracking Barcode</div>
+      <video id="scanVideo" muted playsinline autoplay style="width:100%;border-radius:4px;background:#000;aspect-ratio:4/3;object-fit:cover"></video>
+      <div id="scanMsg" style="font-size:0.82rem;color:var(--stone);margin-top:0.6rem">Point the rear camera at the barcode…</div>
+      <button class="btn btn-ghost" style="margin-top:0.7rem;width:100%" onclick="stopScan()">Cancel</button>
     </div>
   </div>
 
@@ -1002,28 +1019,30 @@
       if (!win) { toast('⚠️ Allow pop-ups to print'); return; }
       const total = packingRows.reduce((s, r) => s + r.qty, 0);
       const when = new Date().toLocaleString('en-IN', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
-      const rows = packingRows.map(r => `<tr><td>${escapeHtml(r.name)}</td><td class="num">${r.qty}</td></tr>`).join('');
+      const mk = arr => arr.map(r => `<tr><td>${escapeHtml(r.name)}</td><td class="num">${r.qty}</td></tr>`).join('');
+      const half = Math.ceil(packingRows.length / 2);
+      const colTable = body => `<table><thead><tr><th>Product</th><th class="num">Qty</th></tr></thead><tbody>${body}</tbody></table>`;
+      const left  = colTable(mk(packingRows.slice(0, half)));
+      const right = packingRows.length > half ? colTable(mk(packingRows.slice(half))) : '<div></div>';
       win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Packing Summary</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Helvetica Neue',Arial,sans-serif;color:#000;padding:28px;font-size:14px}
-  h1{font-size:20px;letter-spacing:1px}
-  .meta{font-size:12px;color:#555;margin:4px 0 18px}
-  table{width:100%;border-collapse:collapse}
-  th{text-align:left;font-size:11px;letter-spacing:1px;text-transform:uppercase;border-bottom:2px solid #000;padding:8px 6px}
-  td{padding:8px 6px;border-bottom:1px solid #ddd}
-  .num{text-align:right}
-  tfoot td{font-weight:700;border-top:2px solid #000;border-bottom:none}
-  @media print{ body{padding:0} @page{margin:16mm} }
+  body{font-family:'Helvetica Neue',Arial,sans-serif;color:#000;padding:14px;font-size:11px}
+  h1{font-size:14px;letter-spacing:0.5px}
+  .meta{font-size:9px;color:#555;margin:2px 0 10px}
+  .cols{display:flex;gap:18px;align-items:flex-start}
+  .cols table{flex:1;border-collapse:collapse;width:100%}
+  th{text-align:left;font-size:8.5px;letter-spacing:0.5px;text-transform:uppercase;border-bottom:1.5px solid #000;padding:3px 5px}
+  td{padding:3px 5px;border-bottom:1px solid #ddd;font-size:11px}
+  .num{text-align:right;white-space:nowrap}
+  .total{display:flex;justify-content:space-between;font-weight:700;font-size:12px;border-top:2px solid #000;margin-top:8px;padding-top:5px}
+  @media print{ body{padding:0} @page{size:A4;margin:12mm} }
 </style></head>
 <body onload="setTimeout(function(){window.print()},200)">
   <h1>PACKING SUMMARY</h1>
   <div class="meta">${packingLabel} &nbsp;·&nbsp; ${when}</div>
-  <table>
-    <thead><tr><th>Product</th><th class="num">Qty to Pack</th></tr></thead>
-    <tbody>${rows}</tbody>
-    <tfoot><tr><td>Total</td><td class="num">${total}</td></tr></tfoot>
-  </table>
+  <div class="cols">${left}${right}</div>
+  <div class="total"><span>Total to pack</span><span>${total}</span></div>
 </body></html>`);
       win.document.close();
     };
@@ -1266,6 +1285,43 @@ ${RECEIPT_CSS}
       document.getElementById('courierOther').style.display =
         document.getElementById('courierSelect').value === 'other' ? 'block' : 'none';
     };
+
+    // ── Barcode scanner (camera) → fills the Tracking ID field ──
+    let scanReader = null;
+    window.startScan = async () => {
+      if (!window.ZXing || !ZXing.BrowserMultiFormatReader) { toast('⚠️ Scanner not ready — check your connection and retry'); return; }
+      const modal = document.getElementById('scanModal');
+      const video = document.getElementById('scanVideo');
+      const msg   = document.getElementById('scanMsg');
+      msg.textContent = 'Point the rear camera at the barcode…';
+      modal.classList.add('open');
+      try {
+        scanReader = new ZXing.BrowserMultiFormatReader();
+        await scanReader.decodeFromConstraints(
+          { video: { facingMode: { ideal: 'environment' } } },
+          video,
+          (result) => {
+            if (!result) return;
+            const raw  = result.getText ? result.getText() : (result.text || '');
+            const code = String(raw).replace(/\s+/g, '').trim();
+            if (code) {
+              document.getElementById('trackingId').value = code;
+              toast('✅ Scanned: ' + code);
+              stopScan();
+            }
+          }
+        );
+      } catch (e) {
+        msg.textContent = '⚠️ ' + (e && e.name === 'NotAllowedError'
+          ? 'Camera permission denied. Allow camera access and retry.'
+          : ('Camera error: ' + (e && e.message || e)));
+      }
+    };
+    window.stopScan = () => {
+      if (scanReader) { try { scanReader.reset(); } catch (_) {} scanReader = null; }
+      document.getElementById('scanModal').classList.remove('open');
+    };
+
     window.confirmDispatch = async () => {
       const sel = document.getElementById('courierSelect').value;
       const courier = sel === 'other' ? document.getElementById('courierOther').value.trim() : sel;
@@ -2417,6 +2473,8 @@ Thank you for shopping with Pebble Store 🌿`;
     ['dispatchModal','stockModal','packingModal','whatsappModal'].forEach(id => {
       document.getElementById(id).addEventListener('click', e => { if (e.target === document.getElementById(id)) closeModal(id); });
     });
+    // Scanner: clicking outside stops the camera too
+    document.getElementById('scanModal').addEventListener('click', e => { if (e.target.id === 'scanModal') stopScan(); });
   </script>
 </body>
 </html>

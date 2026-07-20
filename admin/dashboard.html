@@ -485,23 +485,26 @@
   <div class="modal-overlay" id="dispatchModal">
     <div class="modal">
       <button class="modal-close" onclick="closeModal('dispatchModal')">×</button>
-      <div class="modal-title">📦 Mark as Dispatched</div>
+      <div class="modal-title" id="dispatchTitle">📦 Mark as Dispatched</div>
       <div class="mfg"><label>Courier *</label>
         <select id="courierSelect" onchange="toggleOtherCourier()">
-          <option value="">Select courier…</option>
           <option>ST Courier</option><option>Professional Courier</option>
           <option>DTDC</option><option>India Post</option><option value="other">Other…</option>
         </select>
         <input type="text" id="courierOther" placeholder="Enter courier name" style="display:none;margin-top:0.5rem;font-family:'Jost',sans-serif;font-size:0.88rem;padding:0.65rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0;width:100%"/>
       </div>
       <div class="mfg"><label>Tracking ID *</label>
-        <div style="display:flex;gap:0.5rem">
-          <input id="trackingId" placeholder="e.g. 1234567890" style="flex:1"/>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          <input id="trackingId" placeholder="e.g. 1234567890" style="flex:1;min-width:120px"/>
           <button type="button" class="btn btn-ghost" style="white-space:nowrap" onclick="startScan()">📷 Scan</button>
+          <label class="btn btn-ghost" style="white-space:nowrap;cursor:pointer;display:inline-flex;align-items:center">🖼️ Photo
+            <input type="file" accept="image/*" style="display:none" onchange="scanFromPhoto(event)"/>
+          </label>
         </div>
+        <div style="font-size:0.7rem;color:var(--stone);margin-top:0.35rem">Scan the barcode live, upload/take a photo of it, or type it.</div>
       </div>
       <div style="display:flex;gap:0.8rem;margin-top:0.5rem">
-        <button class="btn btn-green" style="flex:1" onclick="confirmDispatch()">✓ Confirm Dispatch</button>
+        <button class="btn btn-green" id="dispatchConfirmBtn" style="flex:1" onclick="confirmDispatch()">✓ Confirm Dispatch</button>
         <button class="btn btn-ghost" onclick="closeModal('dispatchModal')">Cancel</button>
       </div>
     </div>
@@ -882,9 +885,9 @@
           } else if (o.status === 'ready') {
             actions = `<button class="btn btn-sm btn-green" onclick="openDispatchModal('${o.id}')">Dispatch</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
           } else if (o.status === 'dispatched') {
-            actions = `${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" onclick="checkTrackStatus('${o.id}')">🔄 Check Status</button>` : ''}<button class="btn btn-sm btn-blue" style="margin-top:3px" onclick="updateStatus('${o.id}','delivered')">Delivered</button>`;
+            actions = `${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" onclick="checkTrackStatus('${o.id}')">🔄 Check Status</button>` : ''}<button class="btn btn-sm btn-blue" style="margin-top:3px" onclick="updateStatus('${o.id}','delivered')">Delivered</button><button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="openEditTracking('${o.id}')">✏️ Edit Tracking</button>`;
           } else if (o.status === 'delivered') {
-            actions = `<span style="font-size:0.72rem;color:var(--moss)">✓ Complete</span>${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="checkTrackStatus('${o.id}')">🔄 Refresh Tracking</button>` : ''}`;
+            actions = `<span style="font-size:0.72rem;color:var(--moss)">✓ Complete</span>${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="checkTrackStatus('${o.id}')">🔄 Refresh Tracking</button>` : ''}<button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="openEditTracking('${o.id}')">✏️ Edit Tracking</button>`;
           } else if (o.status === 'cancelled') {
             actions = `<span style="font-size:0.72rem;color:#c0392b">✗ Cancelled</span>`;
           }
@@ -1273,12 +1276,37 @@ ${RECEIPT_CSS}
 <body onload="setTimeout(function(){window.print()},300)">${body}</body></html>`);
       win.document.close();
     };
+    let dispatchEditMode = false;
+    const KNOWN_COURIERS = ['ST Courier', 'Professional Courier', 'DTDC', 'India Post'];
     window.openDispatchModal = (id) => {
       currentDispatchOrderId = id;
-      document.getElementById('courierSelect').value = '';
+      dispatchEditMode = false;
+      document.getElementById('courierSelect').value = 'ST Courier';   // default courier
       document.getElementById('courierOther').value = '';
       document.getElementById('courierOther').style.display = 'none';
       document.getElementById('trackingId').value = '';
+      document.getElementById('dispatchTitle').textContent = '📦 Mark as Dispatched';
+      document.getElementById('dispatchConfirmBtn').textContent = '✓ Confirm Dispatch';
+      document.getElementById('dispatchModal').classList.add('open');
+    };
+    // Edit courier / tracking number of an already-dispatched (or delivered) order
+    window.openEditTracking = (id) => {
+      const o = allOrders.find(x => x.id === id);
+      if (!o) return;
+      currentDispatchOrderId = id;
+      dispatchEditMode = true;
+      const courier = (o.tracking && o.tracking.courier) || 'ST Courier';
+      if (KNOWN_COURIERS.includes(courier)) {
+        document.getElementById('courierSelect').value = courier;
+        document.getElementById('courierOther').value = '';
+      } else {
+        document.getElementById('courierSelect').value = 'other';
+        document.getElementById('courierOther').value = courier;
+      }
+      toggleOtherCourier();
+      document.getElementById('trackingId').value = (o.tracking && o.tracking.trackingId) || '';
+      document.getElementById('dispatchTitle').textContent = '✏️ Edit Tracking';
+      document.getElementById('dispatchConfirmBtn').textContent = '✓ Update Tracking';
       document.getElementById('dispatchModal').classList.add('open');
     };
     window.toggleOtherCourier = () => {
@@ -1321,6 +1349,23 @@ ${RECEIPT_CSS}
       if (scanReader) { try { scanReader.reset(); } catch (_) {} scanReader = null; }
       document.getElementById('scanModal').classList.remove('open');
     };
+    // Decode a barcode from an uploaded / camera photo → fills the Tracking ID field
+    window.scanFromPhoto = async (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      ev.target.value = '';   // allow re-picking the same file
+      if (!file) return;
+      if (!window.ZXing || !ZXing.BrowserMultiFormatReader) { toast('⚠️ Scanner not ready — retry'); return; }
+      toast('🔎 Reading photo…');
+      const url = URL.createObjectURL(file);
+      try {
+        const result = await new ZXing.BrowserMultiFormatReader().decodeFromImageUrl(url);
+        const code = String(result.getText ? result.getText() : (result.text || '')).replace(/\s+/g, '').trim();
+        if (code) { document.getElementById('trackingId').value = code; toast('✅ Scanned: ' + code); }
+        else toast('⚠️ No barcode detected in the photo');
+      } catch (e) {
+        toast('⚠️ No barcode found — try a clearer photo or type it');
+      } finally { URL.revokeObjectURL(url); }
+    };
 
     window.confirmDispatch = async () => {
       const sel = document.getElementById('courierSelect').value;
@@ -1329,6 +1374,18 @@ ${RECEIPT_CSS}
       if (!courier || !trackingId) { toast('⚠️ Select courier and enter tracking ID'); return; }
       const order = allOrders.find(x => x.id === currentDispatchOrderId) || {};
       try {
+        if (dispatchEditMode) {
+          // Correct the courier/tracking only — keep status & the status-age clock;
+          // reset the fetched timeline so the new number re-fetches fresh.
+          await updateDoc(doc(db, 'orders', currentDispatchOrderId), {
+            tracking: { courier, trackingId, dispatchedAt: (order.tracking && order.tracking.dispatchedAt) || new Date().toISOString() },
+            updatedAt: new Date().toISOString()
+          });
+          toast('✅ Tracking updated');
+          closeModal('dispatchModal');
+          loadOrders();
+          return;
+        }
         await updateDoc(doc(db, 'orders', currentDispatchOrderId), {
           status: 'dispatched',
           tracking: { courier, trackingId, dispatchedAt: new Date().toISOString() },

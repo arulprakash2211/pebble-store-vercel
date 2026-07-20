@@ -1315,6 +1315,18 @@ ${RECEIPT_CSS}
     };
 
     // ── Barcode scanner (camera) → fills the Tracking ID field ──
+    // Reader tuned for reading a small 1D barcode inside a full receipt photo:
+    // TRY_HARDER + explicit 1D formats greatly improves real-world detection.
+    function makeBarcodeReader() {
+      const hints = new Map();
+      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+        ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39, ZXing.BarcodeFormat.ITF,
+        ZXing.BarcodeFormat.CODABAR, ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+        ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E, ZXing.BarcodeFormat.QR_CODE
+      ]);
+      return new ZXing.BrowserMultiFormatReader(hints);
+    }
     let scanReader = null;
     window.startScan = async () => {
       if (!window.ZXing || !ZXing.BrowserMultiFormatReader) { toast('⚠️ Scanner not ready — check your connection and retry'); return; }
@@ -1324,9 +1336,9 @@ ${RECEIPT_CSS}
       msg.textContent = 'Point the rear camera at the barcode…';
       modal.classList.add('open');
       try {
-        scanReader = new ZXing.BrowserMultiFormatReader();
+        scanReader = makeBarcodeReader();
         await scanReader.decodeFromConstraints(
-          { video: { facingMode: { ideal: 'environment' } } },
+          { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
           video,
           (result) => {
             if (!result) return;
@@ -1358,7 +1370,7 @@ ${RECEIPT_CSS}
       toast('🔎 Reading photo…');
       const url = URL.createObjectURL(file);
       try {
-        const result = await new ZXing.BrowserMultiFormatReader().decodeFromImageUrl(url);
+        const result = await makeBarcodeReader().decodeFromImageUrl(url);
         const code = String(result.getText ? result.getText() : (result.text || '')).replace(/\s+/g, '').trim();
         if (code) { document.getElementById('trackingId').value = code; toast('✅ Scanned: ' + code); }
         else toast('⚠️ No barcode detected in the photo');

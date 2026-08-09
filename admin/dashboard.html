@@ -2818,6 +2818,8 @@ Thank you for shopping with Pebble Store 🌿`;
     const matById = id => materialsCache.find(m => m.id === id);
     const mErr = (el, txt) => { el.textContent = txt; el.style.cssText = 'display:block;color:#c0392b;font-size:0.8rem'; };
     const num = v => { const n = parseFloat(String(v).replace(/[,₹\s]/g, '')); return isNaN(n) ? 0 : n; };
+    // Title Case for display: first letter of each word capital, rest lowercase
+    const titleCase = s => String(s || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
     const prodLabelById = id => { const p = allProducts.find(x => x.id === id); return p ? prodLabel(p) : id; };
     async function fetchMaterials() { const s = await getDocs(query(collection(db, 'rawMaterials'), orderBy('name'))); materialsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); }
     async function fetchBaseProducts() { const s = await getDocs(query(collection(db, 'baseProducts'), orderBy('name'))); baseProductsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); }
@@ -2959,7 +2961,7 @@ Thank you for shopping with Pebble Store 🌿`;
       const tb = document.getElementById('materialsBody');
       if (!materialsCache.length) { tb.innerHTML = '<tr><td colspan="6" class="loading">No materials yet.</td></tr>'; return; }
       tb.innerHTML = materialsCache.map(m => `<tr>
-        <td><strong>${escapeHtml(m.name)}</strong></td>
+        <td><strong>${escapeHtml(titleCase(m.name))}</strong></td>
         <td>${m.type === 'packaging' ? '📦 Packaging' : '🧪 Ingredient'}</td>
         <td>${m.unit || ''}</td>
         <td style="text-align:right;font-weight:600">${(+(m.stock || 0)).toLocaleString('en-IN')} ${m.unit || ''}</td>

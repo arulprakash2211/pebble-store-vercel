@@ -74,6 +74,15 @@
     .prod-tab{flex:1;padding:0.7rem;text-align:center;cursor:pointer;font-size:0.75rem;letter-spacing:0.1em;text-transform:uppercase;font-weight:500;color:var(--stone);background:var(--warm-white);border:none;font-family:'Jost',sans-serif;transition:all 0.2s}
     .prod-tab.active{background:var(--bark);color:var(--cream)}
     .prod-tab-content{display:none}.prod-tab-content.active{display:block}
+    /* Materials & Production module */
+    .mtabs{display:flex;gap:0;margin-bottom:1.2rem;border:1.5px solid rgba(92,61,46,0.2);flex-wrap:wrap}
+    .mtab{flex:1;min-width:120px;padding:0.7rem;text-align:center;cursor:pointer;font-size:0.75rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;color:var(--stone);background:var(--warm-white);border:none;font-family:'Jost',sans-serif}
+    .mtab.active{background:var(--bark);color:var(--cream)}
+    .mtab-content{display:none}.mtab-content.active{display:block}
+    .mrow-inp{font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.6rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0}
+    table.mini{width:100%;border-collapse:collapse}
+    table.mini th{font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--stone);text-align:left;padding:0.35rem 0.5rem;border-bottom:1.5px solid rgba(92,61,46,0.2)}
+    table.mini td{padding:0.35rem 0.5rem;border-bottom:1px solid rgba(92,61,46,0.12);font-size:0.82rem}
 
     /* PRODUCT GRID */
     .products-grid-admin{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.2rem}
@@ -165,6 +174,7 @@
     <button class="nav-item" onclick="showSection('stock',this)"><span>📈</span> Stock</button>
     <button class="nav-item" onclick="showSection('customers',this)"><span>👤</span> Customers</button>
     <button class="nav-item" onclick="showSection('reports',this)"><span>📊</span> Reports</button>
+    <button class="nav-item" onclick="showSection('materials',this)"><span>🧪</span> Materials</button>
     <div class="sidebar-footer">
       <button class="signout-btn" onclick="doSignOut()">⬅ Sign Out</button>
     </div>
@@ -460,7 +470,119 @@
       </div>
     </div>
 
+    <!-- MATERIALS & PRODUCTION -->
+    <div class="section" id="section-materials">
+      <div class="page-header">
+        <div><div class="page-title">Materials &amp; Production</div><div class="page-sub">Raw-material stock, formulas &amp; manufacturing</div></div>
+      </div>
+      <div class="mtabs">
+        <button class="mtab active" id="mtab-materials" onclick="switchMatTab('materials')">🧪 Raw Materials</button>
+        <button class="mtab" id="mtab-formulas" onclick="switchMatTab('formulas')">📐 Base Products</button>
+        <button class="mtab" id="mtab-production" onclick="switchMatTab('production')">🏭 Production</button>
+      </div>
+
+      <!-- RAW MATERIALS -->
+      <div class="mtab-content active" id="mtab-content-materials">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:0.8rem"><button class="btn btn-primary" onclick="openMaterialModal()">➕ New Material</button></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Material</th><th>Type</th><th>Unit</th><th style="text-align:right">In Stock</th><th style="text-align:right">Avg Cost</th><th>Actions</th></tr></thead>
+          <tbody id="materialsBody"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody>
+        </table></div>
+      </div>
+
+      <!-- BASE PRODUCTS -->
+      <div class="mtab-content" id="mtab-content-formulas">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:0.8rem"><button class="btn btn-primary" onclick="openBaseProductModal()">➕ New Base Product</button></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Base Product</th><th>Batch</th><th style="text-align:center">Ingredients</th><th style="text-align:center">Containers</th><th>Actions</th></tr></thead>
+          <tbody id="baseProductsBody"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody>
+        </table></div>
+      </div>
+
+      <!-- PRODUCTION -->
+      <div class="mtab-content" id="mtab-content-production">
+        <div style="background:var(--cream);padding:1rem;margin-bottom:1.2rem">
+          <div class="mfg" style="max-width:360px;margin-bottom:0.4rem"><label>Base product to manufacture</label>
+            <select id="prodBaseSelect" onchange="renderProductionForm()"><option value="">Select…</option></select>
+          </div>
+          <div id="prodFormArea"></div>
+        </div>
+        <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.6rem">Recent Production</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Base Product</th><th>Filled</th><th>Consumed</th></tr></thead>
+          <tbody id="productionBody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+
   </div>
+
+  <!-- MATERIAL modal -->
+  <div class="modal-overlay" id="materialModal"><div class="modal" style="max-width:420px">
+    <button class="modal-close" onclick="closeModal('materialModal')">×</button>
+    <div class="modal-title" id="materialModalTitle">➕ New Material</div>
+    <div class="mfg"><label>Name *</label><input id="matName" placeholder="e.g. Hibiscus Extract / 100ml Bottle"/></div>
+    <div class="mfg"><label>Type</label><select id="matType"><option value="ingredient">Ingredient</option><option value="packaging">Packaging (bottle/cap/label)</option></select></div>
+    <div class="mfg"><label>Unit</label><select id="matUnit"><option>g</option><option>kg</option><option>ml</option><option>L</option><option>pcs</option></select></div>
+    <div id="matMsg" style="font-size:0.8rem;display:none"></div>
+    <div style="display:flex;gap:0.8rem;margin-top:0.5rem"><button class="btn btn-green" style="flex:1" onclick="saveMaterial()">Save</button><button class="btn btn-ghost" onclick="closeModal('materialModal')">Cancel</button></div>
+  </div></div>
+
+  <!-- STOCK IN modal -->
+  <div class="modal-overlay" id="stockInModal"><div class="modal" style="max-width:420px">
+    <button class="modal-close" onclick="closeModal('stockInModal')">×</button>
+    <div class="modal-title">➕ Add Stock</div>
+    <div id="stockInMat" style="font-size:0.9rem;color:var(--bark);font-weight:600;margin-bottom:0.6rem"></div>
+    <div class="mfg"><label>Quantity added (<span id="stockInUnit"></span>) *</label><input type="number" id="stockInQty" min="0" step="any"/></div>
+    <div class="mfg"><label>Total price paid (₹)</label><input type="number" id="stockInPrice" min="0" step="any" placeholder="Optional"/></div>
+    <div class="mfg"><label>Vendor</label><input id="stockInVendor" placeholder="Vendor / shop name"/></div>
+    <div class="mfg"><label>Date</label><input type="date" id="stockInDate"/></div>
+    <div class="mfg"><label>Note</label><input id="stockInNote" placeholder="Optional"/></div>
+    <div id="stockInMsg" style="font-size:0.8rem;display:none"></div>
+    <div style="display:flex;gap:0.8rem;margin-top:0.5rem"><button class="btn btn-green" style="flex:1" onclick="saveStockIn()">Add Stock</button><button class="btn btn-ghost" onclick="closeModal('stockInModal')">Cancel</button></div>
+  </div></div>
+
+  <!-- STOCK OUT modal -->
+  <div class="modal-overlay" id="stockOutModal"><div class="modal" style="max-width:420px">
+    <button class="modal-close" onclick="closeModal('stockOutModal')">×</button>
+    <div class="modal-title">− Remove Stock</div>
+    <div id="stockOutMat" style="font-size:0.9rem;color:var(--bark);font-weight:600;margin-bottom:0.6rem"></div>
+    <div class="mfg"><label>Quantity removed (<span id="stockOutUnit"></span>) *</label><input type="number" id="stockOutQty" min="0" step="any"/></div>
+    <div class="mfg"><label>Reason</label><input id="stockOutReason" placeholder="e.g. wastage, correction"/></div>
+    <div id="stockOutMsg" style="font-size:0.8rem;display:none"></div>
+    <div style="display:flex;gap:0.8rem;margin-top:0.5rem"><button class="btn btn-red" style="flex:1" onclick="saveStockOut()">Remove</button><button class="btn btn-ghost" onclick="closeModal('stockOutModal')">Cancel</button></div>
+  </div></div>
+
+  <!-- MATERIAL HISTORY modal -->
+  <div class="modal-overlay" id="matHistoryModal"><div class="modal" style="max-width:600px;width:100%">
+    <button class="modal-close" onclick="closeModal('matHistoryModal')">×</button>
+    <div class="modal-title" id="matHistoryTitle">History</div>
+    <div class="table-wrap" style="max-height:60vh;overflow:auto"><table>
+      <thead><tr><th>Date</th><th>Type</th><th style="text-align:right">Qty</th><th style="text-align:right">Price</th><th>Vendor / Note</th></tr></thead>
+      <tbody id="matHistoryBody"></tbody>
+    </table></div>
+    <div style="margin-top:1rem"><button class="btn btn-ghost" onclick="closeModal('matHistoryModal')">Close</button></div>
+  </div></div>
+
+  <!-- BASE PRODUCT modal -->
+  <div class="modal-overlay" id="baseProductModal"><div class="modal" style="max-width:660px;width:100%;max-height:90vh;overflow:auto">
+    <button class="modal-close" onclick="closeModal('baseProductModal')">×</button>
+    <div class="modal-title" id="baseProductModalTitle">➕ New Base Product</div>
+    <div class="mfg"><label>Name *</label><input id="bpName" placeholder="e.g. Hibiscus Silky Shine Shampoo"/></div>
+    <div style="display:flex;gap:0.8rem">
+      <div class="mfg" style="flex:1"><label>Batch base quantity *</label><input type="number" id="bpBaseQty" min="0" step="any" placeholder="1000"/></div>
+      <div class="mfg" style="width:120px"><label>Base unit</label><select id="bpBaseUnit"><option>ml</option><option>g</option><option>L</option><option>kg</option></select></div>
+    </div>
+    <div style="font-weight:600;color:var(--bark);margin:0.6rem 0 0.4rem">Formula — ingredients per batch</div>
+    <div id="bpFormulaRows"></div>
+    <button class="btn btn-ghost btn-sm" onclick="addFormulaRow()">➕ Add ingredient</button>
+    <div style="font-weight:600;color:var(--bark);margin:1rem 0 0.3rem">Container options (fill sizes)</div>
+    <div style="font-size:0.72rem;color:var(--stone);margin-bottom:0.5rem">Size is in the base unit above. Each container maps to a sellable product and can consume packaging.</div>
+    <div id="bpContainerRows"></div>
+    <button class="btn btn-ghost btn-sm" onclick="addContainerRow()">➕ Add container</button>
+    <div id="bpMsg" style="font-size:0.8rem;display:none;margin-top:0.6rem"></div>
+    <div style="display:flex;gap:0.8rem;margin-top:0.9rem"><button class="btn btn-green" style="flex:1" onclick="saveBaseProduct()">Save Base Product</button><button class="btn btn-ghost" onclick="closeModal('baseProductModal')">Cancel</button></div>
+  </div></div>
 
   <!-- PACKING SUMMARY MODAL -->
   <div class="modal-overlay" id="packingModal">
@@ -718,6 +840,7 @@
       if (name === 'stock')     loadStockTable();
       if (name === 'customers') loadCustomers();
       if (name === 'reports')   { initReportDefaults(); loadReports(); }
+      if (name === 'materials') switchMatTab('materials');
     };
 
     // ── Product tab switch ──
@@ -2670,12 +2793,358 @@ Thank you for shopping with Pebble Store 🌿`;
 
     // Click-outside closes these modals. NOT newOrderModal — it holds a lot of
     // typed data, so accidental outside clicks must not discard it (use Cancel/✕).
-    ['dispatchModal','stockModal','packingModal','whatsappModal'].forEach(id => {
+    ['dispatchModal','stockModal','packingModal','whatsappModal','materialModal','stockInModal','stockOutModal','matHistoryModal'].forEach(id => {
       document.getElementById(id).addEventListener('click', e => { if (e.target === document.getElementById(id)) closeModal(id); });
     });
     // Scanner: clicking outside stops the camera too
     document.getElementById('scanModal').addEventListener('click', e => { if (e.target.id === 'scanModal') stopScan(); });
     document.getElementById('photoZoomModal').addEventListener('click', e => { if (e.target.id === 'photoZoomModal') pzClose(); });
+
+    // ══════════════════════════════
+    // MATERIALS & PRODUCTION
+    // ══════════════════════════════
+    let materialsCache = [], baseProductsCache = [];
+    const matById = id => materialsCache.find(m => m.id === id);
+    const mErr = (el, txt) => { el.textContent = txt; el.style.cssText = 'display:block;color:#c0392b;font-size:0.8rem'; };
+    const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+    const prodLabelById = id => { const p = allProducts.find(x => x.id === id); return p ? prodLabel(p) : id; };
+    async function fetchMaterials() { const s = await getDocs(query(collection(db, 'rawMaterials'), orderBy('name'))); materialsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); }
+    async function fetchBaseProducts() { const s = await getDocs(query(collection(db, 'baseProducts'), orderBy('name'))); baseProductsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); }
+
+    window.switchMatTab = (tab) => {
+      document.querySelectorAll('#section-materials .mtab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('#section-materials .mtab-content').forEach(t => t.classList.remove('active'));
+      document.getElementById('mtab-' + tab).classList.add('active');
+      document.getElementById('mtab-content-' + tab).classList.add('active');
+      if (tab === 'materials')  loadMaterials();
+      if (tab === 'formulas')   loadBaseProducts();
+      if (tab === 'production')  loadProductionTab();
+    };
+
+    // ── Raw materials ──
+    async function loadMaterials() {
+      const tb = document.getElementById('materialsBody');
+      tb.innerHTML = '<tr><td colspan="6" class="loading">Loading…</td></tr>';
+      try { await fetchMaterials(); renderMaterials(); }
+      catch (e) { tb.innerHTML = `<tr><td colspan="6" class="loading">Error: ${e.message}</td></tr>`; }
+    }
+    function renderMaterials() {
+      const tb = document.getElementById('materialsBody');
+      if (!materialsCache.length) { tb.innerHTML = '<tr><td colspan="6" class="loading">No materials yet.</td></tr>'; return; }
+      tb.innerHTML = materialsCache.map(m => `<tr>
+        <td><strong>${escapeHtml(m.name)}</strong></td>
+        <td>${m.type === 'packaging' ? '📦 Packaging' : '🧪 Ingredient'}</td>
+        <td>${m.unit || ''}</td>
+        <td style="text-align:right;font-weight:600">${(+(m.stock || 0)).toLocaleString('en-IN')} ${m.unit || ''}</td>
+        <td style="text-align:right">${m.avgCost ? '₹' + (+m.avgCost).toFixed(2) : '—'}</td>
+        <td><div class="action-btns">
+          <button class="btn btn-sm btn-green" onclick="openStockIn('${m.id}')">➕ Stock</button>
+          <button class="btn btn-sm btn-red" style="margin-top:3px" onclick="openStockOut('${m.id}')">− Remove</button>
+          <button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="openMatHistory('${m.id}')">History</button>
+          <button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openMaterialModal('${m.id}')">Edit</button>
+        </div></td></tr>`).join('');
+    }
+
+    let editingMaterialId = null;
+    window.openMaterialModal = (id) => {
+      editingMaterialId = id || null;
+      const m = id ? matById(id) : null;
+      document.getElementById('materialModalTitle').textContent = m ? '✏️ Edit Material' : '➕ New Material';
+      document.getElementById('matName').value = m ? (m.name || '') : '';
+      document.getElementById('matType').value = m ? (m.type || 'ingredient') : 'ingredient';
+      document.getElementById('matUnit').value = m ? (m.unit || 'g') : 'g';
+      document.getElementById('matMsg').style.display = 'none';
+      document.getElementById('materialModal').classList.add('open');
+    };
+    window.saveMaterial = async () => {
+      const msg = document.getElementById('matMsg');
+      const name = document.getElementById('matName').value.trim();
+      if (!name) { mErr(msg, '⚠️ Name is required'); return; }
+      const data = { name, type: document.getElementById('matType').value, unit: document.getElementById('matUnit').value, updatedAt: new Date().toISOString() };
+      try {
+        if (editingMaterialId) await updateDoc(doc(db, 'rawMaterials', editingMaterialId), data);
+        else { data.stock = 0; data.avgCost = 0; data.createdAt = new Date().toISOString(); await addDoc(collection(db, 'rawMaterials'), data); }
+        toast('✅ Saved'); closeModal('materialModal'); loadMaterials();
+      } catch (e) { mErr(msg, '❌ ' + e.message); }
+    };
+
+    let stockInMatId = null;
+    window.openStockIn = (id) => {
+      const m = matById(id); if (!m) return; stockInMatId = id;
+      document.getElementById('stockInMat').textContent = m.name;
+      document.getElementById('stockInUnit').textContent = m.unit || '';
+      ['stockInQty','stockInPrice','stockInVendor','stockInNote'].forEach(i => document.getElementById(i).value = '');
+      const t = new Date(); document.getElementById('stockInDate').value = new Date(t.getTime() - t.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+      document.getElementById('stockInMsg').style.display = 'none';
+      document.getElementById('stockInModal').classList.add('open');
+    };
+    window.saveStockIn = async () => {
+      const msg = document.getElementById('stockInMsg');
+      const m = matById(stockInMatId); if (!m) return;
+      const qty = num(document.getElementById('stockInQty').value);
+      if (!(qty > 0)) { mErr(msg, '⚠️ Enter a valid quantity'); return; }
+      const price = num(document.getElementById('stockInPrice').value);
+      const vendor = document.getElementById('stockInVendor').value.trim();
+      const note = document.getElementById('stockInNote').value.trim();
+      const dateVal = document.getElementById('stockInDate').value;
+      const at = dateVal ? new Date(dateVal + 'T12:00:00').toISOString() : new Date().toISOString();
+      const oldStock = +(m.stock || 0), oldAvg = +(m.avgCost || 0);
+      const newStock = oldStock + qty;
+      const costAdded = price > 0 ? price : oldAvg * qty;   // weighted-average cost
+      const newAvg = newStock > 0 ? (oldStock * oldAvg + costAdded) / newStock : oldAvg;
+      try {
+        await updateDoc(doc(db, 'rawMaterials', m.id), { stock: newStock, avgCost: newAvg, updatedAt: new Date().toISOString() });
+        await addDoc(collection(db, 'materialMovements'), { materialId: m.id, materialName: m.name, type: 'add', qty, price, unitCost: price > 0 ? price / qty : oldAvg, vendor, note, at, balanceAfter: newStock });
+        toast('✅ Stock added'); closeModal('stockInModal'); loadMaterials();
+      } catch (e) { mErr(msg, '❌ ' + e.message); }
+    };
+
+    let stockOutMatId = null;
+    window.openStockOut = (id) => {
+      const m = matById(id); if (!m) return; stockOutMatId = id;
+      document.getElementById('stockOutMat').textContent = `${m.name} · in stock: ${(+(m.stock || 0))} ${m.unit || ''}`;
+      document.getElementById('stockOutUnit').textContent = m.unit || '';
+      document.getElementById('stockOutQty').value = '';
+      document.getElementById('stockOutReason').value = '';
+      document.getElementById('stockOutMsg').style.display = 'none';
+      document.getElementById('stockOutModal').classList.add('open');
+    };
+    window.saveStockOut = async () => {
+      const msg = document.getElementById('stockOutMsg');
+      const m = matById(stockOutMatId); if (!m) return;
+      const qty = num(document.getElementById('stockOutQty').value);
+      if (!(qty > 0)) { mErr(msg, '⚠️ Enter a valid quantity'); return; }
+      if (qty > +(m.stock || 0) && !confirm('That is more than the current stock. Continue and set stock to 0?')) return;
+      const newStock = Math.max(0, +(m.stock || 0) - qty);
+      const now = new Date().toISOString();
+      try {
+        await updateDoc(doc(db, 'rawMaterials', m.id), { stock: newStock, updatedAt: now });
+        await addDoc(collection(db, 'materialMovements'), { materialId: m.id, materialName: m.name, type: 'remove', qty, note: document.getElementById('stockOutReason').value.trim(), at: now, balanceAfter: newStock });
+        toast('✅ Stock removed'); closeModal('stockOutModal'); loadMaterials();
+      } catch (e) { mErr(msg, '❌ ' + e.message); }
+    };
+
+    window.openMatHistory = async (id) => {
+      const m = matById(id); if (!m) return;
+      document.getElementById('matHistoryTitle').textContent = 'History — ' + m.name;
+      const tb = document.getElementById('matHistoryBody');
+      tb.innerHTML = '<tr><td colspan="5" class="loading">Loading…</td></tr>';
+      document.getElementById('matHistoryModal').classList.add('open');
+      try {
+        const snap = await getDocs(query(collection(db, 'materialMovements'), where('materialId', '==', id)));
+        const rows = snap.docs.map(d => d.data()).sort((a, b) => new Date(b.at) - new Date(a.at));
+        tb.innerHTML = rows.length ? rows.map(r => {
+          const d = new Date(r.at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+          const sign = r.type === 'add' ? '+' : '−';
+          const lbl = r.type === 'add' ? 'Added' : (r.type === 'production' ? 'Production' : 'Removed');
+          return `<tr><td>${d}</td><td>${lbl}</td><td style="text-align:right">${sign}${(+r.qty).toLocaleString('en-IN')} ${m.unit || ''}</td><td style="text-align:right">${r.price ? '₹' + r.price : '—'}</td><td>${escapeHtml(r.vendor || r.note || '')}</td></tr>`;
+        }).join('') : '<tr><td colspan="5" class="loading">No movements yet.</td></tr>';
+      } catch (e) { tb.innerHTML = `<tr><td colspan="5" class="loading">Error: ${e.message}</td></tr>`; }
+    };
+
+    // ── Base products (formulas) ──
+    async function loadBaseProducts() {
+      const tb = document.getElementById('baseProductsBody');
+      tb.innerHTML = '<tr><td colspan="5" class="loading">Loading…</td></tr>';
+      try { if (!materialsCache.length) await fetchMaterials(); await fetchBaseProducts(); renderBaseProducts(); }
+      catch (e) { tb.innerHTML = `<tr><td colspan="5" class="loading">Error: ${e.message}</td></tr>`; }
+    }
+    function renderBaseProducts() {
+      const tb = document.getElementById('baseProductsBody');
+      if (!baseProductsCache.length) { tb.innerHTML = '<tr><td colspan="5" class="loading">No base products yet.</td></tr>'; return; }
+      tb.innerHTML = baseProductsCache.map(b => `<tr>
+        <td><strong>${escapeHtml(b.name)}</strong></td>
+        <td>${b.baseQty} ${b.baseUnit}</td>
+        <td style="text-align:center">${(b.formula || []).length}</td>
+        <td style="text-align:center">${(b.containers || []).length}</td>
+        <td><div class="action-btns"><button class="btn btn-sm btn-clay" onclick="openBaseProductModal('${b.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="deleteBaseProduct('${b.id}')">Delete</button></div></td></tr>`).join('');
+    }
+    const matOptions = (selId, type) => materialsCache.filter(m => !type || m.type === type).map(m => `<option value="${m.id}" ${m.id === selId ? 'selected' : ''}>${escapeHtml(m.name)} (${m.unit})</option>`).join('');
+    const prodOptions = (selId) => '<option value="">— not sold / none —</option>' + allProducts.map(p => `<option value="${p.id}" ${p.id === selId ? 'selected' : ''}>${escapeHtml(prodLabel(p))}</option>`).join('');
+
+    window.addFormulaRow = (mId, qty) => {
+      const div = document.createElement('div');
+      div.className = 'bp-frow';
+      div.style.cssText = 'display:flex;gap:0.5rem;margin-bottom:0.4rem;align-items:center';
+      div.innerHTML = `<select class="mrow-inp bp-fmat" style="flex:1">${matOptions(mId, 'ingredient')}</select>
+        <input type="number" class="mrow-inp bp-fqty" step="any" min="0" placeholder="qty" value="${qty != null ? qty : ''}" style="width:100px"/>
+        <button class="btn btn-sm btn-red" onclick="this.parentNode.remove()">✕</button>`;
+      document.getElementById('bpFormulaRows').appendChild(div);
+    };
+    window.addPackRow = (wrap, mId, qty) => {
+      const div = document.createElement('div');
+      div.style.cssText = 'display:flex;gap:0.5rem;margin-bottom:0.3rem;align-items:center';
+      div.innerHTML = `<select class="mrow-inp bp-pmat" style="flex:1">${matOptions(mId, 'packaging')}</select>
+        <input type="number" class="mrow-inp bp-pqty" step="any" min="0" placeholder="qty/container" value="${qty != null ? qty : 1}" style="width:120px"/>
+        <button class="btn btn-sm btn-red" onclick="this.parentNode.remove()">✕</button>`;
+      wrap.appendChild(div);
+    };
+    window.addContainerRow = (c) => {
+      c = c || {};
+      const div = document.createElement('div');
+      div.className = 'bp-crow';
+      div.style.cssText = 'border:1px solid rgba(92,61,46,0.2);padding:0.6rem;margin-bottom:0.6rem';
+      div.innerHTML = `
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+          <input class="mrow-inp bp-clabel" placeholder="Label e.g. 100ml" value="${escapeHtml(c.label || '')}" style="width:130px"/>
+          <input type="number" class="mrow-inp bp-csize" step="any" min="0" placeholder="size" value="${c.size != null ? c.size : ''}" style="width:90px"/>
+          <select class="mrow-inp bp-cprod" style="flex:1;min-width:160px">${prodOptions(c.productId)}</select>
+          <button class="btn btn-sm btn-red" onclick="this.closest('.bp-crow').remove()">✕</button>
+        </div>
+        <div style="font-size:0.68rem;color:var(--stone);margin:0.45rem 0 0.25rem">Packaging used per container:</div>
+        <div class="bp-pack"></div>
+        <button class="btn btn-sm btn-ghost" onclick="addPackRow(this.previousElementSibling)">➕ packaging</button>`;
+      document.getElementById('bpContainerRows').appendChild(div);
+      const packWrap = div.querySelector('.bp-pack');
+      (c.packaging || []).forEach(p => addPackRow(packWrap, p.materialId, p.qty));
+    };
+
+    let editingBaseProductId = null;
+    window.openBaseProductModal = async (id) => {
+      await ensureProductsLoaded();
+      if (!materialsCache.length) await fetchMaterials();
+      editingBaseProductId = id || null;
+      const b = id ? baseProductsCache.find(x => x.id === id) : null;
+      document.getElementById('baseProductModalTitle').textContent = b ? '✏️ Edit Base Product' : '➕ New Base Product';
+      document.getElementById('bpName').value = b ? (b.name || '') : '';
+      document.getElementById('bpBaseQty').value = b ? (b.baseQty || '') : '';
+      document.getElementById('bpBaseUnit').value = b ? (b.baseUnit || 'ml') : 'ml';
+      document.getElementById('bpFormulaRows').innerHTML = '';
+      document.getElementById('bpContainerRows').innerHTML = '';
+      document.getElementById('bpMsg').style.display = 'none';
+      if (b) { (b.formula || []).forEach(f => addFormulaRow(f.materialId, f.qty)); (b.containers || []).forEach(c => addContainerRow(c)); }
+      else { addFormulaRow(); addContainerRow(); }
+      document.getElementById('baseProductModal').classList.add('open');
+    };
+    window.saveBaseProduct = async () => {
+      const msg = document.getElementById('bpMsg');
+      const name = document.getElementById('bpName').value.trim();
+      const baseQty = num(document.getElementById('bpBaseQty').value);
+      const baseUnit = document.getElementById('bpBaseUnit').value;
+      if (!name || !(baseQty > 0)) { mErr(msg, '⚠️ Name and a valid base quantity are required'); return; }
+      const formula = [];
+      document.querySelectorAll('#bpFormulaRows .bp-frow').forEach(r => {
+        const mId = r.querySelector('.bp-fmat').value, qty = num(r.querySelector('.bp-fqty').value);
+        if (mId && qty > 0) { const m = matById(mId); formula.push({ materialId: mId, materialName: m ? m.name : '', qty, unit: m ? m.unit : '' }); }
+      });
+      if (!formula.length) { mErr(msg, '⚠️ Add at least one ingredient'); return; }
+      const containers = [];
+      document.querySelectorAll('#bpContainerRows .bp-crow').forEach(r => {
+        const label = r.querySelector('.bp-clabel').value.trim();
+        const size = num(r.querySelector('.bp-csize').value);
+        if (!label || !(size > 0)) return;
+        const packaging = [];
+        r.querySelectorAll('.bp-pack > div').forEach(pr => {
+          const pmId = pr.querySelector('.bp-pmat').value, pqty = num(pr.querySelector('.bp-pqty').value);
+          if (pmId && pqty > 0) { const pm = matById(pmId); packaging.push({ materialId: pmId, materialName: pm ? pm.name : '', qty: pqty }); }
+        });
+        containers.push({ label, size, productId: r.querySelector('.bp-cprod').value, packaging });
+      });
+      const data = { name, baseQty, baseUnit, formula, containers, updatedAt: new Date().toISOString() };
+      try {
+        if (editingBaseProductId) await updateDoc(doc(db, 'baseProducts', editingBaseProductId), data);
+        else { data.createdAt = new Date().toISOString(); await addDoc(collection(db, 'baseProducts'), data); }
+        toast('✅ Base product saved'); closeModal('baseProductModal'); loadBaseProducts();
+      } catch (e) { mErr(msg, '❌ ' + e.message); }
+    };
+    window.deleteBaseProduct = async (id) => { if (!confirm('Delete this base product?')) return; try { await deleteDoc(doc(db, 'baseProducts', id)); toast('🗑️ Deleted'); loadBaseProducts(); } catch (e) { toast('❌ ' + e.message); } };
+
+    // ── Production ──
+    async function loadProductionTab() {
+      await ensureProductsLoaded();
+      if (!materialsCache.length) await fetchMaterials();
+      await fetchBaseProducts();
+      const sel = document.getElementById('prodBaseSelect');
+      sel.innerHTML = '<option value="">Select…</option>' + baseProductsCache.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+      document.getElementById('prodFormArea').innerHTML = '';
+      loadProductionRuns();
+    }
+    window.renderProductionForm = () => {
+      const b = baseProductsCache.find(x => x.id === document.getElementById('prodBaseSelect').value);
+      const area = document.getElementById('prodFormArea');
+      if (!b) { area.innerHTML = ''; return; }
+      if (!(b.containers || []).length) { area.innerHTML = '<div style="color:#c0392b;font-size:0.85rem;margin-top:0.6rem">This base product has no container options — edit it to add some.</div>'; return; }
+      area.innerHTML = `
+        <div style="font-size:0.8rem;color:var(--stone);margin:0.6rem 0 0.4rem">How many of each container are you filling?</div>
+        <div id="prodContainers">${b.containers.map((c, i) => `
+          <div style="display:flex;gap:0.6rem;align-items:center;margin-bottom:0.4rem">
+            <span style="flex:1"><strong>${escapeHtml(c.label)}</strong> <span style="color:var(--stone);font-size:0.78rem">(${c.size} ${b.baseUnit}${c.productId ? ' → ' + escapeHtml(prodLabelById(c.productId)) : ''})</span></span>
+            <input type="number" min="0" step="1" class="mrow-inp prod-count" data-idx="${i}" value="0" oninput="updateProductionPreview()" style="width:100px"/>
+          </div>`).join('')}</div>
+        <div id="prodPreview" style="margin-top:0.8rem"></div>
+        <button class="btn btn-green" style="margin-top:0.8rem" onclick="doProduce()">🏭 Produce &amp; Deduct Stock</button>`;
+      updateProductionPreview();
+    };
+    function computeProduction() {
+      const b = baseProductsCache.find(x => x.id === document.getElementById('prodBaseSelect').value);
+      if (!b) return null;
+      const fills = []; let totalBase = 0;
+      document.querySelectorAll('#prodContainers .prod-count').forEach(inp => {
+        const idx = +inp.dataset.idx, count = parseInt(inp.value) || 0, c = b.containers[idx];
+        if (count > 0) { fills.push({ ...c, count }); totalBase += (+c.size) * count; }
+      });
+      const mult = b.baseQty > 0 ? totalBase / b.baseQty : 0;
+      const need = {};
+      (b.formula || []).forEach(f => { need[f.materialId] = (need[f.materialId] || 0) + (+f.qty) * mult; });
+      fills.forEach(fl => (fl.packaging || []).forEach(p => { need[p.materialId] = (need[p.materialId] || 0) + (+p.qty) * fl.count; }));
+      return { b, fills, totalBase, mult, need };
+    }
+    window.updateProductionPreview = () => {
+      const el = document.getElementById('prodPreview'); if (!el) return;
+      const r = computeProduction();
+      if (!r || !r.fills.length) { el.innerHTML = '<div style="font-size:0.8rem;color:var(--stone)">Enter quantities to see material usage.</div>'; return; }
+      let short = false;
+      const rows = Object.entries(r.need).map(([mid, q]) => {
+        const m = matById(mid), have = m ? +(m.stock || 0) : 0, ok = have >= q; if (!ok) short = true;
+        return `<tr><td>${m ? escapeHtml(m.name) : mid}</td><td style="text-align:right">${q.toFixed(2)} ${m ? m.unit : ''}</td><td style="text-align:right">${have.toFixed(2)}</td><td style="text-align:center">${ok ? '✓' : '<span style="color:#c0392b">short</span>'}</td></tr>`;
+      }).join('');
+      el.innerHTML = `<div style="font-size:0.78rem;color:var(--stone);margin-bottom:0.3rem">Batch ×${r.mult.toFixed(2)} · total ${r.totalBase} ${r.b.baseUnit}</div>
+        <table class="mini"><thead><tr><th>Material</th><th style="text-align:right">Needed</th><th style="text-align:right">In stock</th><th style="text-align:center">OK</th></tr></thead><tbody>${rows}</tbody></table>
+        ${short ? '<div style="color:#c0392b;font-size:0.8rem;margin-top:0.4rem">⚠️ Some materials are short — producing will set them to 0.</div>' : ''}`;
+    };
+    window.doProduce = async () => {
+      const r = computeProduction();
+      if (!r || !r.fills.length) { toast('Enter quantities first'); return; }
+      if (!confirm('Produce this batch, deduct raw materials and add finished stock?')) return;
+      const now = new Date().toISOString();
+      try {
+        for (const [mid, q] of Object.entries(r.need)) {
+          const m = matById(mid); if (!m) continue;
+          const newStock = Math.max(0, +(m.stock || 0) - q);
+          await updateDoc(doc(db, 'rawMaterials', mid), { stock: newStock, updatedAt: now });
+          await addDoc(collection(db, 'materialMovements'), { materialId: mid, materialName: m.name, type: 'production', qty: q, note: 'Production: ' + r.b.name, at: now, balanceAfter: newStock });
+          m.stock = newStock;
+        }
+        for (const fl of r.fills) {
+          if (!fl.productId) continue;
+          const p = allProducts.find(x => x.id === fl.productId);
+          const cur = p ? +(p.stock || 0) : 0;
+          await updateDoc(doc(db, 'products', fl.productId), { stock: cur + fl.count, updatedAt: now });
+          if (p) p.stock = cur + fl.count;
+        }
+        await addDoc(collection(db, 'productionRuns'), {
+          baseProductId: r.b.id, baseProductName: r.b.name, totalBase: r.totalBase, batches: r.mult,
+          fills: r.fills.map(f => ({ label: f.label, size: f.size, count: f.count, productId: f.productId || '' })),
+          consumed: Object.entries(r.need).map(([mid, q]) => { const m = matById(mid); return { materialId: mid, name: m ? m.name : '', qty: q, unit: m ? m.unit : '' }; }),
+          at: now
+        });
+        toast('✅ Produced! Stock updated'); loadProductionTab();
+      } catch (e) { toast('❌ ' + e.message); }
+    };
+    async function loadProductionRuns() {
+      const tb = document.getElementById('productionBody');
+      tb.innerHTML = '<tr><td colspan="4" class="loading">Loading…</td></tr>';
+      try {
+        const snap = await getDocs(query(collection(db, 'productionRuns'), orderBy('at', 'desc'), limit(30)));
+        const runs = snap.docs.map(d => d.data());
+        tb.innerHTML = runs.length ? runs.map(r => {
+          const d = new Date(r.at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+          const filled = (r.fills || []).map(f => `${f.count}×${escapeHtml(f.label)}`).join(', ');
+          const consumed = (r.consumed || []).map(c => `${escapeHtml(c.name)}: ${(+c.qty).toFixed(1)}${c.unit || ''}`).join('<br>');
+          return `<tr><td style="white-space:nowrap">${d}</td><td>${escapeHtml(r.baseProductName || '')}</td><td>${filled}</td><td style="font-size:0.75rem">${consumed}</td></tr>`;
+        }).join('') : '<tr><td colspan="4" class="loading">No production yet.</td></tr>';
+      } catch (e) { tb.innerHTML = `<tr><td colspan="4" class="loading">Error: ${e.message}</td></tr>`; }
+    }
   </script>
 </body>
 </html>

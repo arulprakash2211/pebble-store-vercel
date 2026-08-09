@@ -3225,75 +3225,112 @@ Thank you for shopping with Pebble Store 🌿`;
       document.getElementById('prodFormArea').innerHTML = '';
       loadProductionRuns();
     }
+    let prodMode = 'containers';
+    window.setProdMode = (m) => { prodMode = m; renderProductionForm(); };
     window.renderProductionForm = () => {
       const b = baseProductsCache.find(x => x.id === document.getElementById('prodBaseSelect').value);
       const area = document.getElementById('prodFormArea');
       if (!b) { area.innerHTML = ''; return; }
-      if (!(b.containers || []).length) { area.innerHTML = '<div style="color:#c0392b;font-size:0.85rem;margin-top:0.6rem">This base product has no container options — edit it to add some.</div>'; return; }
-      area.innerHTML = `
-        <div style="font-size:0.8rem;color:var(--stone);margin:0.6rem 0 0.4rem">How many of each container are you filling?</div>
-        <div id="prodContainers">${b.containers.map((c, i) => `
-          <div style="display:flex;gap:0.6rem;align-items:center;margin-bottom:0.4rem">
-            <span style="flex:1"><strong>${escapeHtml(c.label)}</strong> <span style="color:var(--stone);font-size:0.78rem">(${c.size} ${b.baseUnit}${c.productId ? ' → ' + escapeHtml(prodLabelById(c.productId)) : ''})</span></span>
-            <input type="number" min="0" step="1" class="mrow-inp prod-count" data-idx="${i}" value="0" oninput="updateProductionPreview()" style="width:100px"/>
-          </div>`).join('')}</div>
-        <div id="prodPreview" style="margin-top:0.8rem"></div>
+      const bulk = +(b.bulkStock || 0);
+      const toggle = `<div style="display:flex;gap:0.4rem;margin:0.6rem 0 0.4rem">
+          <button class="ostab ${prodMode === 'containers' ? 'active' : ''}" onclick="setProdMode('containers')">Fill Containers</button>
+          <button class="ostab ${prodMode === 'bulk' ? 'active' : ''}" onclick="setProdMode('bulk')">Bulk (decide later)</button>
+        </div>
+        <div style="font-size:0.78rem;color:var(--stone);margin-bottom:0.5rem">Bulk mix in stock: <strong>${bulk.toLocaleString('en-IN')} ${b.baseUnit}</strong></div>`;
+      let body;
+      if (prodMode === 'bulk') {
+        body = `<div class="mfg" style="max-width:260px"><label>Quantity to make (${b.baseUnit})</label>
+            <input type="number" min="0" step="any" id="prodBulkQty" class="mrow-inp" oninput="updateProductionPreview()"/></div>
+          <div style="font-size:0.72rem;color:var(--stone)">Consumes ingredients and adds to the bulk mix — fill into containers later.</div>`;
+      } else if (!(b.containers || []).length) {
+        body = '<div style="color:#c0392b;font-size:0.85rem">No container options — edit this base product to add some, or use Bulk mode.</div>';
+      } else {
+        body = `<div style="font-size:0.8rem;color:var(--stone);margin-bottom:0.4rem">How many of each container are you filling?</div>
+          <div id="prodContainers">${b.containers.map((c, i) => `
+            <div style="display:flex;gap:0.6rem;align-items:center;margin-bottom:0.4rem">
+              <span style="flex:1"><strong>${escapeHtml(c.label)}</strong> <span style="color:var(--stone);font-size:0.78rem">(${c.size} ${b.baseUnit}${c.productId ? ' → ' + escapeHtml(prodLabelById(c.productId)) : ''})</span></span>
+              <input type="number" min="0" step="1" class="mrow-inp prod-count" data-idx="${i}" value="0" oninput="updateProductionPreview()" style="width:100px"/>
+            </div>`).join('')}</div>`;
+      }
+      area.innerHTML = toggle + body + `<div id="prodPreview" style="margin-top:0.8rem"></div>
         <button class="btn btn-green" style="margin-top:0.8rem" onclick="doProduce()">🏭 Produce &amp; Deduct Stock</button>`;
       updateProductionPreview();
     };
     function computeProduction() {
       const b = baseProductsCache.find(x => x.id === document.getElementById('prodBaseSelect').value);
       if (!b) return null;
+      const bulk = +(b.bulkStock || 0);
+      if (prodMode === 'bulk') {
+        const qty = num(document.getElementById('prodBulkQty') ? document.getElementById('prodBulkQty').value : 0);
+        const mult = b.baseQty > 0 ? qty / b.baseQty : 0;
+        const need = {}; (b.formula || []).forEach(f => { need[f.materialId] = (need[f.materialId] || 0) + (+f.qty) * mult; });
+        return { b, mode: 'bulk', qty, mult, need, fills: [], bulk };
+      }
       const fills = []; let totalBase = 0;
       document.querySelectorAll('#prodContainers .prod-count').forEach(inp => {
         const idx = +inp.dataset.idx, count = parseInt(inp.value) || 0, c = b.containers[idx];
         if (count > 0) { fills.push({ ...c, count }); totalBase += (+c.size) * count; }
       });
-      const mult = b.baseQty > 0 ? totalBase / b.baseQty : 0;
+      const fromBulk = Math.min(bulk, totalBase);
+      const freshBase = Math.max(0, totalBase - fromBulk);
+      const mult = b.baseQty > 0 ? freshBase / b.baseQty : 0;
       const need = {};
-      (b.formula || []).forEach(f => { need[f.materialId] = (need[f.materialId] || 0) + (+f.qty) * mult; });
+      (b.formula || []).forEach(f => { need[f.materialId] = (need[f.materialId] || 0) + (+f.qty) * mult; });   // only for the fresh portion
       fills.forEach(fl => (fl.packaging || []).forEach(p => { need[p.materialId] = (need[p.materialId] || 0) + (+p.qty) * fl.count; }));
-      return { b, fills, totalBase, mult, need };
+      return { b, mode: 'containers', fills, totalBase, fromBulk, freshBase, mult, need, bulk };
     }
     window.updateProductionPreview = () => {
       const el = document.getElementById('prodPreview'); if (!el) return;
-      const r = computeProduction();
-      if (!r || !r.fills.length) { el.innerHTML = '<div style="font-size:0.8rem;color:var(--stone)">Enter quantities to see material usage.</div>'; return; }
+      const r = computeProduction(); if (!r) { el.innerHTML = ''; return; }
+      const hasInput = r.mode === 'bulk' ? r.qty > 0 : r.fills.length > 0;
+      if (!hasInput) { el.innerHTML = `<div style="font-size:0.8rem;color:var(--stone)">Enter ${r.mode === 'bulk' ? 'a quantity' : 'container counts'} to see material usage.</div>`; return; }
       let short = false;
-      const rows = Object.entries(r.need).map(([mid, q]) => {
+      const rows = Object.entries(r.need).filter(([, q]) => q > 0).map(([mid, q]) => {
         const m = matById(mid), have = m ? +(m.stock || 0) : 0, ok = have >= q; if (!ok) short = true;
-        return `<tr><td>${m ? escapeHtml(m.name) : mid}</td><td style="text-align:right">${q.toFixed(2)} ${m ? m.unit : ''}</td><td style="text-align:right">${have.toFixed(2)}</td><td style="text-align:center">${ok ? '✓' : '<span style="color:#c0392b">short</span>'}</td></tr>`;
+        return `<tr><td>${m ? escapeHtml(titleCase(m.name)) : mid}</td><td style="text-align:right">${q.toFixed(2)} ${m ? m.unit : ''}</td><td style="text-align:right">${have.toFixed(2)}</td><td style="text-align:center">${ok ? '✓' : '<span style="color:#c0392b">short</span>'}</td></tr>`;
       }).join('');
-      el.innerHTML = `<div style="font-size:0.78rem;color:var(--stone);margin-bottom:0.3rem">Batch ×${r.mult.toFixed(2)} · total ${r.totalBase} ${r.b.baseUnit}</div>
-        <table class="mini"><thead><tr><th>Material</th><th style="text-align:right">Needed</th><th style="text-align:right">In stock</th><th style="text-align:center">OK</th></tr></thead><tbody>${rows}</tbody></table>
-        ${short ? '<div style="color:#c0392b;font-size:0.8rem;margin-top:0.4rem">⚠️ Some materials are short — producing will set them to 0.</div>' : ''}`;
+      const head = r.mode === 'bulk'
+        ? `Batch ×${r.mult.toFixed(2)} · makes ${r.qty} ${r.b.baseUnit} of bulk mix`
+        : `Total ${r.totalBase} ${r.b.baseUnit}${r.fromBulk > 0 ? ` · from bulk ${r.fromBulk} · fresh ${r.freshBase}` : ''} · batch ×${r.mult.toFixed(2)}`;
+      el.innerHTML = `<div style="font-size:0.78rem;color:var(--stone);margin-bottom:0.3rem">${head}</div>` +
+        (rows ? `<table class="mini"><thead><tr><th>Material</th><th style="text-align:right">Needed</th><th style="text-align:right">In stock</th><th style="text-align:center">OK</th></tr></thead><tbody>${rows}</tbody></table>` : '<div style="font-size:0.8rem;color:var(--stone)">No fresh ingredients needed (covered by bulk).</div>') +
+        (short ? '<div style="color:#c0392b;font-size:0.8rem;margin-top:0.4rem">⚠️ Some materials are short — producing will set them to 0.</div>' : '');
     };
     window.doProduce = async () => {
-      const r = computeProduction();
-      if (!r || !r.fills.length) { toast('Enter quantities first'); return; }
-      if (!confirm('Produce this batch, deduct raw materials and add finished stock?')) return;
+      const r = computeProduction(); if (!r) return;
+      if (r.mode === 'bulk') {
+        if (!(r.qty > 0)) { toast('Enter a quantity first'); return; }
+        if (!confirm(`Make ${r.qty} ${r.b.baseUnit} of bulk mix and deduct ingredients?`)) return;
+      } else {
+        if (!r.fills.length) { toast('Enter container counts first'); return; }
+        if (!confirm('Produce, deduct materials and add finished stock?')) return;
+      }
       const now = new Date().toISOString();
       try {
         for (const [mid, q] of Object.entries(r.need)) {
+          if (!(q > 0)) continue;
           const m = matById(mid); if (!m) continue;
           const newStock = Math.max(0, +(m.stock || 0) - q);
           await updateDoc(doc(db, 'rawMaterials', mid), { stock: newStock, updatedAt: now });
           await addDoc(collection(db, 'materialMovements'), { materialId: mid, materialName: m.name, type: 'production', qty: q, note: 'Production: ' + r.b.name, at: now, balanceAfter: newStock });
           m.stock = newStock;
         }
-        for (const fl of r.fills) {
-          if (!fl.productId) continue;
-          const p = allProducts.find(x => x.id === fl.productId);
-          const cur = p ? +(p.stock || 0) : 0;
-          await updateDoc(doc(db, 'products', fl.productId), { stock: cur + fl.count, updatedAt: now });
-          if (p) p.stock = cur + fl.count;
+        if (r.mode === 'bulk') {
+          const newBulk = (+(r.b.bulkStock || 0)) + r.qty;
+          await updateDoc(doc(db, 'baseProducts', r.b.id), { bulkStock: newBulk, updatedAt: now });
+          r.b.bulkStock = newBulk;
+          await addDoc(collection(db, 'productionRuns'), { baseProductId: r.b.id, baseProductName: r.b.name, mode: 'bulk', qty: r.qty, batches: r.mult, fills: [], consumed: Object.entries(r.need).map(([mid, q]) => { const m = matById(mid); return { materialId: mid, name: m ? m.name : '', qty: q, unit: m ? m.unit : '' }; }), at: now });
+        } else {
+          if (r.fromBulk > 0) { const newBulk = Math.max(0, (+(r.b.bulkStock || 0)) - r.fromBulk); await updateDoc(doc(db, 'baseProducts', r.b.id), { bulkStock: newBulk, updatedAt: now }); r.b.bulkStock = newBulk; }
+          for (const fl of r.fills) {
+            if (!fl.productId) continue;
+            const p = allProducts.find(x => x.id === fl.productId);
+            const cur = p ? +(p.stock || 0) : 0;
+            await updateDoc(doc(db, 'products', fl.productId), { stock: cur + fl.count, updatedAt: now });
+            if (p) p.stock = cur + fl.count;
+          }
+          await addDoc(collection(db, 'productionRuns'), { baseProductId: r.b.id, baseProductName: r.b.name, mode: 'fill', totalBase: r.totalBase, fromBulk: r.fromBulk, freshBase: r.freshBase, batches: r.mult, fills: r.fills.map(f => ({ label: f.label, size: f.size, count: f.count, productId: f.productId || '' })), consumed: Object.entries(r.need).map(([mid, q]) => { const m = matById(mid); return { materialId: mid, name: m ? m.name : '', qty: q, unit: m ? m.unit : '' }; }), at: now });
         }
-        await addDoc(collection(db, 'productionRuns'), {
-          baseProductId: r.b.id, baseProductName: r.b.name, totalBase: r.totalBase, batches: r.mult,
-          fills: r.fills.map(f => ({ label: f.label, size: f.size, count: f.count, productId: f.productId || '' })),
-          consumed: Object.entries(r.need).map(([mid, q]) => { const m = matById(mid); return { materialId: mid, name: m ? m.name : '', qty: q, unit: m ? m.unit : '' }; }),
-          at: now
-        });
         toast('✅ Produced! Stock updated'); loadProductionTab();
       } catch (e) { toast('❌ ' + e.message); }
     };
@@ -3305,7 +3342,7 @@ Thank you for shopping with Pebble Store 🌿`;
         const runs = snap.docs.map(d => d.data());
         tb.innerHTML = runs.length ? runs.map(r => {
           const d = new Date(r.at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-          const filled = (r.fills || []).map(f => `${f.count}×${escapeHtml(f.label)}`).join(', ');
+          const filled = (r.fills && r.fills.length) ? r.fills.map(f => `${f.count}×${escapeHtml(f.label)}`).join(', ') : (r.mode === 'bulk' ? `Bulk +${r.qty != null ? r.qty : ''}` : '—');
           const consumed = (r.consumed || []).map(c => `${escapeHtml(c.name)}: ${(+c.qty).toFixed(1)}${c.unit || ''}`).join('<br>');
           return `<tr><td style="white-space:nowrap">${d}</td><td>${escapeHtml(r.baseProductName || '')}</td><td>${filled}</td><td style="font-size:0.75rem">${consumed}</td></tr>`;
         }).join('') : '<tr><td colspan="4" class="loading">No production yet.</td></tr>';

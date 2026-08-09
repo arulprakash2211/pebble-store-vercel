@@ -534,19 +534,16 @@
           </div>
           <div id="prcForm" style="display:none">
             <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin:0.2rem 0 0.6rem"><span>Ingredient cost / batch (from formula)</span><strong id="prcIng">₹0</strong></div>
-            <div class="mfg"><label>Container / pack size</label>
-              <select id="prcContainerSel" onchange="prcPickContainer()"><option value="">Custom…</option></select>
+            <div style="display:flex;gap:0.8rem;flex-wrap:wrap">
+              <div class="mfg" style="flex:1;min-width:150px"><label>Production volume (total, <span id="prcVolUnit">base unit</span>)</label><input type="number" id="prcVol" class="mrow-inp" step="any" min="0" value="0" oninput="updatePricing()"/></div>
+              <div class="mfg" style="flex:1;min-width:110px"><label>Profit %</label><input type="number" id="prcProfit" class="mrow-inp" step="any" min="0" value="0" oninput="updatePricing()"/></div>
             </div>
             <div style="display:flex;gap:0.8rem;flex-wrap:wrap">
-              <div class="mfg" style="flex:1;min-width:130px"><label>Pieces per batch</label><input type="number" id="prcPieces" class="mrow-inp" step="any" min="0" oninput="updatePricing()"/></div>
-              <div class="mfg" style="flex:1;min-width:130px"><label>Container cost / piece (₹)</label><input type="number" id="prcContainer" class="mrow-inp" step="any" min="0" oninput="updatePricing()"/></div>
+              <div class="mfg" style="flex:1;min-width:130px"><label>Labour (₹ total)</label><input type="number" id="prcLabour" class="mrow-inp" step="any" min="0" value="0" oninput="updatePricing()"/></div>
+              <div class="mfg" style="flex:1;min-width:130px"><label>Other cost (₹ total)</label><input type="number" id="prcVariable" class="mrow-inp" step="any" min="0" value="0" oninput="updatePricing()"/></div>
             </div>
-            <div style="display:flex;gap:0.8rem;flex-wrap:wrap">
-              <div class="mfg" style="flex:1;min-width:130px"><label>Labour / batch (₹)</label><input type="number" id="prcLabour" class="mrow-inp" step="any" min="0" value="0" oninput="updatePricing()"/></div>
-              <div class="mfg" style="flex:1;min-width:130px"><label>Other cost / batch (₹)</label><input type="number" id="prcVariable" class="mrow-inp" step="any" min="0" value="0" oninput="updatePricing()"/></div>
-            </div>
-            <div class="mfg" style="max-width:170px"><label>Profit %</label><input type="number" id="prcProfit" class="mrow-inp" step="any" min="0" value="0" oninput="updatePricing()"/></div>
-            <div id="prcResult" style="margin-top:0.8rem;font-size:0.88rem"></div>
+            <div style="font-size:0.72rem;color:var(--stone);margin-bottom:0.5rem">Labour &amp; other cost are split across the total production volume (₹ per unit volume) and applied to each variant by its fill size. Container cost is per variant.</div>
+            <div id="prcResult" style="font-size:0.85rem"></div>
           </div>
         </div>
       </div>
@@ -3425,48 +3422,46 @@ Thank you for shopping with Pebble Store 🌿`;
       form.style.display = 'block';
       const ing = (b.formula || []).reduce((s, f) => { const m = matById(f.materialId); return s + (+f.qty) * (m ? +(m.avgCost || 0) : 0); }, 0);
       form.dataset.ing = ing;
-      document.getElementById('prcIng').textContent = `₹${ing.toFixed(2)} (per ${b.baseQty} ${b.baseUnit})`;
-      const cs = document.getElementById('prcContainerSel');
-      cs.innerHTML = '<option value="">Custom…</option>' + (b.containers || []).map((c, i) => `<option value="${i}">${escapeHtml(c.label)} (${c.size} ${b.baseUnit})</option>`).join('');
-      if ((b.containers || []).length) { cs.value = '0'; prcPickContainer(); }
-      else { document.getElementById('prcPieces').value = ''; document.getElementById('prcContainer').value = ''; updatePricing(); }
-    };
-    window.prcPickContainer = () => {
-      const b = baseProductsCache.find(x => x.id === document.getElementById('prcBase').value); if (!b) return;
-      const idx = document.getElementById('prcContainerSel').value;
-      if (idx !== '') {
-        const c = b.containers[+idx];
-        const pieces = +c.size > 0 ? b.baseQty / (+c.size) : 0;
-        const packCost = (c.packaging || []).reduce((s, p) => { const m = matById(p.materialId); return s + (+p.qty) * (m ? +(m.avgCost || 0) : 0); }, 0);
-        document.getElementById('prcPieces').value = +pieces.toFixed(2);
-        document.getElementById('prcContainer').value = +packCost.toFixed(2);
-      }
+      const perVol = +b.baseQty > 0 ? ing / +b.baseQty : 0;
+      document.getElementById('prcIng').textContent = `₹${ing.toFixed(2)} (per ${b.baseQty} ${b.baseUnit}) · ₹${perVol.toFixed(4)}/${b.baseUnit}`;
+      document.getElementById('prcVolUnit').textContent = b.baseUnit;
       updatePricing();
     };
     window.updatePricing = () => {
       const b = baseProductsCache.find(x => x.id === document.getElementById('prcBase').value); if (!b) return;
+      const el = document.getElementById('prcResult');
       const ing = num(document.getElementById('prcForm').dataset.ing);
+      const baseQty = +b.baseQty || 0;
+      const perVol = baseQty > 0 ? ing / baseQty : 0;   // ingredient cost per ml/g
+      const volume = num(document.getElementById('prcVol').value);   // total production volume (base unit)
       const labour = num(document.getElementById('prcLabour').value);
       const variable = num(document.getElementById('prcVariable').value);
-      const pieces = num(document.getElementById('prcPieces').value);
-      const container = num(document.getElementById('prcContainer').value);
       const profit = num(document.getElementById('prcProfit').value);
-      const batchCost = ing + labour + variable;
-      const prodPer = pieces > 0 ? batchCost / pieces : 0;
-      const unit = prodPer + container;
-      const sell = unit * (1 + profit / 100);
-      const row = (l, v, bold) => `<div style="display:flex;justify-content:space-between;padding:0.22rem 0;${bold ? 'font-weight:700;border-top:1.5px solid rgba(92,61,46,0.25);margin-top:0.25rem;padding-top:0.4rem' : ''}"><span>${l}</span><span>${v}</span></div>`;
-      document.getElementById('prcResult').innerHTML =
-        row('Ingredient cost / batch', '₹' + ing.toFixed(2)) +
-        row('Labour / batch', '₹' + labour.toFixed(2)) +
-        row('Other cost / batch', '₹' + variable.toFixed(2)) +
-        row('Total batch cost', '₹' + batchCost.toFixed(2), true) +
-        row(`Production cost / piece (${pieces || 0} pcs)`, '₹' + prodPer.toFixed(2)) +
-        row('Container / piece', '₹' + container.toFixed(2)) +
-        row('Cost / piece', '₹' + unit.toFixed(2), true) +
-        row(`Profit @ ${profit || 0}%`, '₹' + (sell - unit).toFixed(2)) +
-        row('Selling price / piece', '₹' + sell.toFixed(2), true) +
-        `<div style="font-size:0.8rem;color:var(--moss);margin-top:0.5rem;font-weight:700">Suggested price: ₹${Math.ceil(sell)} <span style="color:var(--stone);font-weight:400">(rounded up)</span></div>`;
+      const overheadPerVol = volume > 0 ? (labour + variable) / volume : 0;   // ₹ per ml/g
+      const containers = b.containers || [];
+      if (!containers.length) { el.innerHTML = '<div style="color:#c0392b;font-size:0.85rem">This base product has no variants/containers — edit it to add fill sizes, then price them here.</div>'; return; }
+      const rt = 'text-align:right;white-space:nowrap';
+      const rows = containers.map(c => {
+        const size = +c.size || 0;
+        const mix = perVol * size;
+        const overhead = overheadPerVol * size;
+        const cont = (c.packaging || []).reduce((s, p) => { const m = matById(p.materialId); return s + (+p.qty) * (m ? +(m.avgCost || 0) : 0); }, 0);
+        const unit = mix + overhead + cont;
+        const sell = unit * (1 + profit / 100);
+        return `<tr>
+          <td><strong>${escapeHtml(c.label)}</strong>${c.productId ? `<br><span style="font-size:0.7rem;color:var(--stone)">${escapeHtml(prodLabelById(c.productId))}</span>` : ''}</td>
+          <td style="${rt}">${c.size} ${b.baseUnit}</td>
+          <td style="${rt}">₹${mix.toFixed(2)}</td>
+          <td style="${rt}">₹${cont.toFixed(2)}</td>
+          <td style="${rt}">₹${overhead.toFixed(2)}</td>
+          <td style="${rt}">₹${unit.toFixed(2)}</td>
+          <td style="${rt}">₹${sell.toFixed(2)} <span style="color:var(--moss);font-weight:700">→ ₹${Math.ceil(sell)}</span></td>
+        </tr>`;
+      }).join('');
+      el.innerHTML = `<table class="mini"><thead><tr>
+          <th>Variant</th><th style="${rt}">Size</th><th style="${rt}">Mix</th><th style="${rt}">Container</th><th style="${rt}">Labour+Other</th><th style="${rt}">Cost/pc</th><th style="${rt}">Sell price</th>
+        </tr></thead><tbody>${rows}</tbody></table>
+        <div style="font-size:0.75rem;color:var(--stone);margin-top:0.45rem">Labour+Other = ₹${overheadPerVol.toFixed(4)}/${b.baseUnit} [= (₹${labour.toFixed(2)} + ₹${variable.toFixed(2)}) ÷ ${volume || 0} ${b.baseUnit}] × size. Mix = ₹${perVol.toFixed(4)}/${b.baseUnit} × size. Final ₹ at profit ${profit || 0}% (→ rounded up).</div>`;
     };
   </script>
 </body>

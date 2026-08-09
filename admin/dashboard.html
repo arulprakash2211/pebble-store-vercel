@@ -79,6 +79,7 @@
     .mtab{flex:1;min-width:120px;padding:0.7rem;text-align:center;cursor:pointer;font-size:0.75rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;color:var(--stone);background:var(--warm-white);border:none;font-family:'Jost',sans-serif}
     .mtab.active{background:var(--bark);color:var(--cream)}
     .mtab-content{display:none}.mtab-content.active{display:block}
+    .ico-btn{padding:0.3rem 0.45rem;margin:0 2px 0 0;font-size:0.9rem;line-height:1;min-width:0}
     .mrow-inp{font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.6rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0}
     table.mini{width:100%;border-collapse:collapse}
     table.mini th{font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--stone);text-align:left;padding:0.35rem 0.5rem;border-bottom:1.5px solid rgba(92,61,46,0.2)}
@@ -2816,7 +2817,7 @@ Thank you for shopping with Pebble Store 🌿`;
     let materialsCache = [], baseProductsCache = [];
     const matById = id => materialsCache.find(m => m.id === id);
     const mErr = (el, txt) => { el.textContent = txt; el.style.cssText = 'display:block;color:#c0392b;font-size:0.8rem'; };
-    const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+    const num = v => { const n = parseFloat(String(v).replace(/[,₹\s]/g, '')); return isNaN(n) ? 0 : n; };
     const prodLabelById = id => { const p = allProducts.find(x => x.id === id); return p ? prodLabel(p) : id; };
     async function fetchMaterials() { const s = await getDocs(query(collection(db, 'rawMaterials'), orderBy('name'))); materialsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); }
     async function fetchBaseProducts() { const s = await getDocs(query(collection(db, 'baseProducts'), orderBy('name'))); baseProductsCache = s.docs.map(d => ({ id: d.id, ...d.data() })); }
@@ -2832,7 +2833,7 @@ Thank you for shopping with Pebble Store 🌿`;
         f.push(cur);
         return f.map(x => x.replace(/^"|"$/g, '').trim());
       };
-      const headers = parseLine(lines[0]).map(h => h.toLowerCase().replace(/\s+/g, ''));
+      const headers = parseLine(lines[0]).map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
       return lines.slice(1).map(line => { const fields = parseLine(line); const o = {}; headers.forEach((h, i) => o[h] = fields[i] || ''); return o; })
         .filter(o => Object.values(o).some(v => v));
     }
@@ -2863,18 +2864,23 @@ Thank you for shopping with Pebble Store 🌿`;
         const byName = {}; materialsCache.forEach(m => byName[(m.name || '').toLowerCase()] = m);
         let added = 0, updated = 0, skipped = 0; const now = new Date().toISOString();
         for (const r of rows) {
-          const name = csvGet(r, 'name', 'material', 'materialname'); if (!name) { skipped++; continue; }
-          const type = (csvGet(r, 'type', 'category') || 'ingredient').toLowerCase().startsWith('pack') ? 'packaging' : 'ingredient';
+          const name = csvGet(r, 'materialname', 'name', 'material'); if (!name) { skipped++; continue; }
+          const type = (csvGet(r, 'type', 'category') || '').toLowerCase().startsWith('pack') ? 'packaging' : 'ingredient';
           const unit = csvGet(r, 'unit', 'uom') || 'g';
-          const stock = num(csvGet(r, 'stock', 'qty', 'quantity', 'openingstock'));
-          const cost = num(csvGet(r, 'cost', 'price', 'avgcost', 'unitcost'));
+          const stock = num(csvGet(r, 'currentstock', 'stock', 'openingstock', 'qty', 'quantity'));
+          const cost = num(csvGet(r, 'costperunit', 'cost', 'price', 'avgcost', 'unitcost'));
+          const supplier = csvGet(r, 'supplier', 'vendor');
+          const code = csvGet(r, 'materialid', 'code', 'id', 'sku');
+          const notes = csvGet(r, 'notes', 'note');
           const existing = byName[name.toLowerCase()];
           if (existing) {
-            await updateDoc(doc(db, 'rawMaterials', existing.id), { type, unit, updatedAt: now });
+            const upd = { type, unit, updatedAt: now };
+            if (code) upd.code = code; if (supplier) upd.supplier = supplier;
+            await updateDoc(doc(db, 'rawMaterials', existing.id), upd);
             updated++;
           } else {
-            const ref = await addDoc(collection(db, 'rawMaterials'), { name, type, unit, stock: stock || 0, avgCost: cost || 0, createdAt: now, updatedAt: now });
-            if (stock > 0) await addDoc(collection(db, 'materialMovements'), { materialId: ref.id, materialName: name, type: 'add', qty: stock, price: cost > 0 ? cost * stock : 0, unitCost: cost || 0, vendor: '', note: 'CSV import (opening stock)', at: now, balanceAfter: stock });
+            const ref = await addDoc(collection(db, 'rawMaterials'), { name, type, unit, stock: stock || 0, avgCost: cost || 0, supplier, code, createdAt: now, updatedAt: now });
+            if (stock > 0) await addDoc(collection(db, 'materialMovements'), { materialId: ref.id, materialName: name, type: 'add', qty: stock, price: cost > 0 ? cost * stock : 0, unitCost: cost || 0, vendor: supplier || '', note: notes || 'CSV import (opening stock)', at: now, balanceAfter: stock });
             byName[name.toLowerCase()] = { id: ref.id, name };
             added++;
           }
@@ -2958,12 +2964,13 @@ Thank you for shopping with Pebble Store 🌿`;
         <td>${m.unit || ''}</td>
         <td style="text-align:right;font-weight:600">${(+(m.stock || 0)).toLocaleString('en-IN')} ${m.unit || ''}</td>
         <td style="text-align:right">${m.avgCost ? '₹' + (+m.avgCost).toFixed(2) : '—'}</td>
-        <td><div class="action-btns">
-          <button class="btn btn-sm btn-green" onclick="openStockIn('${m.id}')">➕ Stock</button>
-          <button class="btn btn-sm btn-red" style="margin-top:3px" onclick="openStockOut('${m.id}')">− Remove</button>
-          <button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="openMatHistory('${m.id}')">History</button>
-          <button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openMaterialModal('${m.id}')">Edit</button>
-        </div></td></tr>`).join('');
+        <td style="white-space:nowrap">
+          <button class="btn btn-sm btn-green ico-btn" title="Add stock" onclick="openStockIn('${m.id}')">＋</button>
+          <button class="btn btn-sm btn-red ico-btn" title="Remove stock" onclick="openStockOut('${m.id}')">−</button>
+          <button class="btn btn-sm btn-ghost ico-btn" title="History" onclick="openMatHistory('${m.id}')">🕘</button>
+          <button class="btn btn-sm btn-clay ico-btn" title="Edit" onclick="openMaterialModal('${m.id}')">✏️</button>
+          <button class="btn btn-sm ico-btn" style="background:var(--dark);color:var(--cream)" title="Delete" onclick="deleteMaterial('${m.id}')">🗑️</button>
+        </td></tr>`).join('');
     }
 
     let editingMaterialId = null;
@@ -2987,6 +2994,12 @@ Thank you for shopping with Pebble Store 🌿`;
         else { data.stock = 0; data.avgCost = 0; data.createdAt = new Date().toISOString(); await addDoc(collection(db, 'rawMaterials'), data); }
         toast('✅ Saved'); closeModal('materialModal'); loadMaterials();
       } catch (e) { mErr(msg, '❌ ' + e.message); }
+    };
+    window.deleteMaterial = async (id) => {
+      const m = matById(id); if (!m) return;
+      if (!confirm(`Delete "${m.name}"? The material is removed (its stock-movement history is kept).`)) return;
+      try { await deleteDoc(doc(db, 'rawMaterials', id)); toast('🗑️ Deleted'); loadMaterials(); }
+      catch (e) { toast('❌ ' + e.message); }
     };
 
     let stockInMatId = null;

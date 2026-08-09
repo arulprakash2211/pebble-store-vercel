@@ -585,6 +585,12 @@
       <div class="mfg" style="width:120px"><label>Base unit</label><select id="bpBaseUnit"><option>ml</option><option>g</option><option>L</option><option>kg</option></select></div>
     </div>
     <div style="font-weight:600;color:var(--bark);margin:0.6rem 0 0.4rem">Formula — ingredients per batch</div>
+    <details style="margin-bottom:0.5rem">
+      <summary style="cursor:pointer;font-size:0.78rem;color:var(--bark)">📋 Paste formula (one ingredient &amp; qty per line — tab or comma separated)</summary>
+      <textarea id="bpPaste" placeholder="SCI	80&#10;Glycerin	80&#10;Coco Glucoside	50" style="width:100%;min-height:100px;font-family:'Jost',sans-serif;font-size:0.82rem;padding:0.5rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);margin-top:0.4rem"></textarea>
+      <button type="button" class="btn btn-sm btn-ghost" onclick="fillFormulaFromPaste()">➡ Fill ingredient rows</button>
+      <div id="bpPasteMsg" style="font-size:0.72rem;color:var(--stone);margin-top:0.3rem"></div>
+    </details>
     <div id="bpFormulaRows"></div>
     <button class="btn btn-ghost btn-sm" onclick="addFormulaRow()">➕ Add ingredient</button>
     <div style="font-weight:600;color:var(--bark);margin:1rem 0 0.3rem">Container options (fill sizes)</div>
@@ -3107,6 +3113,28 @@ Thank you for shopping with Pebble Store 🌿`;
         <button class="btn btn-sm btn-red" onclick="this.parentNode.remove()">✕</button>`;
       document.getElementById('bpFormulaRows').appendChild(div);
     };
+    // Paste a 2-column list (ingredient <tab|comma|space> qty per line) → fill formula rows
+    window.fillFormulaFromPaste = () => {
+      const txt = document.getElementById('bpPaste').value || '';
+      const msg = document.getElementById('bpPasteMsg');
+      const lines = txt.split('\n').map(l => l.trim()).filter(Boolean);
+      if (!lines.length) { msg.innerHTML = 'Paste some lines first (e.g. "SCI	80").'; return; }
+      const byName = {}; materialsCache.forEach(m => byName[(m.name || '').toLowerCase()] = m);
+      let matched = 0, sum = 0; const missing = [];
+      document.getElementById('bpFormulaRows').innerHTML = '';   // replace existing rows
+      for (const line of lines) {
+        const mm = line.match(/^(.+?)[\s,\t]+([\d.]+)$/);   // name … then trailing number
+        if (!mm) { missing.push(line); continue; }
+        const nm = mm[1].trim(), qty = parseFloat(mm[2]);
+        const mat = byName[nm.toLowerCase()];
+        if (mat && qty > 0) { addFormulaRow(mat.id, qty); matched++; sum += qty; }
+        else missing.push(nm);
+      }
+      const bq = document.getElementById('bpBaseQty');
+      if (!num(bq.value) && sum > 0) bq.value = +sum.toFixed(4);   // default batch = sum of qtys
+      msg.innerHTML = `✅ Matched ${matched} ingredient(s)${sum > 0 ? ` · batch total ${+sum.toFixed(2)}` : ''}.`
+        + (missing.length ? ` <span style="color:#c0392b">⚠️ Not found (add as materials first, then re-paste): ${escapeHtml(missing.join(', '))}</span>` : '');
+    };
     window.addPackRow = (wrap, mId, qty) => {
       const div = document.createElement('div');
       div.style.cssText = 'display:flex;gap:0.5rem;margin-bottom:0.3rem;align-items:center';
@@ -3148,6 +3176,8 @@ Thank you for shopping with Pebble Store 🌿`;
       document.getElementById('bpFormulaRows').innerHTML = '';
       document.getElementById('bpContainerRows').innerHTML = '';
       document.getElementById('bpMsg').style.display = 'none';
+      document.getElementById('bpPaste').value = '';
+      document.getElementById('bpPasteMsg').innerHTML = '';
       if (b) { (b.formula || []).forEach(f => addFormulaRow(f.materialId, f.qty)); (b.containers || []).forEach(c => addContainerRow(c)); }
       else { addFormulaRow(); addContainerRow(); }
       document.getElementById('baseProductModal').classList.add('open');

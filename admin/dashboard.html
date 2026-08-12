@@ -2374,7 +2374,7 @@ Thank you for shopping with Pebble Store 🌿`;
     // already have a product chosen (so added products don't get changed).
     window.filterOrderProducts = () => {
       document.querySelectorAll('#noProductRows .no-product-select').forEach(sel => {
-        if (sel.value) return;   // preserve already-selected products
+        if (sel.dataset.picked) return;   // preserve rows the user actually chose
         sel.innerHTML = orderProductOptions('');
       });
       recalcNewOrder();
@@ -2451,7 +2451,7 @@ Thank you for shopping with Pebble Store 🌿`;
       const row = document.createElement('div');
       row.style.cssText = 'display:grid;grid-template-columns:1fr 80px 80px 32px;gap:0.5rem;margin-bottom:0.5rem;align-items:center';
       row.innerHTML = `
-        <select class="no-product-select" onchange="recalcNewOrder()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0;width:100%">
+        <select class="no-product-select" ${preId ? 'data-picked="1"' : ''} onchange="this.dataset.picked='1';recalcNewOrder()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0;width:100%">
           ${opts}
         </select>
         <input type="number" class="no-qty-input" value="${preQty}" min="1" oninput="recalcNewOrder()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;text-align:center;width:100%"/>

@@ -609,8 +609,8 @@
     </div>
     <div style="font-weight:600;color:var(--bark);margin:0.6rem 0 0.4rem">Formula — ingredients per batch</div>
     <details style="margin-bottom:0.5rem">
-      <summary style="cursor:pointer;font-size:0.78rem;color:var(--bark)">📋 Paste formula (one ingredient &amp; qty per line — tab or comma separated)</summary>
-      <textarea id="bpPaste" placeholder="SCI	80&#10;Glycerin	80&#10;Coco Glucoside	50" style="width:100%;min-height:100px;font-family:'Jost',sans-serif;font-size:0.82rem;padding:0.5rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);margin-top:0.4rem"></textarea>
+      <summary style="cursor:pointer;font-size:0.78rem;color:var(--bark)">📋 Paste formula (ingredient &amp; qty per line; add a "Phase A" line to group)</summary>
+      <textarea id="bpPaste" placeholder="Phase A&#10;SCI	80&#10;Glycerin	80&#10;Phase B&#10;Coco Glucoside	50" style="width:100%;min-height:100px;font-family:'Jost',sans-serif;font-size:0.82rem;padding:0.5rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);margin-top:0.4rem"></textarea>
       <button type="button" class="btn btn-sm btn-ghost" onclick="fillFormulaFromPaste()">➡ Fill ingredient rows</button>
       <div id="bpPasteMsg" style="font-size:0.72rem;color:var(--stone);margin-top:0.3rem"></div>
     </details>
@@ -3128,12 +3128,13 @@ Thank you for shopping with Pebble Store 🌿`;
     const matOptions = (selId, type) => materialsCache.filter(m => !type || m.type === type).map(m => `<option value="${m.id}" ${m.id === selId ? 'selected' : ''}>${escapeHtml(m.name)} (${m.unit})</option>`).join('');
     const prodOptions = (selId) => '<option value="">— not sold / none —</option>' + allProducts.map(p => `<option value="${p.id}" ${p.id === selId ? 'selected' : ''}>${escapeHtml(prodLabel(p))}</option>`).join('');
 
-    window.addFormulaRow = (mId, qty) => {
+    window.addFormulaRow = (mId, qty, phase) => {
       const div = document.createElement('div');
       div.className = 'bp-frow';
       div.style.cssText = 'display:flex;gap:0.5rem;margin-bottom:0.4rem;align-items:center';
-      div.innerHTML = `<select class="mrow-inp bp-fmat" style="flex:1">${matOptions(mId, 'ingredient')}</select>
-        <input type="number" class="mrow-inp bp-fqty" step="any" min="0" placeholder="qty" value="${qty != null ? qty : ''}" style="width:100px"/>
+      div.innerHTML = `<input class="mrow-inp bp-fphase" placeholder="Ph" title="Phase (e.g. A, B)" value="${phase != null ? escapeHtml(String(phase)) : ''}" style="width:46px"/>
+        <select class="mrow-inp bp-fmat" style="flex:1">${matOptions(mId, 'ingredient')}</select>
+        <input type="number" class="mrow-inp bp-fqty" step="any" min="0" placeholder="qty" value="${qty != null ? qty : ''}" style="width:90px"/>
         <button class="btn btn-sm btn-red" onclick="this.parentNode.remove()">✕</button>`;
       document.getElementById('bpFormulaRows').appendChild(div);
     };
@@ -3144,14 +3145,19 @@ Thank you for shopping with Pebble Store 🌿`;
       const lines = txt.split('\n').map(l => l.trim()).filter(Boolean);
       if (!lines.length) { msg.innerHTML = 'Paste some lines first (e.g. "SCI	80").'; return; }
       const byName = {}; materialsCache.forEach(m => byName[(m.name || '').toLowerCase()] = m);
-      let matched = 0, sum = 0; const missing = [];
+      let matched = 0, sum = 0, curPhase = ''; const missing = [];
       document.getElementById('bpFormulaRows').innerHTML = '';   // replace existing rows
       for (const line of lines) {
+        // Phase header line: starts with "Phase …", or has no digits at all (e.g. "A", "Oil Phase")
+        if (/^\s*phase\b/i.test(line) || !/\d/.test(line)) {
+          curPhase = line.replace(/^\s*phase\b[\s:.\-]*/i, '').replace(/[:.\-\s]+$/, '').trim();
+          continue;
+        }
         const mm = line.match(/^(.+?)[\s,\t]+([\d.]+)$/);   // name … then trailing number
         if (!mm) { missing.push(line); continue; }
         const nm = mm[1].trim(), qty = parseFloat(mm[2]);
         const mat = byName[nm.toLowerCase()];
-        if (mat && qty > 0) { addFormulaRow(mat.id, qty); matched++; sum += qty; }
+        if (mat && qty > 0) { addFormulaRow(mat.id, qty, curPhase); matched++; sum += qty; }
         else missing.push(nm);
       }
       const bq = document.getElementById('bpBaseQty');
@@ -3202,7 +3208,7 @@ Thank you for shopping with Pebble Store 🌿`;
       document.getElementById('bpMsg').style.display = 'none';
       document.getElementById('bpPaste').value = '';
       document.getElementById('bpPasteMsg').innerHTML = '';
-      if (b) { (b.formula || []).forEach(f => addFormulaRow(f.materialId, f.qty)); (b.containers || []).forEach(c => addContainerRow(c)); }
+      if (b) { (b.formula || []).forEach(f => addFormulaRow(f.materialId, f.qty, f.phase)); (b.containers || []).forEach(c => addContainerRow(c)); }
       else { addFormulaRow(); addContainerRow(); }
       document.getElementById('baseProductModal').classList.add('open');
     };
@@ -3215,7 +3221,8 @@ Thank you for shopping with Pebble Store 🌿`;
       const formula = [];
       document.querySelectorAll('#bpFormulaRows .bp-frow').forEach(r => {
         const mId = r.querySelector('.bp-fmat').value, qty = num(r.querySelector('.bp-fqty').value);
-        if (mId && qty > 0) { const m = matById(mId); formula.push({ materialId: mId, materialName: m ? m.name : '', qty, unit: m ? m.unit : '' }); }
+        const phase = (r.querySelector('.bp-fphase').value || '').trim();
+        if (mId && qty > 0) { const m = matById(mId); formula.push({ materialId: mId, materialName: m ? m.name : '', qty, unit: m ? m.unit : '', phase }); }
       });
       if (!formula.length) { mErr(msg, '⚠️ Add at least one ingredient'); return; }
       const containers = [];
@@ -3387,22 +3394,37 @@ Thank you for shopping with Pebble Store 🌿`;
         headline = r.mode === 'bulk'
           ? `Bulk batch — make ${r.qty} ${b.baseUnit}`
           : `Fill ${r.fills.map(f => f.count + '×' + f.label).join(', ')} · total ${r.totalBase} ${b.baseUnit}`;
-        rows = Object.entries(r.need).filter(([, q]) => q > 0).map(([mid, q]) => { const m = matById(mid); return { name: m ? m.name : mid, qty: q, unit: m ? m.unit : '' }; });
+        rows = Object.entries(r.need).filter(([, q]) => q > 0).map(([mid, q]) => {
+          const m = matById(mid), f = (b.formula || []).find(x => x.materialId === mid);
+          return { name: m ? m.name : mid, qty: q, unit: m ? m.unit : '', phase: f ? ((f.phase && f.phase.trim()) ? f.phase.trim() : 'Mix') : 'Packaging' };
+        });
       } else {
         headline = `Formula — per batch of ${b.baseQty} ${b.baseUnit}`;
-        rows = (b.formula || []).map(f => { const m = matById(f.materialId); return { name: f.materialName || (m ? m.name : ''), qty: +f.qty, unit: f.unit || (m ? m.unit : '') }; });
+        rows = (b.formula || []).map(f => { const m = matById(f.materialId); return { name: f.materialName || (m ? m.name : ''), qty: +f.qty, unit: f.unit || (m ? m.unit : ''), phase: (f.phase && f.phase.trim()) ? f.phase.trim() : 'Mix' }; });
       }
       if (!rows.length) { toast('No ingredients to print'); return; }
-      const win = window.open('', '_blank', 'width=560,height=780');
+      const sumByUnit = list => { const o = {}; list.forEach(x => o[x.unit || ''] = (o[x.unit || ''] || 0) + (+x.qty)); return Object.entries(o).map(([u, q]) => `${(+q).toFixed(2)} ${u}`.trim()).join(' + '); };
+      const phaseTitle = p => p === 'Packaging' ? 'Packaging' : (p === 'Mix' ? 'Ingredients' : (/phase/i.test(p) ? p : 'Phase ' + p));
+      const order = [...new Set(rows.map(x => x.phase))].sort((a, b2) => (a === 'Packaging') - (b2 === 'Packaging'));
+      let body = '';
+      order.forEach(ph => {
+        const list = rows.filter(x => x.phase === ph);
+        body += `<tr class="ph"><td></td><td colspan="2">${escapeHtml(phaseTitle(ph))}</td></tr>`;
+        body += list.map(x => `<tr><td class="chk"></td><td>${escapeHtml(titleCase(x.name))}</td><td class="num">${(+x.qty).toFixed(2)} ${x.unit || ''}</td></tr>`).join('');
+        body += `<tr class="sub"><td></td><td>Subtotal</td><td class="num">${sumByUnit(list)}</td></tr>`;
+      });
+      const win = window.open('', '_blank', 'width=460,height=760');
       if (!win) { toast('⚠️ Allow pop-ups to print'); return; }
       const when = new Date().toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-      const bodyRows = rows.map(x => `<tr><td>${escapeHtml(titleCase(x.name))}</td><td class="num">${(+x.qty).toFixed(2)} ${x.unit || ''}</td><td class="chk"></td></tr>`).join('');
       win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Ingredients — ${escapeHtml(b.name)}</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Helvetica Neue',Arial,sans-serif;color:#000;padding:20px;font-size:13px}h1{font-size:18px}.sub{font-size:12px;color:#555;margin:3px 0 14px}table{width:100%;border-collapse:collapse}th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #000;padding:6px}td{padding:7px 6px;border-bottom:1px solid #ddd}.num{text-align:right;white-space:nowrap}th.chk,td.chk{width:44px;text-align:center}td.chk{border:1px solid #999}@media print{@page{margin:14mm}}</style></head>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Helvetica Neue',Arial,sans-serif;color:#000;padding:12px;font-size:11.5px}h1{font-size:15px}.hd{font-size:10.5px;color:#555;margin:2px 0 8px}table{width:100%;border-collapse:collapse}th{text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.4px;border-bottom:1.5px solid #000;padding:3px 5px}td{padding:3px 5px;border-bottom:1px solid #e2e2e2}.num{text-align:right;white-space:nowrap}th.chk,td.chk{width:18px;padding:3px}td.chk{border:1px solid #999;height:15px}tr.ph td{background:#eee;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;border-bottom:1px solid #999}tr.sub td{font-style:italic;color:#444;border-bottom:1.5px solid #999}tr.tot td{font-weight:700;border-top:2px solid #000;border-bottom:none;padding-top:5px}@media print{@page{margin:12mm}}</style></head>
 <body onload="setTimeout(function(){window.print()},200)">
   <h1>${escapeHtml(b.name)}</h1>
-  <div class="sub">${escapeHtml(headline)} &nbsp;·&nbsp; ${when}</div>
-  <table><thead><tr><th>Ingredient</th><th class="num">Quantity</th><th class="chk">✓</th></tr></thead><tbody>${bodyRows}</tbody></table>
+  <div class="hd">${escapeHtml(headline)} &nbsp;·&nbsp; ${when}</div>
+  <table><thead><tr><th class="chk">✓</th><th>Ingredient</th><th class="num">Quantity</th></tr></thead>
+    <tbody>${body}</tbody>
+    <tfoot><tr class="tot"><td></td><td>OVERALL TOTAL</td><td class="num">${sumByUnit(rows)}</td></tr></tfoot>
+  </table>
 </body></html>`);
       win.document.close();
     };

@@ -677,6 +677,7 @@
     <div class="modal" style="max-width:440px">
       <button class="modal-close" onclick="stopScan()">×</button>
       <div class="modal-title">📷 Scan Tracking Barcode</div>
+      <div id="scanFor" style="font-size:1rem;font-weight:700;color:var(--bark);margin-bottom:0.5rem;display:none"></div>
       <video id="scanVideo" muted playsinline autoplay style="width:100%;border-radius:4px;background:#000;aspect-ratio:4/3;object-fit:cover"></video>
       <div id="scanMsg" style="font-size:0.82rem;color:var(--stone);margin-top:0.6rem">Hold the barcode/QR steady. If it doesn't catch, tap Capture & Zoom.</div>
       <div style="display:flex;gap:0.6rem;margin-top:0.7rem">
@@ -1535,6 +1536,11 @@ ${RECEIPT_CSS}
       const video = document.getElementById('scanVideo');
       const msg   = document.getElementById('scanMsg');
       msg.textContent = 'Point the camera at the barcode or QR — it scans automatically.';
+      // Show which order we're scanning for (customer name + order#)
+      const forEl = document.getElementById('scanFor');
+      const ord = allOrders.find(o => o.id === currentDispatchOrderId);
+      if (ord) { forEl.textContent = `📦 ${ord.name || ''}${ord.orderNo != null ? ' · #' + ord.orderNo : ''}`; forEl.style.display = 'block'; }
+      else { forEl.style.display = 'none'; }
       modal.classList.add('open');
       try {
         scanStream = await navigator.mediaDevices.getUserMedia({

@@ -192,6 +192,7 @@
           <button class="btn btn-ghost" onclick="showPackingSummary()">📦 Packing</button>
           <button class="btn btn-ghost" onclick="printOrdersSheet()">🖨️ Print Sheet</button>
           <button class="btn btn-ghost" onclick="refreshAllStatuses()">🔄 Refresh Statuses</button>
+          <button class="btn btn-ghost" onclick="findDuplicateTracking()">🔎 Dup Tracking</button>
           <button class="btn btn-primary" onclick="loadOrders()">↻ Refresh</button>
         </div>
       </div>
@@ -1129,6 +1130,35 @@
       } catch (err) { toast('❌ ' + err.message); }
     };
     // Manually refresh live status for every dispatched order (same as the scheduled job)
+    // Debug: find courier tracking numbers used on more than one order.
+    window.findDuplicateTracking = async () => {
+      toast('🔎 Scanning all orders for duplicate tracking numbers…');
+      let snap;
+      try { snap = await getDocs(collection(db, 'orders')); }
+      catch (e) { toast('❌ ' + e.message); return []; }
+      const map = {};
+      snap.docs.forEach(d => {
+        const o = d.data();
+        const t = (o.tracking && o.tracking.trackingId ? String(o.tracking.trackingId) : '').trim();
+        if (!t) return;
+        (map[t] = map[t] || []).push({ id: d.id, orderNo: o.orderNo, name: o.name, status: o.status, courier: o.tracking && o.tracking.courier });
+      });
+      const dups = Object.entries(map).filter(([, arr]) => arr.length > 1)
+        .map(([trackingId, orders]) => ({ trackingId, count: orders.length, orders }))
+        .sort((a, b) => b.count - a.count);
+      if (!dups.length) { toast('✅ No duplicate tracking numbers'); console.log('[dup-tracking] none found'); return []; }
+      console.group(`%c🔎 Duplicate tracking numbers (${dups.length})`, 'font-weight:bold;font-size:13px');
+      dups.forEach(d => {
+        console.log(`%c${d.trackingId}  ×${d.count}`, 'font-weight:bold;color:#c0392b');
+        console.table(d.orders.map(o => ({ 'Order #': o.orderNo, Customer: o.name, Status: o.status, Courier: o.courier, id: o.id })));
+      });
+      console.groupEnd();
+      const summary = dups.map(d => `${d.trackingId} (×${d.count}):\n  ` + d.orders.map(o => `#${o.orderNo != null ? o.orderNo : '?'} ${o.name || ''} [${o.status || ''}]`).join('\n  ')).join('\n\n');
+      toast(`⚠️ ${dups.length} duplicate tracking number(s) — details in console`);
+      alert(`⚠️ ${dups.length} duplicate tracking number(s):\n\n${summary}`);
+      return dups;
+    };
+
     window.refreshAllStatuses = async () => {
       // Query all dispatched orders directly — not limited to the loaded page.
       let dispatched = [];

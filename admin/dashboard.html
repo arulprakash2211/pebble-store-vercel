@@ -2402,7 +2402,10 @@ Thank you for shopping with Pebble Store 🌿`;
     // Product <option> list for an order row, filtered by the chosen category
     function orderProductOptions(preId) {
       const cat = (document.getElementById('noCatFilter') || {}).value || '';
+      // Most-selling first (soldCount computed daily by cron), then by name.
       return noProducts.filter(p => !cat || p.category === cat)
+        .slice()
+        .sort((a, b) => (+(b.soldCount || 0)) - (+(a.soldCount || 0)) || prodLabel(a).localeCompare(prodLabel(b)))
         .map(p => `<option value="${p.id}" data-price="${p.price}" ${preId === p.id ? 'selected' : ''}>${prodLabel(p)} — ₹${p.price}</option>`).join('');
     }
 
@@ -2483,6 +2486,8 @@ Thank you for shopping with Pebble Store 🌿`;
 
     window.addOrderProductRow = (preId = null, preQty = 1) => {
       const container = document.getElementById('noProductRows');
+      // Lock existing rows so a later category change can't override them
+      container.querySelectorAll('.no-product-select').forEach(s => s.dataset.picked = '1');
       const opts = orderProductOptions(preId);
       const row = document.createElement('div');
       row.style.cssText = 'display:grid;grid-template-columns:1fr 80px 80px 32px;gap:0.5rem;margin-bottom:0.5rem;align-items:center';

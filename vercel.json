@@ -2,9 +2,11 @@
   "version": 2,
   "crons": [
     { "path": "/api/cron-track", "schedule": "30 8 * * *" },
-    { "path": "/api/cron-track", "schedule": "30 14 * * *" }
+    { "path": "/api/cron-track", "schedule": "30 14 * * *" },
+    { "path": "/api/cron-salescount", "schedule": "0 20 * * *" }
   ],
   "routes": [
+    { "src": "/api/cron-salescount", "dest": "/api/cron-salescount.js" },
     { "src": "/api/cron-track",      "dest": "/api/cron-track.js" },
     { "src": "/api/order-lookup",    "dest": "/api/order-lookup.js" },
     { "src": "/api/next-order-no",   "dest": "/api/next-order-no.js" },

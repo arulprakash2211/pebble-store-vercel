@@ -1,6 +1,8 @@
-// api/cron-track.js — Scheduled job: refresh status of all undelivered (dispatched) orders
-// Runs on a Vercel Cron schedule (see vercel.json). Reuses /api/track per order,
-// which fetches the courier status, saves it, and auto-marks Delivered.
+// api/cron-track.js — Daily scheduled job (consolidated to fit Vercel Hobby limits):
+//   1) refresh status of all undelivered (dispatched) orders via /api/track
+//   2) recompute each product's `soldCount` (qty sold, excl. cancelled) for
+//      "most sold first" ordering.
+// One cron entry in vercel.json triggers this once a day.
 
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -59,7 +61,30 @@ export default async function handler(req, res) {
     }));
   }
 
-  const summary = { ok: true, dispatched: orders.length, checked, delivered, errors, at: new Date().toISOString() };
-  console.log('[cron-track]', JSON.stringify(summary));
+  // ── Part 2: recompute soldCount per product (qty sold, excludes cancelled) ──
+  let salesUpdated = 0, productsScanned = 0;
+  try {
+    const ordersSnap = await db.collection('orders').get();
+    const counts = {};
+    ordersSnap.docs.forEach(d => {
+      const o = d.data();
+      if (o.status === 'cancelled') return;
+      (o.items || []).forEach(it => { if (it.id) counts[it.id] = (counts[it.id] || 0) + (Number(it.qty) || 0); });
+    });
+    const prodSnap = await db.collection('products').get();
+    productsScanned = prodSnap.size;
+    let batch = db.batch(), n = 0;
+    for (const doc of prodSnap.docs) {
+      const want = counts[doc.id] || 0;
+      if ((doc.data().soldCount || 0) === want) continue;
+      batch.update(doc.ref, { soldCount: want });
+      salesUpdated++;
+      if (++n >= 400) { await batch.commit(); batch = db.batch(); n = 0; }
+    }
+    if (n > 0) await batch.commit();
+  } catch (err) { console.error('soldCount step failed:', err); }
+
+  const summary = { ok: true, dispatched: orders.length, checked, delivered, errors, productsScanned, salesUpdated, at: new Date().toISOString() };
+  console.log('[cron-daily]', JSON.stringify(summary));
   return res.status(200).json(summary);
 }

@@ -191,6 +191,7 @@
         <div><div class="page-title">Orders</div><div class="page-sub">All customer orders</div></div>
         <div style="display:flex;gap:0.6rem">
           <button class="btn btn-green" onclick="openNewOrderModal()">➕ New Order</button>
+          <button class="btn btn-clay" onclick="openDirectSale()">🛍️ Direct Sale</button>
           <button class="btn btn-ghost" onclick="showPackingSummary()">📦 Packing</button>
           <button class="btn btn-ghost" onclick="printOrdersSheet()">🖨️ Print Sheet</button>
           <button class="btn btn-ghost" onclick="refreshAllStatuses()">🔄 Refresh Statuses</button>
@@ -493,8 +494,14 @@
         </div>
       </div>
 
-      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.2rem">Dispatch update message</div>
-      <div style="font-size:0.75rem;color:var(--stone);margin-bottom:0.8rem">Sent to the customer on WhatsApp after an order is dispatched. Click a placeholder to insert it at the cursor; it is replaced with the real order details when sending.</div>
+      <div style="display:flex;align-items:center;gap:0.8rem;flex-wrap:wrap;margin:0.5rem 0 0.4rem">
+        <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark)">Message for</div>
+        <select id="waKindSelect" onchange="switchWaKind()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.45rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none">
+          <option value="dispatched">Dispatched</option>
+          <option value="delivered">Delivered</option>
+        </select>
+      </div>
+      <div style="font-size:0.75rem;color:var(--stone);margin-bottom:0.8rem">Offered after an order is marked Dispatched or Delivered, and from the 💬 WhatsApp button on those orders (to resend). Click a placeholder to insert it at the cursor; it is replaced with the real order details when sending.</div>
       <div id="waPlaceholders" style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.8rem"></div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem" class="wa-settings-grid">
@@ -775,7 +782,7 @@
   <div class="modal-overlay" id="whatsappModal">
     <div class="modal">
       <button class="modal-close" onclick="closeModal('whatsappModal')">×</button>
-      <div class="modal-title">💬 Send Dispatch Update on WhatsApp</div>
+      <div class="modal-title" id="waTitle">💬 Send Dispatch Update on WhatsApp</div>
       <div id="waTo" style="font-size:0.82rem;color:var(--stone);margin-bottom:0.6rem"></div>
       <div class="mfg"><label>Message (edit if needed)</label>
         <textarea id="waMessage" style="width:100%;min-height:170px;font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.65rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;resize:vertical"></textarea>
@@ -822,8 +829,8 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:1rem">
         <div class="mfg" style="grid-column:1/-1"><label>Customer Name *</label><input id="noName" placeholder="Full name" style="text-transform:uppercase"/></div>
         <div class="mfg"><label>Phone *</label><input id="noPhone" placeholder="00000 00000" oninput="autofillFromPhone()"/></div>
-        <div class="mfg"><label>Alternate Phone</label><input id="noAltPhone" placeholder="Optional"/></div>
-        <div style="grid-column:1/-1">
+        <div class="mfg" id="noAltPhoneWrap"><label>Alternate Phone</label><input id="noAltPhone" placeholder="Optional"/></div>
+        <div style="grid-column:1/-1" id="noAddrBlock">
           <label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);font-weight:500;display:block;margin-bottom:0.4rem">Address</label>
           <div style="display:flex;gap:0.4rem;margin-bottom:0.6rem">
             <button type="button" class="ostab addr-mode-btn" data-amode="whole" onclick="setAddrMode('whole')">Whole Address</button>
@@ -863,7 +870,7 @@
 
       <!-- Payment & Discount -->
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0.8rem;margin-bottom:1rem">
-        <div class="mfg">
+        <div class="mfg" id="noShippingWrap">
           <label>Shipping (₹)</label>
           <input id="noShipping" type="number" value="0" min="0" oninput="recalcNewOrder()"/>
         </div>
@@ -878,7 +885,7 @@
             <option value="true">Paid</option>
           </select>
         </div>
-        <div class="mfg">
+        <div class="mfg" id="noStatusWrap">
           <label>Order Status</label>
           <select id="noStatus">
             <option value="confirmed">Confirmed</option>
@@ -886,7 +893,7 @@
             <option value="ready">Ready for Dispatch</option>
           </select>
         </div>
-        <div class="mfg">
+        <div class="mfg" id="noPriorityWrap">
           <label>Priority</label>
           <div style="display:flex;align-items:center;gap:0.5rem;padding:0.55rem 0">
             <input type="checkbox" id="noPriority" style="width:auto;transform:scale(1.3)"/>
@@ -906,7 +913,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-    import { getFirestore, collection, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit, where, startAfter, getCountFromServer } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getFirestore, collection, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, deleteField, addDoc, query, orderBy, limit, where, startAfter, getCountFromServer } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
@@ -1137,9 +1144,11 @@
           } else if (o.status === 'ready') {
             actions = `<button class="btn btn-sm btn-green" onclick="openDispatchModal('${o.id}')">Dispatch</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
           } else if (o.status === 'dispatched') {
-            actions = `${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" onclick="checkTrackStatus('${o.id}')">🔄 Check Status</button>` : ''}<button class="btn btn-sm btn-blue" style="margin-top:3px" onclick="updateStatus('${o.id}','delivered')">Delivered</button><button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="openEditTracking('${o.id}')">✏️ Edit Tracking</button>`;
+            actions = `${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" onclick="checkTrackStatus('${o.id}')">🔄 Check Status</button>` : ''}<button class="btn btn-sm btn-blue" style="margin-top:3px" onclick="updateStatus('${o.id}','delivered')">Delivered</button><button class="btn btn-sm btn-green" style="margin-top:3px" onclick="resendWhatsApp('${o.id}')">💬 WhatsApp</button><button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="openEditTracking('${o.id}')">✏️ Edit Tracking</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="undoDispatch('${o.id}')">↩ Yet to Dispatch</button>`;
+          } else if (o.source === 'direct') {
+            actions = `<span style="font-size:0.72rem;color:var(--moss)">🛍️ Direct sale</span><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button>`;
           } else if (o.status === 'delivered') {
-            actions = `<span style="font-size:0.72rem;color:var(--moss)">✓ Complete</span>${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="checkTrackStatus('${o.id}')">🔄 Refresh Tracking</button>` : ''}<button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="openEditTracking('${o.id}')">✏️ Edit Tracking</button>`;
+            actions = `<span style="font-size:0.72rem;color:var(--moss)">✓ Complete</span><button class="btn btn-sm btn-green" style="margin-top:3px" onclick="resendWhatsApp('${o.id}')">💬 WhatsApp</button>${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="checkTrackStatus('${o.id}')">🔄 Refresh Tracking</button>` : ''}<button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="openEditTracking('${o.id}')">✏️ Edit Tracking</button>`;
           } else if (o.status === 'cancelled') {
             actions = `<span style="font-size:0.72rem;color:#c0392b">✗ Cancelled</span>`;
           }
@@ -1149,7 +1158,7 @@
           return `<tr class="${ageClass}">
             <td style="text-align:center"><input type="checkbox" class="order-check" value="${o.id}" ${selectedOrderIds.has(o.id) ? 'checked' : ''} onclick="toggleOrderSelect('${o.id}',this)"/></td>
             <td style="white-space:nowrap;font-size:0.78rem">${date}<br><span style="color:var(--stone);font-size:0.72rem">#${o.orderNo != null ? o.orderNo : '—'}</span></td>
-            <td>${o.priority ? '<span title="Priority order">⭐ </span>' : ''}<strong>${o.name}</strong>${o.source === 'admin' ? ' <span style="font-size:0.62rem;background:#e8d5ff;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">ADMIN</span>' : ''}<br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
+            <td>${o.priority ? '<span title="Priority order">⭐ </span>' : ''}<strong>${o.name}</strong>${o.source === 'direct' ? ' <span style="font-size:0.62rem;background:#fde9c9;color:#9a5b00;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">DIRECT</span>' : ''}${o.source === 'admin' ? ' <span style="font-size:0.62rem;background:#e8d5ff;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">ADMIN</span>' : ''}<br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
             <td>${normPhone(o.phone) || o.phone || ''}</td>
             <td class="order-items">${items}</td>
             <td><strong>₹${o.total}</strong></td>
@@ -1174,7 +1183,16 @@
 
     window.updateStatus = async (id, status) => {
       const now = new Date().toISOString();
-      try { await updateDoc(doc(db, 'orders', id), { status, statusChangedAt: now, updatedAt: now }); toast(`✅ Order marked as ${status}`); loadOrders(); }
+      try {
+        await updateDoc(doc(db, 'orders', id), { status, statusChangedAt: now, updatedAt: now });
+        toast(`✅ Order marked as ${status}`);
+        const o = allOrders.find(x => x.id === id);
+        loadOrders();
+        if (status === 'delivered' && o) {   // offer the delivery update on WhatsApp
+          const t = o.tracking || {};
+          openWhatsAppSend(o, t.courier || '', t.trackingId || '', 'delivered');
+        }
+      }
       catch (err) { toast('❌ ' + err.message); }
     };
     // Fetch live courier status via /api/track (which also saves it + marks delivered)
@@ -1251,6 +1269,19 @@
       }
       toast(`✅ Checked ${checked} · ${delivered} delivered`);
       loadOrders();
+    };
+    // Dispatched order went back (courier missed / delayed): return it to "Ready for Dispatch"
+    window.undoDispatch = async (id) => {
+      const o = allOrders.find(x => x.id === id);
+      if (!confirm('Move this order back to "Ready for Dispatch"? The current courier/tracking details will be removed so you can dispatch it again.')) return;
+      const now = new Date().toISOString();
+      try {
+        const upd = { status: 'ready', statusChangedAt: now, updatedAt: now, tracking: deleteField() };
+        if (o && o.tracking) upd.previousTracking = o.tracking;   // keep for reference
+        await updateDoc(doc(db, 'orders', id), upd);
+        toast('↩ Moved back to Ready for Dispatch');
+        loadOrders();
+      } catch (err) { toast('❌ ' + err.message); }
     };
     window.cancelOrder = async (id) => {
       if (!confirm('Cancel this order?')) return;
@@ -1826,24 +1857,45 @@ Thank you for shopping with Pebble Store 🌿`;
       ['{name}', 'Customer name'], ['{orderNo}', 'Order number'], ['{courier}', 'Courier'],
       ['{trackingId}', 'Tracking ID'], ['{items}', 'Item list'], ['{total}', 'Order total'], ['{trackUrl}', 'Tracking page link']
     ];
-    let waTemplateCache = null;
-    async function getWaTemplate() {
-      if (waTemplateCache !== null) return waTemplateCache;
+    const WA_DELIVERED_TEMPLATE =
+`Hi {name}, your Pebble Store order {orderNo} has been delivered! ✅
+
+Items:
+{items}
+
+We hope you love it! If you have any questions, just reply to this message.
+
+Thank you for shopping with Pebble Store 🌿`;
+    // kind → { field in settings/whatsapp, default text, modal title }
+    const WA_KINDS = {
+      dispatched: { field: 'dispatchTemplate',  def: WA_DEFAULT_TEMPLATE,   title: '💬 Send Dispatch Update on WhatsApp' },
+      delivered:  { field: 'deliveredTemplate', def: WA_DELIVERED_TEMPLATE, title: '💬 Send Delivery Update on WhatsApp' }
+    };
+    let waTemplatesCache = null;
+    async function getWaTemplates() {
+      if (waTemplatesCache) return waTemplatesCache;
+      let data = {};
       try {
         const snap = await getDoc(doc(db, 'settings', 'whatsapp'));
-        const t = snap.exists() ? snap.data().dispatchTemplate : '';
-        waTemplateCache = (t && t.trim()) ? t : WA_DEFAULT_TEMPLATE;
-      } catch (e) { return WA_DEFAULT_TEMPLATE; }   // don't cache failures; fall back to default
-      return waTemplateCache;
+        if (snap.exists()) data = snap.data();
+      } catch (e) {   // don't cache failures; fall back to defaults
+        return Object.fromEntries(Object.entries(WA_KINDS).map(([k, v]) => [k, v.def]));
+      }
+      waTemplatesCache = {};
+      for (const [k, v] of Object.entries(WA_KINDS)) {
+        const t = data[v.field];
+        waTemplatesCache[k] = (t && t.trim()) ? t : v.def;
+      }
+      return waTemplatesCache;
     }
     function fillWaTemplate(tpl, v) {
       return tpl.replace(/\{(\w+)\}/g, (m, k) => (k in v ? v[k] : m));
     }
 
-    window.openWhatsAppSend = async (order, courier, trackingId) => {
+    window.openWhatsAppSend = async (order, courier, trackingId, kind = 'dispatched') => {
       const digits = normPhone(order.phone);
       waPhone = digits.length === 10 ? '91' + digits : digits;
-      const msg = fillWaTemplate(await getWaTemplate(), {
+      const msg = fillWaTemplate((await getWaTemplates())[kind], {
         name: order.name || '',
         orderNo: order.orderNo != null ? '#' + order.orderNo : '',
         courier, trackingId,
@@ -1853,6 +1905,7 @@ Thank you for shopping with Pebble Store 🌿`;
       });
       document.getElementById('waTo').textContent =
         `To: ${order.name || 'Customer'}${waPhone ? '  ·  +' + waPhone : '  ·  (no phone number on order)'}`;
+      document.getElementById('waTitle').textContent = WA_KINDS[kind].title;
       document.getElementById('waMessage').value = msg;
       document.getElementById('whatsappModal').classList.add('open');
       waShowQR();   // show the QR by default
@@ -1873,7 +1926,17 @@ Thank you for shopping with Pebble Store 🌿`;
       document.getElementById('waQR').style.display = 'block';
     };
 
+    // Resend the WhatsApp update for an order already dispatched / delivered
+    window.resendWhatsApp = (id) => {
+      const o = allOrders.find(x => x.id === id);
+      if (!o) return;
+      const t = o.tracking || {};
+      openWhatsAppSend(o, t.courier || '', t.trackingId || '', o.status === 'delivered' ? 'delivered' : 'dispatched');
+    };
+
     // ── Settings: WhatsApp template editor ──
+    let waDrafts = {};          // unsaved editor text per kind
+    let waEditKind = 'dispatched';
     window.loadWaSettings = async () => {
       const box = document.getElementById('waPlaceholders');
       if (!box.children.length) {
@@ -1884,8 +1947,16 @@ Thank you for shopping with Pebble Store 🌿`;
           box.appendChild(b);
         });
       }
-      waTemplateCache = null;   // re-read so the editor always shows what is saved
-      document.getElementById('waTemplateInput').value = await getWaTemplate();
+      waTemplatesCache = null;   // re-read so the editor always shows what is saved
+      waDrafts = { ...(await getWaTemplates()) };
+      waEditKind = document.getElementById('waKindSelect').value;
+      document.getElementById('waTemplateInput').value = waDrafts[waEditKind];
+      renderWaPreview();
+    };
+    window.switchWaKind = () => {
+      waDrafts[waEditKind] = document.getElementById('waTemplateInput').value;   // keep unsaved edits
+      waEditKind = document.getElementById('waKindSelect').value;
+      document.getElementById('waTemplateInput').value = waDrafts[waEditKind];
       renderWaPreview();
     };
     window.insertWaPlaceholder = (ph) => {
@@ -1903,17 +1974,19 @@ Thank you for shopping with Pebble Store 🌿`;
       });
     };
     window.saveWaTemplate = async () => {
-      const t = document.getElementById('waTemplateInput').value;
-      if (!t.trim()) { toast('⚠️ Template cannot be empty'); return; }
+      waDrafts[waEditKind] = document.getElementById('waTemplateInput').value;
+      if (Object.values(waDrafts).some(t => !t.trim())) { toast('⚠️ Template cannot be empty'); return; }
+      const data = { updatedAt: new Date().toISOString() };
+      for (const [k, v] of Object.entries(WA_KINDS)) data[v.field] = waDrafts[k];
       try {
-        await setDoc(doc(db, 'settings', 'whatsapp'), { dispatchTemplate: t, updatedAt: new Date().toISOString() }, { merge: true });
-        waTemplateCache = t;
-        toast('✅ Template saved');
+        await setDoc(doc(db, 'settings', 'whatsapp'), data, { merge: true });
+        waTemplatesCache = { ...waDrafts };
+        toast('✅ Templates saved');
       } catch (err) { toast('❌ ' + err.message); }
     };
     window.resetWaTemplate = () => {
-      if (!confirm('Replace the editor text with the default template? (Not saved until you click Save.)')) return;
-      document.getElementById('waTemplateInput').value = WA_DEFAULT_TEMPLATE;
+      if (!confirm('Replace the editor text with the default for this message? (Not saved until you click Save.)')) return;
+      document.getElementById('waTemplateInput').value = WA_KINDS[waEditKind].def;
       renderWaPreview();
     };
 
@@ -2552,10 +2625,28 @@ Thank you for shopping with Pebble Store 🌿`;
       recalcNewOrder();
     };
 
+    // Direct sale = walk-in / over-the-counter sale: no address, shipping, dispatch or status steps.
+    let noDirectMode = false;
+    function setDirectMode(on) {
+      noDirectMode = on;
+      const show = (id, v) => { document.getElementById(id).style.display = v ? '' : 'none'; };
+      ['noAddrBlock', 'noAltPhoneWrap', 'noShippingWrap', 'noStatusWrap', 'noPriorityWrap'].forEach(id => show(id, !on));
+      document.getElementById('noName').previousElementSibling.textContent  = on ? 'Customer Name (optional)' : 'Customer Name *';
+      document.getElementById('noPhone').previousElementSibling.textContent = on ? 'Phone (optional)' : 'Phone *';
+      document.getElementById('noName').placeholder = on ? 'Walk-in customer' : 'Full name';
+    }
+    window.openDirectSale = async () => {
+      await openNewOrderModal();
+      setDirectMode(true);
+      document.getElementById('noModalTitle').textContent = '🛍️ Direct Sale';
+      document.getElementById('noPaid').value = 'true';
+    };
+
     window.openNewOrderModal = async () => {
       await ensureProductsLoaded();
       editingOrderId = null;
       document.getElementById('noModalTitle').textContent = '➕ New Manual Order';
+      setDirectMode(false);
       // Reset form
       ['noName','noPhone','noAltPhone','noAddress','noEmail','noNotes','noAddrLine','noAddrArea','noAddrCity','noAddrState','noAddrPincode'].forEach(id => document.getElementById(id).value = '');
       setAddrMode('fields');
@@ -2580,7 +2671,8 @@ Thank you for shopping with Pebble Store 🌿`;
       const order = allOrders.find(o => o.id === id);
       if (!order) { toast('❌ Order not found'); return; }
       editingOrderId = id;
-      document.getElementById('noModalTitle').textContent = '✏️ Edit Order';
+      document.getElementById('noModalTitle').textContent = order.source === 'direct' ? '✏️ Edit Direct Sale' : '✏️ Edit Order';
+      setDirectMode(order.source === 'direct');
       document.getElementById('noName').value    = order.name    || '';
       document.getElementById('noPhone').value    = order.phone    || '';
       document.getElementById('noAltPhone').value = order.altPhone || '';
@@ -2730,8 +2822,8 @@ Thank you for shopping with Pebble Store 🌿`;
       const dateVal  = document.getElementById('noDate').value;
       const createdAtISO = dateVal ? new Date(dateVal + 'T12:00:00').toISOString() : new Date().toISOString();
 
-      if (!name || !phone) { showNoErr(msg, '⚠️ Name and phone are required.'); return; }
-      if (!/^\+?\d{10,15}$/.test(phone)) {
+      if (!noDirectMode && (!name || !phone)) { showNoErr(msg, '⚠️ Name and phone are required.'); return; }
+      if ((phone || !noDirectMode) && !/^\+?\d{10,15}$/.test(phone)) {
         showNoErr(msg, '⚠️ Enter a valid phone number (10–15 digits, optional leading +).');
         return;
       }
@@ -2764,7 +2856,7 @@ Thank you for shopping with Pebble Store 🌿`;
         ? consolidateAddr(addrLine, addrArea, addrCity, addrState, addrPincode)
         : document.getElementById('noAddress').value.trim().toUpperCase();
 
-      const shippingVal = parseFloat(document.getElementById('noShipping').value) || 0;
+      const shippingVal = noDirectMode ? 0 : (parseFloat(document.getElementById('noShipping').value) || 0);
       const discountVal = parseFloat(document.getElementById('noDiscount').value) || 0;
       const subtotal    = items.reduce((s, i) => s + i.subtotal, 0);
       const total       = Math.max(0, subtotal + shippingVal - discountVal);
@@ -2773,7 +2865,7 @@ Thank you for shopping with Pebble Store 🌿`;
       msg.style.cssText = 'display:block;color:var(--moss);font-size:0.8rem';
 
       const data = {
-        name,
+        name: name || (noDirectMode ? 'WALK-IN CUSTOMER' : name),
         phone,
         phoneNorm: normPhone(phone),
         altPhone,
@@ -2786,9 +2878,9 @@ Thank you for shopping with Pebble Store 🌿`;
         shipping: shippingVal,
         discount: discountVal,
         total,
-        status:   document.getElementById('noStatus').value,
+        status:   noDirectMode ? 'delivered' : document.getElementById('noStatus').value,
         paid:     document.getElementById('noPaid').value === 'true',
-        priority: document.getElementById('noPriority').checked,
+        priority: noDirectMode ? false : document.getElementById('noPriority').checked,
         createdAt: createdAtISO,
         updatedAt: new Date().toISOString()
       };
@@ -2801,12 +2893,12 @@ Thank you for shopping with Pebble Store 🌿`;
           await updateDoc(doc(db, 'orders', editingOrderId), data);
           toast('✅ Order updated!');
         } else {
-          data.source    = 'admin';   // marks as manual/admin order
+          data.source    = noDirectMode ? 'direct' : 'admin';   // manual order vs. direct (walk-in) sale
           data.tracking  = null;
           data.statusChangedAt = createdAtISO;   // status-age starts at the order date
           data.orderNo   = await nextOrderNo();
           await addDoc(collection(db, 'orders'), data);
-          toast('✅ Order saved!');
+          toast(noDirectMode ? '✅ Direct sale saved!' : '✅ Order saved!');
         }
         editingOrderId = null;
         closeModal('newOrderModal');

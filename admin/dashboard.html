@@ -195,7 +195,6 @@
         <div><div class="page-title">Orders</div><div class="page-sub">All customer orders</div></div>
         <div style="display:flex;gap:0.6rem">
           <button class="btn btn-green" onclick="openNewOrderModal()">➕ New Order</button>
-          <button class="btn btn-clay" onclick="openDirectSale()">🛍️ Direct Sale</button>
           <button class="btn btn-ghost" onclick="showPackingSummary()">📦 Packing</button>
           <button class="btn btn-ghost" onclick="printOrdersSheet()">🖨️ Print Sheet</button>
           <button class="btn btn-ghost" onclick="refreshAllStatuses()">🔄 Refresh Statuses</button>
@@ -878,6 +877,10 @@
     <div class="modal" style="max-width:600px;width:100%">
       <button class="modal-close" onclick="closeModal('newOrderModal')">×</button>
       <div class="modal-title" id="noModalTitle">➕ New Manual Order</div>
+      <div id="noDirectWrap" style="background:#fdf3e2;border:1px solid #f0d9a8;padding:0.55rem 0.8rem;margin-bottom:1rem;display:flex;align-items:center;gap:0.6rem">
+        <input type="checkbox" id="noDirect" style="width:auto;transform:scale(1.2)" onchange="toggleDirectSale(this.checked)"/>
+        <label for="noDirect" style="cursor:pointer;font-size:0.85rem">🛍️ <strong>Direct sale</strong> <span style="color:var(--stone)">— walk-in / over the counter. Name, phone, address and shipping can be skipped.</span></label>
+      </div>
 
       <!-- Customer Details -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:1rem">
@@ -886,6 +889,10 @@
         <div class="mfg" id="noAltPhoneWrap"><label>Alternate Phone</label><input id="noAltPhone" placeholder="Optional"/></div>
         <div style="grid-column:1/-1" id="noAddrBlock">
           <label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone);font-weight:500;display:block;margin-bottom:0.4rem">Address</label>
+          <div id="noAddrPickWrap" style="display:none;margin-bottom:0.6rem">
+            <select id="noAddrPick" onchange="applyAddrChoice(this.value)" style="width:100%;font-family:'Jost',sans-serif;font-size:0.82rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none"></select>
+            <div style="font-size:0.66rem;color:var(--stone);margin-top:0.2rem">Addresses used on this customer's earlier orders — pick one, or choose "type a new address" to add another.</div>
+          </div>
           <div style="display:flex;gap:0.4rem;margin-bottom:0.6rem">
             <button type="button" class="ostab addr-mode-btn" data-amode="whole" onclick="setAddrMode('whole')">Whole Address</button>
             <button type="button" class="ostab addr-mode-btn active" data-amode="fields" onclick="setAddrMode('fields')">Specific Fields</button>
@@ -2789,11 +2796,12 @@ Hope to see you again soon!`;
       const itemsBought = valid.reduce((t, o) => t + (o.items || []).reduce((u, i) => u + (i.qty || 0), 0), 0);
       const first = valid.length ? dateOf(valid[valid.length - 1]) : '—';
       const last  = valid.length ? dateOf(valid[0]) : '—';
+      const addrs = [...new Set(all.map(addrKeyOf).filter(Boolean))];   // distinct addresses, latest first
       const card = (label, val, cls = '') => `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value ${cls}" style="font-size:1.3rem">${val}</div></div>`;
 
       document.getElementById('custModalName').textContent = c.name;
       document.getElementById('custModalContact').innerHTML =
-        `📞 +91 ${c.key}${c.email && c.email !== '—' ? ' · ✉️ ' + c.email : ''}${c.address && c.address !== '—' ? '<br>📍 ' + c.address : ''}${c.referredBy ? '<br>🤝 Referred by ' + c.referredBy : ''}`;
+        `📞 +91 ${c.key}${c.email && c.email !== '—' ? ' · ✉️ ' + c.email : ''}${addrs.map((a, i) => '<br>📍 ' + (addrs.length > 1 ? `<span style="color:var(--stone)">${i === 0 ? 'Latest' : 'Alt ' + i}:</span> ` : '') + escapeHtml(a)).join('')}${c.referredBy ? '<br>🤝 Referred by ' + c.referredBy : ''}`;
       document.getElementById('custModalStats').innerHTML =
         card('Orders', valid.length) + card('Total Spent', fmt(spent), 'green') +
         card('Avg Order', fmt(valid.length ? Math.round(spent / valid.length) : 0), 'clay') +
@@ -3016,13 +3024,14 @@ Hope to see you again soon!`;
       recalcNewOrder();
     };
     ['noAddress', 'noAddrLine', 'noAddrArea', 'noAddrCity', 'noAddrState', 'noAddrPincode']
-      .forEach(id => document.getElementById(id).addEventListener('input', () => applyDefaultShipping()));
+      .forEach(id => document.getElementById(id).addEventListener('input', () => { applyDefaultShipping(); syncAddrPick(); }));
 
     // Direct sale = walk-in / over-the-counter sale: no address, shipping, dispatch or status steps.
     let noDirectMode = false;
     let noKeepStatus = null;   // editing a dispatched/delivered order: status is left as is
     function setDirectMode(on) {
       noDirectMode = on;
+      document.getElementById('noDirect').checked = on;
       const show = (id, v) => { document.getElementById(id).style.display = v ? '' : 'none'; };
       ['noAddrBlock', 'noAltPhoneWrap', 'noShippingWrap', 'noPriorityWrap'].forEach(id => show(id, !on));
       // Direct sales only go New → Delivered
@@ -3033,12 +3042,13 @@ Hope to see you again soon!`;
       document.getElementById('noPhone').previousElementSibling.textContent = on ? 'Phone (optional)' : 'Phone *';
       document.getElementById('noName').placeholder = on ? 'Walk-in customer' : 'Full name';
     }
-    window.openDirectSale = async () => {
-      await openNewOrderModal();
-      setDirectMode(true);
-      document.getElementById('noModalTitle').textContent = '🛍️ Direct Sale';
-      document.getElementById('noPaid').value = 'true';
-      document.getElementById('noStatus').value = 'new';
+    // "Direct sale" checkbox on the New Order form
+    window.toggleDirectSale = (on) => {
+      setDirectMode(on);
+      document.getElementById('noModalTitle').textContent = on ? '🛍️ Direct Sale' : '➕ New Manual Order';
+      document.getElementById('noPaid').value = on ? 'true' : 'false';
+      document.getElementById('noStatus').value = on ? 'new' : 'confirmed';
+      if (!on) applyDefaultShipping();
     };
 
     window.openNewOrderModal = async () => {
@@ -3047,6 +3057,8 @@ Hope to see you again soon!`;
       editingOrderId = null;
       noKeepStatus = null;
       document.getElementById('noStatusWrap').style.display = '';
+      document.getElementById('noDirectWrap').style.display = '';
+      setSavedAddrs([]);
       document.getElementById('noModalTitle').textContent = '➕ New Manual Order';
       setDirectMode(false);
       // Reset form
@@ -3077,6 +3089,7 @@ Hope to see you again soon!`;
       editingOrderId = id;
       document.getElementById('noModalTitle').textContent = order.source === 'direct' ? '✏️ Edit Direct Sale' : '✏️ Edit Order';
       setDirectMode(order.source === 'direct');
+      document.getElementById('noDirectWrap').style.display = 'none';
       document.getElementById('noName').value    = order.name    || '';
       document.getElementById('noPhone').value    = order.phone    || '';
       document.getElementById('noAltPhone').value = order.altPhone || '';
@@ -3116,6 +3129,7 @@ Hope to see you again soon!`;
       document.getElementById('noMsg').style.display = 'none';
       recalcNewOrder();
       document.getElementById('newOrderModal').classList.add('open');
+      loadSavedAddrs(order.phone);
     };
 
     window.addOrderProductRow = (preId = null, preQty = 1) => {
@@ -3188,17 +3202,65 @@ Hope to see you again soon!`;
     }
 
     // Only fills empty fields, so anything already typed is preserved.
+    // ── Customer's saved addresses = the distinct addresses on their earlier orders ──
+    let noSavedAddrs = [];
+    const normAddrKey = t => String(t || '').trim().toUpperCase().replace(/\s+/g, ' ');
+    function addrKeyOf(o) {
+      const hasFields = o.addrLine || o.addrArea || o.addrCity || o.addrState || o.addrPincode;
+      return normAddrKey(hasFields ? consolidateAddr(o.addrLine, o.addrArea, o.addrCity, o.addrState, o.addrPincode) : o.address);
+    }
+    function currentAddrKey() {
+      const v = id => document.getElementById(id).value.trim().toUpperCase();
+      const fieldsMode = document.querySelector('.addr-mode-btn[data-amode="fields"]')?.classList.contains('active');
+      return normAddrKey(fieldsMode ? consolidateAddr(v('noAddrLine'), v('noAddrArea'), v('noAddrCity'), v('noAddrState'), document.getElementById('noAddrPincode').value.trim()) : v('noAddress'));
+    }
+    function syncAddrPick() {
+      const k = currentAddrKey();
+      const i = noSavedAddrs.findIndex(a => a.key === k);
+      document.getElementById('noAddrPick').value = i >= 0 ? String(i) : '';
+    }
+    function setSavedAddrs(orders) {   // orders: the customer's earlier orders, newest first
+      const seen = new Set();
+      noSavedAddrs = [];
+      orders.forEach(o => { const k = addrKeyOf(o); if (k && !seen.has(k)) { seen.add(k); noSavedAddrs.push({ key: k, o }); } });
+      document.getElementById('noAddrPick').innerHTML = '<option value="">＋ Type a new / different address</option>' +
+        noSavedAddrs.map((a, i) => `<option value="${i}">${escapeHtml(a.key.length > 80 ? a.key.slice(0, 80) + '…' : a.key)}</option>`).join('');
+      document.getElementById('noAddrPickWrap').style.display = noSavedAddrs.length ? '' : 'none';
+      syncAddrPick();
+    }
+    async function loadSavedAddrs(phone) {
+      const key = normPhone(phone);
+      if (key.length < 10) return;
+      try {
+        const snap = await getDocs(query(collection(db, 'orders'), where('phoneNorm', '==', key)));
+        setSavedAddrs(snap.docs.map(d => d.data()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+      } catch (_) {}
+    }
+    // Choose one of the saved addresses (or '' to clear the fields and type a different one)
+    window.applyAddrChoice = (i) => {
+      const set = (id, v) => { document.getElementById(id).value = v || ''; };
+      ['noAddress', 'noAddrLine', 'noAddrArea', 'noAddrCity', 'noAddrState', 'noAddrPincode'].forEach(id => set(id, ''));
+      if (i === '') { setAddrMode('fields'); return; }
+      const o = noSavedAddrs[+i].o;
+      if (o.addrLine || o.addrArea || o.addrCity || o.addrState || o.addrPincode) {
+        set('noAddrLine', o.addrLine); set('noAddrArea', o.addrArea); set('noAddrCity', o.addrCity); set('noAddrState', o.addrState); set('noAddrPincode', o.addrPincode);
+        setAddrMode('fields');
+      } else { set('noAddress', o.address); setAddrMode('whole'); }
+      applyDefaultShipping();
+    };
+
     window.autofillFromPhone = async () => {
       const key = normPhone(document.getElementById('noPhone').value);
       if (key.length < 10) return;
       // Targeted query on the normalised phone field — no full-collection download.
-      let match;
+      let match, hist = [];
       try {
         const snap = await getDocs(query(collection(db, 'orders'), where('phoneNorm', '==', key)));
-        match = snap.docs.map(d => d.data())
-          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+        hist = snap.docs.map(d => d.data())
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        match = hist[0];
       } catch (err) { return; }
-      if (!match) return;
+      if (!match) { setSavedAddrs([]); return; }
       const setIfEmpty = (id, val) => { const el = document.getElementById(id); if (el && !el.value.trim() && val) el.value = val; };
       setIfEmpty('noName', match.name);
       setIfEmpty('noEmail', match.email);
@@ -3216,6 +3278,7 @@ Hope to see you again soon!`;
         setIfEmpty('noAddress', match.address);
         setAddrMode('whole');
       }
+      setSavedAddrs(hist);
       applyDefaultShipping();
     };
 

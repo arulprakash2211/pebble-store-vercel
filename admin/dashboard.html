@@ -447,6 +447,15 @@
         <div class="stat-card"><div class="stat-label">Avg Order</div><div class="stat-value clay" id="repAvg">—</div></div>
       </div>
 
+      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.2rem">First-time vs Repeat Orders</div>
+      <div style="font-size:0.72rem;color:var(--stone);margin-bottom:0.6rem">First-time = the customer's first order ever (matched by phone). Repeat = they had ordered before.</div>
+      <div class="table-wrap" style="margin-bottom:1.6rem">
+        <table>
+          <thead><tr><th>Type</th><th style="text-align:center">Orders</th><th style="text-align:center">Customers</th><th style="text-align:right">Revenue</th><th style="text-align:right">Share of Orders</th></tr></thead>
+          <tbody id="repCustBody"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+
       <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.6rem">Sales by Category</div>
       <div class="table-wrap" style="margin-bottom:1.6rem">
         <table>
@@ -466,8 +475,8 @@
       <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.6rem">Monthly Summary</div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Month</th><th style="text-align:center">Orders</th><th style="text-align:center">Items</th><th style="text-align:right">Revenue</th></tr></thead>
-          <tbody id="repMonthlyBody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+          <thead><tr><th>Month</th><th style="text-align:center">Orders</th><th style="text-align:center">First-time</th><th style="text-align:center">Repeat</th><th style="text-align:center">Items</th><th style="text-align:right">Revenue</th></tr></thead>
+          <tbody id="repMonthlyBody"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -2713,6 +2722,8 @@ Thank you for shopping with Pebble Store 🌿`;
     // REPORTS
     // ══════════════════════════════
     let reportOrders = [];
+    let reportPriorPhones = new Set();   // customers who ordered before the report range
+    let repCustRows = [];
     let repMonthlyRows = [], repProductRows = [], repCategoryRows = [];
     let reportCatById = {}, reportCatByLabel = {}, reportGroupById = {}, reportVariantById = {};
 
@@ -2757,11 +2768,20 @@ Thank you for shopping with Pebble Store 🌿`;
         if (from) cons.push(where('createdAt', '>=', from));
         if (to)   cons.push(where('createdAt', '<=', to + 'T23:59:59.999Z'));
         const oQuery = cons.length ? query(collection(db, 'orders'), ...cons) : collection(db, 'orders');
-        const [oSnap, pSnap] = await Promise.all([
+        // Orders before the range start tell us who is already an existing customer
+        const priorQuery = from ? query(collection(db, 'orders'), where('createdAt', '<', from)) : null;
+        const [oSnap, pSnap, priorSnap] = await Promise.all([
           getDocs(oQuery),
-          getDocs(collection(db, 'products'))
+          getDocs(collection(db, 'products')),
+          priorQuery ? getDocs(priorQuery) : Promise.resolve(null)
         ]);
         reportOrders = oSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        reportPriorPhones = new Set();
+        if (priorSnap) priorSnap.docs.forEach(d => {
+          const o = d.data();
+          const k = o.status !== 'cancelled' && normPhone(o.phone);
+          if (k) reportPriorPhones.add(k);
+        });
         // Map order items back to a category (orders don't store category)
         reportCatById = {}; reportCatByLabel = {}; reportGroupById = {}; reportVariantById = {};
         pSnap.docs.forEach(d => {
@@ -2771,7 +2791,7 @@ Thank you for shopping with Pebble Store 🌿`;
         });
         renderReports();
       } catch (err) {
-        document.getElementById('repMonthlyBody').innerHTML = `<tr><td colspan="4" class="loading">Error: ${err.message}</td></tr>`;
+        document.getElementById('repMonthlyBody').innerHTML = `<tr><td colspan="6" class="loading">Error: ${err.message}</td></tr>`;
       }
     };
 
@@ -2788,6 +2808,18 @@ Thank you for shopping with Pebble Store 🌿`;
       if (from) orders = orders.filter(o => (o.createdAt || '') >= from);
       if (to)   orders = orders.filter(o => (o.createdAt || '') <= to + 'T23:59:59');
 
+      // Classify each order as new (customer's first ever) or repeat, oldest first
+      const seen = new Set(reportPriorPhones);
+      const cust = { new: { orders: 0, revenue: 0, phones: new Set() }, repeat: { orders: 0, revenue: 0, phones: new Set() }, unknown: { orders: 0, revenue: 0, phones: new Set() } };
+      [...orders].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || '')).forEach(o => {
+        const k = normPhone(o.phone);
+        const type = !k ? 'unknown' : (seen.has(k) ? 'repeat' : 'new');
+        if (k) seen.add(k);
+        o._custType = type;
+        cust[type].orders++; cust[type].revenue += o.total || 0;
+        if (k) cust[type].phones.add(k);
+      });
+
       const fmt = n => '₹' + Number(n || 0).toLocaleString('en-IN');
       const revenue   = orders.reduce((s, o) => s + (o.total || 0), 0);
       const itemsSold = orders.reduce((s, o) => s + (o.items || []).reduce((t, i) => t + (i.qty || 0), 0), 0);
@@ -2800,6 +2832,14 @@ Thank you for shopping with Pebble Store 🌿`;
       document.getElementById('repAvg').textContent     = fmt(avg);
       document.getElementById('repRangeInfo').textContent =
         (from || to) ? `${from || '…'} → ${to || '…'} · excludes cancelled` : 'All time · excludes cancelled';
+
+      // New vs repeat summary
+      const custLabels = { new: 'First-time orders', repeat: 'Repeat orders', unknown: 'No phone number' };
+      repCustRows = ['new', 'repeat', 'unknown'].filter(t => t !== 'unknown' || cust.unknown.orders)
+        .map(t => ({ label: custLabels[t], orders: cust[t].orders, customers: t === 'unknown' ? '' : cust[t].phones.size, revenue: cust[t].revenue, share: count ? Math.round(cust[t].orders / count * 100) : 0 }));
+      document.getElementById('repCustBody').innerHTML = count
+        ? repCustRows.map(r => `<tr><td><strong>${r.label}</strong></td><td style="text-align:center">${r.orders}</td><td style="text-align:center">${r.customers}</td><td style="text-align:right"><strong>${fmt(r.revenue)}</strong></td><td style="text-align:right">${r.share}%</td></tr>`).join('')
+        : '<tr><td colspan="5" class="loading">No orders in this range.</td></tr>';
 
       // Sales by category, with the products inside each category as sub-rows
       const byCat = {};
@@ -2834,8 +2874,10 @@ Thank you for shopping with Pebble Store 🌿`;
       orders.forEach(o => {
         const d = new Date(o.createdAt);
         const key = isNaN(d.getTime()) ? '0000-00' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        (byMonth[key] = byMonth[key] || { orders: 0, items: 0, revenue: 0 });
+        (byMonth[key] = byMonth[key] || { orders: 0, newOrders: 0, repeatOrders: 0, items: 0, revenue: 0 });
         byMonth[key].orders++;
+        if (o._custType === 'new') byMonth[key].newOrders++;
+        else if (o._custType === 'repeat') byMonth[key].repeatOrders++;
         byMonth[key].revenue += o.total || 0;
         byMonth[key].items   += (o.items || []).reduce((t, i) => t + (i.qty || 0), 0);
       });
@@ -2844,8 +2886,8 @@ Thank you for shopping with Pebble Store 🌿`;
         return { label: k === '0000-00' ? 'Unknown' : `${MON[parseInt(m) - 1]} ${y}`, ...byMonth[k] };
       });
       document.getElementById('repMonthlyBody').innerHTML = repMonthlyRows.length
-        ? repMonthlyRows.map(r => `<tr><td><strong>${r.label}</strong></td><td style="text-align:center">${r.orders}</td><td style="text-align:center">${r.items}</td><td style="text-align:right"><strong>${fmt(r.revenue)}</strong></td></tr>`).join('')
-        : '<tr><td colspan="4" class="loading">No orders in this range.</td></tr>';
+        ? repMonthlyRows.map(r => `<tr><td><strong>${r.label}</strong></td><td style="text-align:center">${r.orders}</td><td style="text-align:center">${r.newOrders}</td><td style="text-align:center">${r.repeatOrders}</td><td style="text-align:center">${r.items}</td><td style="text-align:right"><strong>${fmt(r.revenue)}</strong></td></tr>`).join('')
+        : '<tr><td colspan="6" class="loading">No orders in this range.</td></tr>';
 
       // Product split — grouped by product, with size variants as sub-rows.
       // Item names for grouped products are stored as "Group — Variant".
@@ -2889,8 +2931,10 @@ Thank you for shopping with Pebble Store 🌿`;
       const nl = String.fromCharCode(10);
       let csv = 'Sales by Category' + nl + 'Category / Product,Qty,Revenue,Share %' + nl;
       csv += repCategoryRows.map(r => `"${String(r.name).trim().replace(/"/g, '""')}",${r.qty},${r.revenue},${r.share}`).join(nl);
-      csv += nl + nl + 'Monthly Summary' + nl + 'Month,Orders,Items,Revenue' + nl;
-      csv += repMonthlyRows.map(r => `${r.label},${r.orders},${r.items},${r.revenue}`).join(nl);
+      csv += nl + nl + 'First-time vs Repeat Orders' + nl + 'Type,Orders,Customers,Revenue,Share of Orders %' + nl;
+      csv += repCustRows.map(r => `${r.label},${r.orders},${r.customers},${r.revenue},${r.share}`).join(nl);
+      csv += nl + nl + 'Monthly Summary' + nl + 'Month,Orders,First-time Orders,Repeat Orders,Items,Revenue' + nl;
+      csv += repMonthlyRows.map(r => `${r.label},${r.orders},${r.newOrders},${r.repeatOrders},${r.items},${r.revenue}`).join(nl);
       csv += nl + nl + 'Product Split' + nl + 'Product,Qty,Price Per Unit,Total' + nl;
       csv += repProductRows.map(r => `"${String(r.name).trim().replace(/"/g, '""')}",${r.qty},${r.unit},${r.revenue}`).join(nl);
       const blob = new Blob([csv], { type: 'text/csv' });

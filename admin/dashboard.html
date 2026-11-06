@@ -225,6 +225,7 @@
           <option value="unpaid">Unpaid</option>
         </select>
         <button class="ostab" id="priorityFilterBtn" onclick="togglePriorityFilter(this)">⭐ Priority</button>
+        <span id="orderBulkBar"></span>
         <span id="orderCount" style="font-size:0.75rem;color:var(--stone);margin-left:auto"></span>
       </div>
       <div class="table-wrap">
@@ -518,12 +519,13 @@
       <div style="display:flex;align-items:center;gap:0.8rem;flex-wrap:wrap;margin:0.5rem 0 0.4rem">
         <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark)">Message for</div>
         <select id="waKindSelect" onchange="switchWaKind()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.45rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none">
+          <option value="confirmed">Order confirmation</option>
           <option value="dispatched">Dispatched</option>
           <option value="delivered">Delivered</option>
           <option value="winback">Win-back (no order in 2 months)</option>
         </select>
       </div>
-      <div style="font-size:0.75rem;color:var(--stone);margin-bottom:0.8rem">Dispatched / Delivered: offered after the status change and from the 💬 WhatsApp button on those orders (to resend). Win-back: sent from the 💬 button on the Customers page — put your offer in it. Click a placeholder to insert it at the cursor; it is replaced with the real order details when sending.</div>
+      <div style="font-size:0.75rem;color:var(--stone);margin-bottom:0.8rem">Order confirmation: offered when you click Confirm, and from the 💬 WhatsApp button on any order not yet dispatched (send whenever you like). Dispatched / Delivered: offered after the status change and from the 💬 WhatsApp button on those orders (to resend). Win-back: sent from the 💬 button on the Customers page — put your offer in it. Click a placeholder to insert it at the cursor; it is replaced with the real order details when sending.</div>
       <div id="waPlaceholders" style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.8rem"></div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem" class="wa-settings-grid">
@@ -719,17 +721,23 @@
 
   <!-- PACKING SUMMARY MODAL -->
   <div class="modal-overlay" id="packingModal">
-    <div class="modal" style="max-width:520px;width:100%">
+    <div class="modal" style="max-width:720px;width:100%">
       <button class="modal-close" onclick="closeModal('packingModal')">×</button>
       <div class="modal-title">📦 Packing Summary</div>
-      <div id="packingInfo" style="font-size:0.8rem;color:var(--stone);margin-bottom:0.9rem"></div>
-      <div class="table-wrap" style="max-height:55vh;overflow:auto">
+      <div id="packingInfo" style="font-size:0.8rem;color:var(--stone);margin-bottom:0.6rem"></div>
+      <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;margin-bottom:0.7rem">
+        <span style="font-size:0.74rem;color:var(--stone);flex:1;min-width:220px">Enter what you have <strong>available</strong> to see how many orders can be fully processed (blank = plenty). Priority ⭐ orders first, then oldest.</span>
+        <button class="btn btn-ghost btn-sm" onclick="packingFillStock()">↧ Fill from Stock tab</button>
+      </div>
+      <div class="table-wrap" style="max-height:40vh;overflow:auto">
         <table>
-          <thead><tr><th>Product</th><th style="text-align:right">Qty to Pack</th></tr></thead>
+          <thead><tr><th>Product</th><th style="text-align:right">Qty to Pack</th><th style="text-align:right">Available</th><th style="text-align:right">Left over</th></tr></thead>
           <tbody id="packingBody"></tbody>
         </table>
       </div>
-      <div style="display:flex;gap:0.8rem;margin-top:1rem">
+      <div id="packingResult" style="margin-top:0.9rem;max-height:30vh;overflow:auto"></div>
+      <div style="display:flex;gap:0.8rem;margin-top:1rem;flex-wrap:wrap">
+        <button class="btn btn-blue" id="packingSelBtn" style="display:none" onclick="packingSelectOk()">☑ Select these orders</button>
         <button class="btn btn-primary" onclick="printPackingSummary()">🖨️ Print</button>
         <button class="btn btn-ghost" onclick="closeModal('packingModal')">Close</button>
       </div>
@@ -913,7 +921,8 @@
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0.8rem;margin-bottom:1rem">
         <div class="mfg" id="noShippingWrap">
           <label>Shipping (₹)</label>
-          <input id="noShipping" type="number" value="0" min="0" oninput="recalcNewOrder()"/>
+          <input id="noShipping" type="number" value="0" min="0" oninput="noShipTouched=true;noShipHint(false);recalcNewOrder()"/>
+          <div id="noShipHintTxt" style="font-size:0.62rem;color:var(--stone);margin-top:0.2rem"></div>
         </div>
         <div class="mfg">
           <label>Discount (₹)</label>
@@ -954,7 +963,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-    import { getFirestore, collection, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, deleteField, addDoc, query, orderBy, limit, where, startAfter, getCountFromServer } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getFirestore, collection, getDocs, getDoc, writeBatch, doc, setDoc, updateDoc, deleteDoc, deleteField, addDoc, query, orderBy, limit, where, startAfter, getCountFromServer } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
@@ -1063,7 +1072,34 @@
       const el = document.getElementById('orderCount');
       if (el) el.textContent = `${filteredOrders.length} of ${allOrders.length} orders` +
         (selectedOrderIds.size ? ` · ${selectedOrderIds.size} selected` : '');
+      // Bulk action: selected Confirmed orders → Ready for Dispatch
+      const bar = document.getElementById('orderBulkBar');
+      if (bar) {
+        const n = allOrders.filter(o => selectedOrderIds.has(o.id) && o.status === 'confirmed').length;
+        bar.innerHTML = n ? `<button class="btn btn-blue btn-sm" onclick="bulkMarkReady()">📦 Mark ${n} selected as Ready for Dispatch</button>` : '';
+      }
     }
+
+    window.bulkMarkReady = async () => {
+      const picked = allOrders.filter(o => selectedOrderIds.has(o.id));
+      const eligible = picked.filter(o => o.status === 'confirmed');
+      if (!eligible.length) { toast('⚠️ None of the selected orders are Confirmed'); return; }
+      const skipped = picked.length - eligible.length;
+      if (!confirm(`Mark ${eligible.length} Confirmed order${eligible.length !== 1 ? 's' : ''} as Ready for Dispatch?` +
+                   (skipped ? `\n\n${skipped} selected order${skipped !== 1 ? 's are' : ' is'} not Confirmed and will be left unchanged.` : ''))) return;
+      const now = new Date().toISOString();
+      try {
+        for (let i = 0; i < eligible.length; i += 400) {   // Firestore batches hold up to 500 writes
+          const batch = writeBatch(db);
+          eligible.slice(i, i + 400).forEach(o => batch.update(doc(db, 'orders', o.id), { status: 'ready', statusChangedAt: now, updatedAt: now }));
+          await batch.commit();
+        }
+        eligible.forEach(o => selectedOrderIds.delete(o.id));
+        const all = document.getElementById('orderSelectAll'); if (all) all.checked = false;
+        toast(`✅ ${eligible.length} order${eligible.length !== 1 ? 's' : ''} marked Ready for Dispatch`);
+        loadOrders();
+      } catch (err) { toast('❌ ' + err.message); }
+    };
 
     window.toggleOrderSelect = (id, el) => {
       if (el.checked) selectedOrderIds.add(id); else selectedOrderIds.delete(id);
@@ -1175,7 +1211,7 @@
           const itemsFull = itemList.map(i => `${escapeHtml(i.name)} ×${i.qty}`).join('<br>') || '—';
           const items = `<span class="items-count" onclick="this.closest('.order-items').classList.toggle('open')">${itemList.length} item${itemList.length !== 1 ? 's' : ''}</span><div class="items-pop">${itemsFull}</div>`;
           const trackingHtml = o.tracking
-            ? `<div style="font-size:0.75rem"><strong>${o.tracking.courier}</strong><br><span style="font-family:monospace;color:var(--moss)">${o.tracking.trackingId}</span>${o.tracking.rawStatus ? `<div style="font-size:0.7rem;color:var(--bark);margin-top:2px">📍 ${o.tracking.rawStatus}</div>` : ''}${o.tracking.details ? `<div style="font-size:0.66rem;color:var(--stone)">${o.tracking.details}</div>` : ''}</div>`
+            ? `<div style="font-size:0.75rem"><strong>${o.tracking.courier}</strong><br><span style="font-family:monospace;color:var(--moss)">${o.tracking.trackingId}</span>${o.tracking.dispatchedAt ? `<div style="font-size:0.68rem;color:var(--stone)">📅 Sent ${fmtShortDate(o.tracking.dispatchedAt)}</div>` : ''}${o.tracking.rawStatus ? `<div style="font-size:0.7rem;color:var(--bark);margin-top:2px">📍 ${o.tracking.rawStatus}</div>` : ''}${o.tracking.details ? `<div style="font-size:0.66rem;color:var(--stone)">${o.tracking.details}</div>` : ''}</div>`
             : `<span style="color:var(--stone);font-size:0.72rem">—</span>`;
           let actions = '';
           if (o.source === 'direct' && o.status === 'new') {
@@ -1183,11 +1219,11 @@
           } else if (o.source === 'direct' && o.status === 'delivered') {
             actions = `<span style="font-size:0.72rem;color:var(--moss)">🛍️ Direct sale ✓</span><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button>`;
           } else if (o.status === 'new') {
-            actions = `<button class="btn btn-sm btn-ghost" onclick="updateStatus('${o.id}','confirmed')">Confirm</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
+            actions = `<button class="btn btn-sm btn-ghost" onclick="updateStatus('${o.id}','confirmed')">Confirm</button><button class="btn btn-sm btn-green" style="margin-top:3px" onclick="resendWhatsApp('${o.id}')">💬 WhatsApp</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
           } else if (o.status === 'confirmed') {
-            actions = `<button class="btn btn-sm btn-blue" onclick="updateStatus('${o.id}','ready')">Mark Ready</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
+            actions = `<button class="btn btn-sm btn-blue" onclick="updateStatus('${o.id}','ready')">Mark Ready</button><button class="btn btn-sm btn-green" style="margin-top:3px" onclick="resendWhatsApp('${o.id}')">💬 WhatsApp</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
           } else if (o.status === 'ready') {
-            actions = `<button class="btn btn-sm btn-green" onclick="openDispatchModal('${o.id}')">Dispatch</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
+            actions = `<button class="btn btn-sm btn-green" onclick="openDispatchModal('${o.id}')">Dispatch</button><button class="btn btn-sm btn-green" style="margin-top:3px" onclick="resendWhatsApp('${o.id}')">💬 WhatsApp</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
           } else if (o.status === 'dispatched') {
             actions = `${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" onclick="checkTrackStatus('${o.id}')">🔄 Check Status</button>` : ''}<button class="btn btn-sm btn-blue" style="margin-top:3px" onclick="updateStatus('${o.id}','delivered')">Delivered</button><button class="btn btn-sm btn-green" style="margin-top:3px" onclick="resendWhatsApp('${o.id}')">💬 WhatsApp</button><button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="openEditTracking('${o.id}')">✏️ Edit Tracking</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="undoDispatch('${o.id}')">↩ Yet to Dispatch</button>`;
           } else if (o.status === 'delivered') {
@@ -1245,6 +1281,9 @@
         toast(`✅ Order marked as ${status}`);
         const o = allOrders.find(x => x.id === id);
         loadOrders();
+        if (status === 'confirmed' && o && o.source !== 'direct') {   // offer the confirmation on WhatsApp
+          openWhatsAppSend(o, '', '', 'confirmed');
+        }
         if (status === 'delivered' && o && o.source !== 'direct') {   // (not for direct sales) offer the delivery update on WhatsApp
           const t = o.tracking || {};
           openWhatsAppSend(o, t.courier || '', t.trackingId || '', 'delivered');
@@ -1353,6 +1392,7 @@
 
     // ── Packing summary: product → total qty across all undispatched orders ──
     let packingRows = [];
+    let packingOrders = [], packingIds = {}, packingOk = [];
     let packingLabel = '';
     window.showPackingSummary = async () => {
       // Use the selected orders if any are ticked; otherwise ALL undispatched orders
@@ -1368,9 +1408,11 @@
         } catch (err) { toast('❌ ' + err.message); return; }
       }
       const byProduct = {};
+      packingOrders = orders; packingIds = {};
       orders.forEach(o => (o.items || []).forEach(i => {
         const key = i.name || i.id || 'Unknown';
         byProduct[key] = (byProduct[key] || 0) + (i.qty || 0);
+        if (!packingIds[key]) packingIds[key] = i.id;
       }));
       packingRows = Object.entries(byProduct).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty);
       const totalItems = packingRows.reduce((s, r) => s + r.qty, 0);
@@ -1379,10 +1421,64 @@
         : `${orders.length} undispatched order${orders.length !== 1 ? 's' : ''} (New / Confirmed / Ready)`;
       document.getElementById('packingInfo').textContent = `${packingLabel} · ${totalItems} item${totalItems !== 1 ? 's' : ''} to pack`;
       document.getElementById('packingBody').innerHTML = packingRows.length
-        ? packingRows.map(r => `<tr><td>${escapeHtml(r.name)}</td><td style="text-align:right"><strong>${r.qty}</strong></td></tr>`).join('') +
-          `<tr><td style="font-weight:700;border-top:2px solid rgba(92,61,46,0.25)">Total</td><td style="text-align:right;font-weight:700;border-top:2px solid rgba(92,61,46,0.25)">${totalItems}</td></tr>`
-        : '<tr><td colspan="2" class="loading">No orders to pack.</td></tr>';
+        ? packingRows.map((r, i) => `<tr><td>${escapeHtml(r.name)}</td><td style="text-align:right"><strong>${r.qty}</strong></td><td style="text-align:right"><input id="pkAvail${i}" type="number" min="0" oninput="packingCalc()" style="width:76px;text-align:right;font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.3rem 0.4rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none"/></td><td id="pkLeft${i}" style="text-align:right"></td></tr>`).join('') +
+          `<tr><td style="font-weight:700;border-top:2px solid rgba(92,61,46,0.25)">Total</td><td style="text-align:right;font-weight:700;border-top:2px solid rgba(92,61,46,0.25)">${totalItems}</td><td style="border-top:2px solid rgba(92,61,46,0.25)"></td><td style="border-top:2px solid rgba(92,61,46,0.25)"></td></tr>`
+        : '<tr><td colspan="4" class="loading">No orders to pack.</td></tr>';
+      packingCalc();
       document.getElementById('packingModal').classList.add('open');
+    };
+
+    // How many orders can be fully processed with the quantities entered?
+    // Orders are served priority-first, then oldest-first; an order is processed only if ALL its items are covered.
+    window.packingCalc = () => {
+      const res = document.getElementById('packingResult');
+      const selBtn = document.getElementById('packingSelBtn');
+      const avail = packingRows.map((r, i) => { const v = (document.getElementById('pkAvail' + i) || {}).value; return (v == null || v.trim() === '') ? null : Math.max(0, parseInt(v, 10) || 0); });
+      packingRows.forEach((r, i) => { const c = document.getElementById('pkLeft' + i); if (c) c.textContent = ''; });
+      packingOk = [];
+      if (!avail.some(v => v !== null)) { res.innerHTML = ''; selBtn.style.display = 'none'; return; }
+
+      const left = {};
+      packingRows.forEach((r, i) => { left[r.name] = avail[i]; });
+      const sorted = [...packingOrders].sort((a, b) => (b.priority ? 1 : 0) - (a.priority ? 1 : 0) || (a.createdAt || '').localeCompare(b.createdAt || ''));
+      const blocked = [];
+      sorted.forEach(o => {
+        const need = {};
+        (o.items || []).forEach(i => { const k = i.name || i.id || 'Unknown'; need[k] = (need[k] || 0) + (i.qty || 0); });
+        const short = Object.entries(need).filter(([k, q]) => left[k] != null && left[k] < q).map(([k, q]) => ({ k, q, have: left[k] }));
+        if (short.length) { blocked.push({ o, short }); return; }
+        Object.entries(need).forEach(([k, q]) => { if (left[k] != null) left[k] -= q; });
+        packingOk.push(o);
+      });
+      packingRows.forEach((r, i) => { const c = document.getElementById('pkLeft' + i); if (c && avail[i] !== null) c.textContent = left[r.name]; });
+
+      const lbl = o => `#${o.orderNo != null ? o.orderNo : '—'} ${escapeHtml(o.name || '')}${o.priority ? ' ⭐' : ''}`;
+      res.innerHTML =
+        `<div style="background:var(--cream);padding:0.7rem 0.9rem;font-size:0.9rem">✅ <strong>${packingOk.length}</strong> of <strong>${sorted.length}</strong> orders can be fully processed</div>` +
+        (packingOk.length ? `<details style="margin-top:0.5rem;font-size:0.8rem"><summary style="cursor:pointer;color:var(--moss)">Can process (${packingOk.length})</summary><div style="padding:0.3rem 0 0 1rem;line-height:1.6">${packingOk.map(lbl).join('<br>')}</div></details>` : '') +
+        (blocked.length ? `<details open style="margin-top:0.5rem;font-size:0.8rem"><summary style="cursor:pointer;color:#c0392b">Can't process yet (${blocked.length})</summary><div style="padding:0.3rem 0 0 1rem;line-height:1.6">${blocked.map(b => `${lbl(b.o)} — <span style="color:var(--stone)">short: ${b.short.map(x => `${escapeHtml(x.k)} (need ${x.q}, ${x.have} left)`).join(', ')}</span>`).join('<br>')}</div></details>` : '');
+      selBtn.style.display = packingOk.length ? '' : 'none';
+    };
+
+    // Tick the processable orders in the Orders list (then e.g. Mark Ready / print)
+    window.packingSelectOk = () => {
+      selectedOrderIds.clear();
+      packingOk.forEach(o => selectedOrderIds.add(o.id));
+      const all = document.getElementById('orderSelectAll'); if (all) all.checked = false;
+      closeModal('packingModal');
+      applyOrderFilters();
+      toast(`☑ ${packingOk.length} order${packingOk.length !== 1 ? 's' : ''} selected`);
+    };
+
+    // Prefill "Available" from the stock held on the Stock tab
+    window.packingFillStock = async () => {
+      await ensureProductsLoaded();
+      packingRows.forEach((r, i) => {
+        const p = allProducts.find(x => x.id === packingIds[r.name]) || allProducts.find(x => prodLabel(x) === r.name);
+        const el = document.getElementById('pkAvail' + i);
+        if (p && p.stock != null && el) el.value = Math.max(0, parseInt(p.stock, 10) || 0);
+      });
+      packingCalc();
     };
 
     window.printPackingSummary = () => {
@@ -1439,6 +1535,7 @@
     const escapeHtml = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
     // Normalise a phone to its last 10 digits so +91 / spacing variants match
     const normPhone = (p) => String(p ?? '').replace(/\D/g, '').slice(-10);
+    const fmtShortDate = iso => iso ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
     // "Sale referred by" helpers — names are stored uppercase so filters/groups match
     const refNamesFrom = (arr) => [...new Set(arr.map(o => String((o && o.referredBy) || '').trim().toUpperCase()).filter(Boolean))].sort();
     function fillRefDatalist() {
@@ -1873,12 +1970,14 @@ ${RECEIPT_CSS}
       const trackingId = document.getElementById('trackingId').value.trim();
       if (!courier || !trackingId) { toast('⚠️ Select courier and enter tracking ID'); return; }
       const order = allOrders.find(x => x.id === currentDispatchOrderId) || {};
+      // Sent date = when it was dispatched in this app (never edited afterwards)
+      const sentISO = (dispatchEditMode && order.tracking && order.tracking.dispatchedAt) || new Date().toISOString();
       try {
         if (dispatchEditMode) {
           // Correct the courier/tracking only — keep status & the status-age clock;
           // reset the fetched timeline so the new number re-fetches fresh.
           await updateDoc(doc(db, 'orders', currentDispatchOrderId), {
-            tracking: { courier, trackingId, dispatchedAt: (order.tracking && order.tracking.dispatchedAt) || new Date().toISOString() },
+            tracking: { courier, trackingId, dispatchedAt: sentISO },
             updatedAt: new Date().toISOString()
           });
           toast('✅ Tracking updated');
@@ -1888,15 +1987,15 @@ ${RECEIPT_CSS}
         }
         await updateDoc(doc(db, 'orders', currentDispatchOrderId), {
           status: 'dispatched',
-          tracking: { courier, trackingId, dispatchedAt: new Date().toISOString() },
-          statusChangedAt: new Date().toISOString(),
+          tracking: { courier, trackingId, dispatchedAt: sentISO },
+          statusChangedAt: sentISO,
           updatedAt: new Date().toISOString()
         });
         toast('✅ Order dispatched!');
         closeModal('dispatchModal');
         loadOrders();
         // Offer to send the dispatch update to the customer on WhatsApp
-        openWhatsAppSend(order, courier, trackingId);
+        openWhatsAppSend({ ...order, tracking: { courier, trackingId, dispatchedAt: sentISO } }, courier, trackingId);
       } catch (err) { toast('❌ ' + err.message); }
     };
 
@@ -1908,6 +2007,7 @@ ${RECEIPT_CSS}
 
 Courier: {courier}
 Tracking ID: {trackingId}
+Sent on: {dispatchDate}
 
 Items:
 {items}
@@ -1918,7 +2018,7 @@ Track your order: {trackUrl}
 Thank you for shopping with Pebble Store 🌿`;
     const WA_PH_ORDER = [
       ['{name}', 'Customer name'], ['{orderNo}', 'Order number'], ['{courier}', 'Courier'],
-      ['{trackingId}', 'Tracking ID'], ['{items}', 'Item list'], ['{total}', 'Order total'], ['{trackUrl}', 'Tracking page link']
+      ['{trackingId}', 'Tracking ID'], ['{dispatchDate}', 'Date sent by courier'], ['{items}', 'Item list'], ['{total}', 'Order total'], ['{trackUrl}', 'Tracking page link']
     ];
     const WA_DELIVERED_TEMPLATE =
 `Hi {name}, your Pebble Store order {orderNo} has been delivered! ✅
@@ -1929,6 +2029,22 @@ Items:
 We hope you love it! If you have any questions, just reply to this message.
 
 Thank you for shopping with Pebble Store 🌿`;
+    const WA_CONFIRMED_TEMPLATE =
+`Hi {name}, thank you for your order {orderNo} at Pebble Store! 🌿
+
+Items:
+{items}
+Total: ₹{total}
+Payment: {payment}
+
+Delivery address:
+{address}
+
+We'll message you as soon as it's dispatched 📦`;
+    const WA_PH_CONFIRM = [
+      ['{name}', 'Customer name'], ['{orderNo}', 'Order number'], ['{items}', 'Item list'], ['{total}', 'Order total'],
+      ['{payment}', 'Paid / Payment pending'], ['{address}', 'Delivery address']
+    ];
     const WA_WINBACK_TEMPLATE =
 `Hi {firstName}, we miss you at Pebble Store! 🌿
 
@@ -1945,6 +2061,7 @@ Hope to see you again soon!`;
     ];
     // kind → { field in settings/whatsapp, default text, modal title, placeholder chips }
     const WA_KINDS = {
+      confirmed:  { field: 'confirmedTemplate', def: WA_CONFIRMED_TEMPLATE, title: '💬 Send Order Confirmation on WhatsApp', ph: WA_PH_CONFIRM },
       dispatched: { field: 'dispatchTemplate',  def: WA_DEFAULT_TEMPLATE,   title: '💬 Send Dispatch Update on WhatsApp', ph: WA_PH_ORDER },
       delivered:  { field: 'deliveredTemplate', def: WA_DELIVERED_TEMPLATE, title: '💬 Send Delivery Update on WhatsApp', ph: WA_PH_ORDER },
       winback:    { field: 'winbackTemplate',   def: WA_WINBACK_TEMPLATE,   title: '💬 Win-back Message on WhatsApp',     ph: WA_PH_WINBACK }
@@ -1993,8 +2110,11 @@ Hope to see you again soon!`;
         name: order.name || '',
         orderNo: order.orderNo != null ? '#' + order.orderNo : '',
         courier, trackingId,
+        dispatchDate: fmtShortDate(order.tracking && order.tracking.dispatchedAt),
         items: (order.items || []).map(i => `• ${i.name} x${i.qty}`).join('\n'),
         total: order.total != null ? order.total : '',
+        payment: order.paid ? 'Paid ✅' : 'Payment pending',
+        address: order.address || '',
         trackUrl: `${location.origin}/track.html${digits ? '?phone=' + digits : ''}`
       });
     };
@@ -2049,7 +2169,7 @@ Hope to see you again soon!`;
       const o = allOrders.find(x => x.id === id);
       if (!o) return;
       const t = o.tracking || {};
-      openWhatsAppSend(o, t.courier || '', t.trackingId || '', o.status === 'delivered' ? 'delivered' : 'dispatched');
+      openWhatsAppSend(o, t.courier || '', t.trackingId || '', o.status === 'delivered' ? 'delivered' : o.status === 'dispatched' ? 'dispatched' : 'confirmed');
     };
 
     // ── Settings: WhatsApp template editor ──
@@ -2089,9 +2209,10 @@ Hope to see you again soon!`;
     };
     window.renderWaPreview = () => {
       document.getElementById('waTemplatePreview').textContent = fillWaTemplate(document.getElementById('waTemplateInput').value, {
-        name: 'Priya', orderNo: '#1024', courier: 'India Post', trackingId: 'EW123456789IN',
+        name: 'Priya', orderNo: '#1024', courier: 'India Post', trackingId: 'EW123456789IN', dispatchDate: '5 Nov 2026',
         items: '• Neem Soap x2\n• Hibiscus Shampoo 210ml x1', total: 560,
         trackUrl: location.origin + '/track.html?phone=9876543210',
+        payment: 'Payment pending', address: '12, Rose Street, Chennai 600001',
         firstName: 'Priya', lastOrderDate: '12 Aug 2026', daysSince: 85, orders: 4, totalSpent: 2150, shopUrl: location.origin
       });
     };
@@ -2861,6 +2982,31 @@ Hope to see you again soon!`;
       recalcNewOrder();
     };
 
+    // Default shipping: ₹50 for Tamil Nadu addresses, until the shipping field is edited by hand
+    const TN_SHIPPING = 50;
+    window.noShipTouched = false;
+    function noShipHint(auto) { document.getElementById('noShipHintTxt').textContent = auto ? 'Tamil Nadu default' : ''; }
+    window.noShipHint = noShipHint;
+    function isTamilNaduAddress() {
+      const fieldsMode = document.querySelector('.addr-mode-btn[data-amode="fields"]')?.classList.contains('active');
+      const v = id => document.getElementById(id).value;
+      const text = fieldsMode ? [v('noAddrLine'), v('noAddrArea'), v('noAddrCity'), v('noAddrState')].join(' ') : v('noAddress');
+      if (/tamil\s*nadu|tamilnadu|\btn\b/i.test(text)) return true;
+      const pin = fieldsMode ? v('noAddrPincode').trim() : ((v('noAddress').match(/\b\d{6}\b/) || [''])[0]);
+      if (!/^\d{6}$/.test(pin)) return false;
+      const pre = parseInt(pin.slice(0, 3), 10);   // 600–643; 605/607/609 are Puducherry
+      return pre >= 600 && pre <= 643 && ![605, 607, 609].includes(pre);
+    }
+    window.applyDefaultShipping = () => {
+      if (editingOrderId || noDirectMode || window.noShipTouched) return;
+      const tn = isTamilNaduAddress();
+      document.getElementById('noShipping').value = tn ? TN_SHIPPING : 0;
+      noShipHint(tn);
+      recalcNewOrder();
+    };
+    ['noAddress', 'noAddrLine', 'noAddrArea', 'noAddrCity', 'noAddrState', 'noAddrPincode']
+      .forEach(id => document.getElementById(id).addEventListener('input', () => applyDefaultShipping()));
+
     // Direct sale = walk-in / over-the-counter sale: no address, shipping, dispatch or status steps.
     let noDirectMode = false;
     function setDirectMode(on) {
@@ -2895,6 +3041,7 @@ Hope to see you again soon!`;
       const _t = new Date();
       document.getElementById('noDate').value = new Date(_t.getTime() - _t.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
       document.getElementById('noShipping').value = 0;
+      window.noShipTouched = false; noShipHint(false);
       document.getElementById('noDiscount').value = 0;
       document.getElementById('noPaid').value = 'false';
       document.getElementById('noStatus').value = 'confirmed';
@@ -3011,6 +3158,7 @@ Hope to see you again soon!`;
       document.querySelectorAll('.addr-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.amode === mode));
       document.getElementById('noAddrWhole').style.display  = mode === 'whole'  ? 'block' : 'none';
       document.getElementById('noAddrFields').style.display = mode === 'fields' ? 'grid'  : 'none';
+      applyDefaultShipping();
     };
     // Join structured parts into one consolidated address string
     function consolidateAddr(line, area, city, state, pincode) {
@@ -3050,6 +3198,7 @@ Hope to see you again soon!`;
         setIfEmpty('noAddress', match.address);
         setAddrMode('whole');
       }
+      applyDefaultShipping();
     };
 
     const showNoErr = (msg, text) => {

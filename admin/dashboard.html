@@ -160,6 +160,7 @@
       .sidebar-logo,.sidebar-sub,.sidebar-footer{display:none}
       .nav-item{padding:0.4rem 0.7rem;font-size:0.75rem}
       .form-row,.form-row.three{grid-template-columns:1fr}
+      .wa-settings-grid{grid-template-columns:1fr !important}
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -176,6 +177,7 @@
     <button class="nav-item" onclick="showSection('customers',this)"><span>👤</span> Customers</button>
     <button class="nav-item" onclick="showSection('reports',this)"><span>📊</span> Reports</button>
     <button class="nav-item" onclick="showSection('materials',this)"><span>🧪</span> Materials</button>
+    <button class="nav-item" onclick="showSection('settings',this)"><span>⚙️</span> Settings</button>
     <div class="sidebar-footer">
       <button class="signout-btn" onclick="doSignOut()">⬅ Sign Out</button>
     </div>
@@ -478,6 +480,32 @@
           <thead><tr><th>Month</th><th style="text-align:center">Orders</th><th style="text-align:center">First-time</th><th style="text-align:center">Repeat</th><th style="text-align:center">Items</th><th style="text-align:right">Revenue</th></tr></thead>
           <tbody id="repMonthlyBody"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="section" id="section-settings">
+      <div class="page-header">
+        <div><div class="page-title">Settings</div><div class="page-sub">WhatsApp message template</div></div>
+        <div style="display:flex;gap:0.6rem">
+          <button class="btn btn-ghost" onclick="resetWaTemplate()">↺ Reset to default</button>
+          <button class="btn btn-primary" onclick="saveWaTemplate()">💾 Save template</button>
+        </div>
+      </div>
+
+      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.2rem">Dispatch update message</div>
+      <div style="font-size:0.75rem;color:var(--stone);margin-bottom:0.8rem">Sent to the customer on WhatsApp after an order is dispatched. Click a placeholder to insert it at the cursor; it is replaced with the real order details when sending.</div>
+      <div id="waPlaceholders" style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.8rem"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem" class="wa-settings-grid">
+        <div>
+          <label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone)">Template</label>
+          <textarea id="waTemplateInput" oninput="renderWaPreview()" style="width:100%;min-height:320px;margin-top:0.3rem;font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.65rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;resize:vertical"></textarea>
+        </div>
+        <div>
+          <label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone)">Preview (sample order)</label>
+          <div id="waTemplatePreview" style="margin-top:0.3rem;min-height:320px;white-space:pre-wrap;font-size:0.85rem;padding:0.65rem 0.8rem;background:#e7f5dc;border:1.5px solid rgba(92,61,46,0.12);color:var(--dark)"></div>
+        </div>
       </div>
     </div>
 
@@ -878,7 +906,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
     import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-    import { getFirestore, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit, where, startAfter, getCountFromServer } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getFirestore, collection, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit, where, startAfter, getCountFromServer } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyA-tA1L4XZk644INv5Hu2_iySOjVMkzpPo",
@@ -918,6 +946,7 @@
       if (name === 'customers') loadCustomers();
       if (name === 'reports')   { initReportDefaults(); loadReports(); }
       if (name === 'materials') switchMatTab('materials');
+      if (name === 'settings')  loadWaSettings();
     };
 
     // ── Product tab switch ──
@@ -1779,24 +1808,49 @@ ${RECEIPT_CSS}
 
     // ── WhatsApp dispatch message (2 ways to send: Web link or QR to scan) ──
     let waPhone = '';   // international format, e.g. 919791240655
-    window.openWhatsAppSend = (order, courier, trackingId) => {
-      const digits = normPhone(order.phone);
-      waPhone = digits.length === 10 ? '91' + digits : digits;
-      const items = (order.items || []).map(i => `• ${i.name} x${i.qty}`).join('\n');
-      const trackUrl = `${location.origin}/track.html${digits ? '?phone=' + digits : ''}`;
-      const msg =
-`Hi ${order.name || ''}, your Pebble Store order${order.orderNo != null ? ' #' + order.orderNo : ''} has been dispatched! 📦
+    // Editable template (Settings → WhatsApp). Placeholders are {name}, {orderNo}, etc.
+    const WA_DEFAULT_TEMPLATE =
+`Hi {name}, your Pebble Store order {orderNo} has been dispatched! 📦
 
-Courier: ${courier}
-Tracking ID: ${trackingId}
+Courier: {courier}
+Tracking ID: {trackingId}
 
 Items:
-${items}
-Total: ₹${order.total != null ? order.total : ''}
+{items}
+Total: ₹{total}
 
-Track your order: ${trackUrl}
+Track your order: {trackUrl}
 
 Thank you for shopping with Pebble Store 🌿`;
+    const WA_PLACEHOLDERS = [
+      ['{name}', 'Customer name'], ['{orderNo}', 'Order number'], ['{courier}', 'Courier'],
+      ['{trackingId}', 'Tracking ID'], ['{items}', 'Item list'], ['{total}', 'Order total'], ['{trackUrl}', 'Tracking page link']
+    ];
+    let waTemplateCache = null;
+    async function getWaTemplate() {
+      if (waTemplateCache !== null) return waTemplateCache;
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'whatsapp'));
+        const t = snap.exists() ? snap.data().dispatchTemplate : '';
+        waTemplateCache = (t && t.trim()) ? t : WA_DEFAULT_TEMPLATE;
+      } catch (e) { return WA_DEFAULT_TEMPLATE; }   // don't cache failures; fall back to default
+      return waTemplateCache;
+    }
+    function fillWaTemplate(tpl, v) {
+      return tpl.replace(/\{(\w+)\}/g, (m, k) => (k in v ? v[k] : m));
+    }
+
+    window.openWhatsAppSend = async (order, courier, trackingId) => {
+      const digits = normPhone(order.phone);
+      waPhone = digits.length === 10 ? '91' + digits : digits;
+      const msg = fillWaTemplate(await getWaTemplate(), {
+        name: order.name || '',
+        orderNo: order.orderNo != null ? '#' + order.orderNo : '',
+        courier, trackingId,
+        items: (order.items || []).map(i => `• ${i.name} x${i.qty}`).join('\n'),
+        total: order.total != null ? order.total : '',
+        trackUrl: `${location.origin}/track.html${digits ? '?phone=' + digits : ''}`
+      });
       document.getElementById('waTo').textContent =
         `To: ${order.name || 'Customer'}${waPhone ? '  ·  +' + waPhone : '  ·  (no phone number on order)'}`;
       document.getElementById('waMessage').value = msg;
@@ -1817,6 +1871,50 @@ Thank you for shopping with Pebble Store 🌿`;
       box.innerHTML = '';
       new QRCode(box, { text: waLink(), width: 220, height: 220, correctLevel: QRCode.CorrectLevel.L });
       document.getElementById('waQR').style.display = 'block';
+    };
+
+    // ── Settings: WhatsApp template editor ──
+    window.loadWaSettings = async () => {
+      const box = document.getElementById('waPlaceholders');
+      if (!box.children.length) {
+        WA_PLACEHOLDERS.forEach(([ph, label]) => {
+          const b = document.createElement('button');
+          b.className = 'btn btn-ghost btn-sm'; b.title = label; b.textContent = ph;
+          b.onclick = () => insertWaPlaceholder(ph);
+          box.appendChild(b);
+        });
+      }
+      waTemplateCache = null;   // re-read so the editor always shows what is saved
+      document.getElementById('waTemplateInput').value = await getWaTemplate();
+      renderWaPreview();
+    };
+    window.insertWaPlaceholder = (ph) => {
+      const ta = document.getElementById('waTemplateInput');
+      const a = ta.selectionStart, b = ta.selectionEnd;
+      ta.value = ta.value.slice(0, a) + ph + ta.value.slice(b);
+      ta.focus(); ta.selectionStart = ta.selectionEnd = a + ph.length;
+      renderWaPreview();
+    };
+    window.renderWaPreview = () => {
+      document.getElementById('waTemplatePreview').textContent = fillWaTemplate(document.getElementById('waTemplateInput').value, {
+        name: 'Priya', orderNo: '#1024', courier: 'India Post', trackingId: 'EW123456789IN',
+        items: '• Neem Soap x2\n• Hibiscus Shampoo 210ml x1', total: 560,
+        trackUrl: location.origin + '/track.html?phone=9876543210'
+      });
+    };
+    window.saveWaTemplate = async () => {
+      const t = document.getElementById('waTemplateInput').value;
+      if (!t.trim()) { toast('⚠️ Template cannot be empty'); return; }
+      try {
+        await setDoc(doc(db, 'settings', 'whatsapp'), { dispatchTemplate: t, updatedAt: new Date().toISOString() }, { merge: true });
+        waTemplateCache = t;
+        toast('✅ Template saved');
+      } catch (err) { toast('❌ ' + err.message); }
+    };
+    window.resetWaTemplate = () => {
+      if (!confirm('Replace the editor text with the default template? (Not saved until you click Save.)')) return;
+      document.getElementById('waTemplateInput').value = WA_DEFAULT_TEMPLATE;
+      renderWaPreview();
     };
 
     // ══════════════════════════════

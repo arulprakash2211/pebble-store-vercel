@@ -1225,9 +1225,9 @@
           } else if (o.status === 'ready') {
             actions = `<button class="btn btn-sm btn-green" onclick="openDispatchModal('${o.id}')">Dispatch</button><button class="btn btn-sm btn-green" style="margin-top:3px" onclick="resendWhatsApp('${o.id}')">💬 WhatsApp</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
           } else if (o.status === 'dispatched') {
-            actions = `${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" onclick="checkTrackStatus('${o.id}')">🔄 Check Status</button>` : ''}<button class="btn btn-sm btn-blue" style="margin-top:3px" onclick="updateStatus('${o.id}','delivered')">Delivered</button><button class="btn btn-sm btn-green" style="margin-top:3px" onclick="resendWhatsApp('${o.id}')">💬 WhatsApp</button><button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="openEditTracking('${o.id}')">✏️ Edit Tracking</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="undoDispatch('${o.id}')">↩ Yet to Dispatch</button>`;
+            actions = `${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" onclick="checkTrackStatus('${o.id}')">🔄 Check Status</button>` : ''}<button class="btn btn-sm btn-blue" style="margin-top:3px" onclick="updateStatus('${o.id}','delivered')">Delivered</button><button class="btn btn-sm btn-green" style="margin-top:3px" onclick="resendWhatsApp('${o.id}')">💬 WhatsApp</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">✏️ Edit Order</button><button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="openEditTracking('${o.id}')">✏️ Edit Tracking</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="undoDispatch('${o.id}')">↩ Yet to Dispatch</button>`;
           } else if (o.status === 'delivered') {
-            actions = `<span style="font-size:0.72rem;color:var(--moss)">✓ Complete</span><button class="btn btn-sm btn-green" style="margin-top:3px" onclick="resendWhatsApp('${o.id}')">💬 WhatsApp</button>${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="checkTrackStatus('${o.id}')">🔄 Refresh Tracking</button>` : ''}<button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="openEditTracking('${o.id}')">✏️ Edit Tracking</button>`;
+            actions = `<span style="font-size:0.72rem;color:var(--moss)">✓ Complete</span><button class="btn btn-sm btn-green" style="margin-top:3px" onclick="resendWhatsApp('${o.id}')">💬 WhatsApp</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">✏️ Edit Order</button>${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="checkTrackStatus('${o.id}')">🔄 Refresh Tracking</button>` : ''}<button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="openEditTracking('${o.id}')">✏️ Edit Tracking</button>`;
           } else if (o.status === 'cancelled') {
             actions = `<span style="font-size:0.72rem;color:#c0392b">✗ Cancelled</span>`;
           }
@@ -3009,6 +3009,7 @@ Hope to see you again soon!`;
 
     // Direct sale = walk-in / over-the-counter sale: no address, shipping, dispatch or status steps.
     let noDirectMode = false;
+    let noKeepStatus = null;   // editing a dispatched/delivered order: status is left as is
     function setDirectMode(on) {
       noDirectMode = on;
       const show = (id, v) => { document.getElementById(id).style.display = v ? '' : 'none'; };
@@ -3033,6 +3034,8 @@ Hope to see you again soon!`;
       await ensureProductsLoaded();
       fillRefDatalist();
       editingOrderId = null;
+      noKeepStatus = null;
+      document.getElementById('noStatusWrap').style.display = '';
       document.getElementById('noModalTitle').textContent = '➕ New Manual Order';
       setDirectMode(false);
       // Reset form
@@ -3054,7 +3057,7 @@ Hope to see you again soon!`;
       document.getElementById('newOrderModal').classList.add('open');
     };
 
-    // Edit an existing (non-dispatched) order — reuses the New Order modal
+    // Edit an existing order (any status) — reuses the New Order modal
     window.openEditOrder = async (id) => {
       await ensureProductsLoaded();
       fillRefDatalist();
@@ -3082,6 +3085,10 @@ Hope to see you again soon!`;
       document.getElementById('noDiscount').value = order.discount || 0;
       document.getElementById('noPaid').value   = order.paid ? 'true' : 'false';
       document.getElementById('noStatus').value = order.status || 'confirmed';
+      // Dispatched / delivered orders can be edited, but their status isn't changed here
+      noKeepStatus = (order.source !== 'direct' && ['dispatched', 'delivered'].includes(order.status)) ? order.status : null;
+      document.getElementById('noStatusWrap').style.display = noKeepStatus ? 'none' : '';
+      if (noKeepStatus) document.getElementById('noModalTitle').textContent = `✏️ Edit Order (${noKeepStatus})`;
       document.getElementById('noPriority').checked = !!order.priority;
       document.getElementById('noDate').value    = (order.createdAt || '').slice(0, 10);
       document.getElementById('noProductRows').innerHTML = '';
@@ -3273,7 +3280,7 @@ Hope to see you again soon!`;
         shipping: shippingVal,
         discount: discountVal,
         total,
-        status:   document.getElementById('noStatus').value,
+        status:   noKeepStatus || document.getElementById('noStatus').value,
         paid:     document.getElementById('noPaid').value === 'true',
         priority: noDirectMode ? false : document.getElementById('noPriority').checked,
         createdAt: createdAtISO,

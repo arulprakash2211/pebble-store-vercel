@@ -403,9 +403,16 @@
       <div class="page-header">
         <div><div class="page-title">Customers</div><div class="page-sub">Built from order history</div></div>
       </div>
+      <div class="stats-grid" id="custStats"></div>
       <div style="display:flex;gap:0.6rem;margin-bottom:0.8rem;flex-wrap:wrap;align-items:center">
         <input id="custSearch" type="search" placeholder="🔍 Search by name or phone number…" oninput="searchCustomers()" style="flex:1;min-width:240px;max-width:420px;font-family:'Jost',sans-serif;font-size:0.88rem;padding:0.55rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"/>
         <span id="custCount" style="font-size:0.75rem;color:var(--stone)"></span>
+      </div>
+      <div style="display:flex;gap:0.6rem;margin-bottom:0.8rem;flex-wrap:wrap;align-items:center">
+        <span style="font-size:0.72rem;color:var(--stone);text-transform:uppercase;letter-spacing:0.08em">Show:</span>
+        <button class="filter-btn active" data-cf="all" onclick="setCustFilter('all')">All</button>
+        <button class="filter-btn" data-cf="repeat" onclick="setCustFilter('repeat')">Repeat customers</button>
+        <button class="filter-btn" data-cf="lapsed" onclick="setCustFilter('lapsed')">Repeat · no order in 2 months</button>
       </div>
       <div style="display:flex;gap:0.6rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
         <span style="font-size:0.72rem;color:var(--stone);text-transform:uppercase;letter-spacing:0.08em">Sort by:</span>
@@ -466,8 +473,8 @@
       <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.6rem">Sales by Category</div>
       <div class="table-wrap" style="margin-bottom:1.6rem">
         <table>
-          <thead><tr><th>Category</th><th style="text-align:center">Qty</th><th style="text-align:right">Revenue</th><th style="text-align:right">Share</th></tr></thead>
-          <tbody id="repCategoryBody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+          <thead><tr><th>Category</th><th style="text-align:center">Qty</th><th style="text-align:right">Revenue</th><th style="text-align:right">Share</th><th style="text-align:center">First-time orders</th><th style="text-align:center">Repeat orders</th></tr></thead>
+          <tbody id="repCategoryBody"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody>
         </table>
       </div>
 
@@ -1158,7 +1165,11 @@
             ? `<div style="font-size:0.75rem"><strong>${o.tracking.courier}</strong><br><span style="font-family:monospace;color:var(--moss)">${o.tracking.trackingId}</span>${o.tracking.rawStatus ? `<div style="font-size:0.7rem;color:var(--bark);margin-top:2px">📍 ${o.tracking.rawStatus}</div>` : ''}${o.tracking.details ? `<div style="font-size:0.66rem;color:var(--stone)">${o.tracking.details}</div>` : ''}</div>`
             : `<span style="color:var(--stone);font-size:0.72rem">—</span>`;
           let actions = '';
-          if (o.status === 'new') {
+          if (o.source === 'direct' && o.status === 'new') {
+            actions = `<button class="btn btn-sm btn-blue" onclick="updateStatus('${o.id}','delivered')">Delivered</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
+          } else if (o.source === 'direct' && o.status === 'delivered') {
+            actions = `<span style="font-size:0.72rem;color:var(--moss)">🛍️ Direct sale ✓</span><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button>`;
+          } else if (o.status === 'new') {
             actions = `<button class="btn btn-sm btn-ghost" onclick="updateStatus('${o.id}','confirmed')">Confirm</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
           } else if (o.status === 'confirmed') {
             actions = `<button class="btn btn-sm btn-blue" onclick="updateStatus('${o.id}','ready')">Mark Ready</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
@@ -1166,8 +1177,6 @@
             actions = `<button class="btn btn-sm btn-green" onclick="openDispatchModal('${o.id}')">Dispatch</button><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="cancelOrder('${o.id}')">Cancel</button>`;
           } else if (o.status === 'dispatched') {
             actions = `${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" onclick="checkTrackStatus('${o.id}')">🔄 Check Status</button>` : ''}<button class="btn btn-sm btn-blue" style="margin-top:3px" onclick="updateStatus('${o.id}','delivered')">Delivered</button><button class="btn btn-sm btn-green" style="margin-top:3px" onclick="resendWhatsApp('${o.id}')">💬 WhatsApp</button><button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="openEditTracking('${o.id}')">✏️ Edit Tracking</button><button class="btn btn-sm btn-red" style="margin-top:3px" onclick="undoDispatch('${o.id}')">↩ Yet to Dispatch</button>`;
-          } else if (o.source === 'direct') {
-            actions = `<span style="font-size:0.72rem;color:var(--moss)">🛍️ Direct sale</span><button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="openEditOrder('${o.id}')">Edit</button>`;
           } else if (o.status === 'delivered') {
             actions = `<span style="font-size:0.72rem;color:var(--moss)">✓ Complete</span><button class="btn btn-sm btn-green" style="margin-top:3px" onclick="resendWhatsApp('${o.id}')">💬 WhatsApp</button>${o.tracking && o.tracking.trackingId ? `<button class="btn btn-sm btn-clay" style="margin-top:3px" onclick="checkTrackStatus('${o.id}')">🔄 Refresh Tracking</button>` : ''}<button class="btn btn-sm btn-ghost" style="margin-top:3px" onclick="openEditTracking('${o.id}')">✏️ Edit Tracking</button>`;
           } else if (o.status === 'cancelled') {
@@ -1209,7 +1218,7 @@
         toast(`✅ Order marked as ${status}`);
         const o = allOrders.find(x => x.id === id);
         loadOrders();
-        if (status === 'delivered' && o) {   // offer the delivery update on WhatsApp
+        if (status === 'delivered' && o && o.source !== 'direct') {   // (not for direct sales) offer the delivery update on WhatsApp
           const t = o.tracking || {};
           openWhatsAppSend(o, t.courier || '', t.trackingId || '', 'delivered');
         }
@@ -2405,6 +2414,8 @@ Thank you for shopping with Pebble Store 🌿`;
             map[key] = {
               key,
               list:     [],
+              validCount: 0,
+              lastValid: '',
               name:     o.name || '—',
               phone:    o.phone || key,
               email:    o.email || '—',
@@ -2416,6 +2427,10 @@ Thank you for shopping with Pebble Store 🌿`;
           }
           map[key].orders++;
           map[key].list.push({ id: d.id, ...o });
+          if (o.status !== 'cancelled') {   // repeat / lapsed are based on real (non-cancelled) orders
+            map[key].validCount++;
+            if ((o.createdAt || '') > map[key].lastValid) map[key].lastValid = o.createdAt || '';
+          }
           map[key].spent += o.total || 0;
           // Keep the most recent order's details as the customer's display record
           if ((o.createdAt || '') > map[key].lastOrder) {
@@ -2443,6 +2458,18 @@ Thank you for shopping with Pebble Store 🌿`;
     };
 
     window.searchCustomers = () => renderCustomers(currentCustomerSort);
+    let custFilter = 'all';   // all | repeat | lapsed
+    window.setCustFilter = (f) => {
+      custFilter = f;
+      document.querySelectorAll('[data-cf]').forEach(b => b.classList.toggle('active', b.dataset.cf === f));
+      renderCustomers(currentCustomerSort);
+    };
+    // A repeat customer = 2+ non-cancelled orders; lapsed = last order more than 2 months ago
+    const isRepeatCust = c => c.validCount >= 2;
+    function isLapsedCust(c) {
+      const cutoff = new Date(); cutoff.setMonth(cutoff.getMonth() - 2);
+      return isRepeatCust(c) && c.lastValid && c.lastValid < cutoff.toISOString();
+    }
 
     function renderCustomers(sortField) {
       if (!allCustomers.length) {
@@ -2451,12 +2478,23 @@ Thank you for shopping with Pebble Store 🌿`;
         return;
       }
 
-      // Search by name (any part) or phone number (digits, any part)
+      // Summary cards (always over all customers)
+      const repeatN = allCustomers.filter(isRepeatCust).length;
+      const lapsedN = allCustomers.filter(isLapsedCust).length;
+      const card = (label, val, sub, f) => `<div class="stat-card" style="cursor:pointer" onclick="setCustFilter('${f}')"><div class="stat-label">${label}</div><div class="stat-value">${val}</div><div style="font-size:0.7rem;color:var(--stone);margin-top:0.2rem">${sub}</div></div>`;
+      document.getElementById('custStats').innerHTML =
+        card('Total Customers', allCustomers.length, 'unique phone numbers', 'all') +
+        card('Repeat Customers', repeatN, `${Math.round(repeatN / allCustomers.length * 100)}% ordered 2+ times`, 'repeat') +
+        card('Lapsed Repeat', lapsedN, 'no order in last 2 months', 'lapsed');
+
+      // Filter chip + search by name (any part) or phone number (digits, any part)
+      const base = custFilter === 'repeat' ? allCustomers.filter(isRepeatCust)
+                 : custFilter === 'lapsed' ? allCustomers.filter(isLapsedCust) : allCustomers;
       const q = (document.getElementById('custSearch').value || '').trim().toLowerCase();
       const qDigits = q.replace(/\D/g, '');
-      const matches = !q ? allCustomers : allCustomers.filter(c =>
+      const matches = !q ? base : base.filter(c =>
         c.name.toLowerCase().includes(q) || (qDigits && String(c.key).includes(qDigits)));
-      document.getElementById('custCount').textContent = q ? `${matches.length} of ${allCustomers.length} customers` : `${allCustomers.length} customers`;
+      document.getElementById('custCount').textContent = (q || custFilter !== 'all') ? `${matches.length} of ${allCustomers.length} customers` : `${allCustomers.length} customers`;
       if (!matches.length) {
         document.getElementById('customersBody').innerHTML = '<tr><td colspan="7" class="loading">No customer matches your search.</td></tr>';
         return;
@@ -2709,7 +2747,11 @@ Thank you for shopping with Pebble Store 🌿`;
     function setDirectMode(on) {
       noDirectMode = on;
       const show = (id, v) => { document.getElementById(id).style.display = v ? '' : 'none'; };
-      ['noAddrBlock', 'noAltPhoneWrap', 'noShippingWrap', 'noStatusWrap', 'noPriorityWrap'].forEach(id => show(id, !on));
+      ['noAddrBlock', 'noAltPhoneWrap', 'noShippingWrap', 'noPriorityWrap'].forEach(id => show(id, !on));
+      // Direct sales only go New → Delivered
+      document.getElementById('noStatus').innerHTML = on
+        ? '<option value="new">New</option><option value="delivered">Delivered</option>'
+        : '<option value="confirmed">Confirmed</option><option value="new">New</option><option value="ready">Ready for Dispatch</option>';
       document.getElementById('noName').previousElementSibling.textContent  = on ? 'Customer Name (optional)' : 'Customer Name *';
       document.getElementById('noPhone').previousElementSibling.textContent = on ? 'Phone (optional)' : 'Phone *';
       document.getElementById('noName').placeholder = on ? 'Walk-in customer' : 'Full name';
@@ -2719,6 +2761,7 @@ Thank you for shopping with Pebble Store 🌿`;
       setDirectMode(true);
       document.getElementById('noModalTitle').textContent = '🛍️ Direct Sale';
       document.getElementById('noPaid').value = 'true';
+      document.getElementById('noStatus').value = 'new';
     };
 
     window.openNewOrderModal = async () => {
@@ -2957,7 +3000,7 @@ Thank you for shopping with Pebble Store 🌿`;
         shipping: shippingVal,
         discount: discountVal,
         total,
-        status:   noDirectMode ? 'delivered' : document.getElementById('noStatus').value,
+        status:   document.getElementById('noStatus').value,
         paid:     document.getElementById('noPaid').value === 'true',
         priority: noDirectMode ? false : document.getElementById('noPriority').checked,
         createdAt: createdAtISO,
@@ -3113,29 +3156,37 @@ Thank you for shopping with Pebble Store 🌿`;
       // Sales by category, with the products inside each category as sub-rows
       const byCat = {};
       let catTotal = 0;
-      orders.forEach(o => (o.items || []).forEach(i => {
-        const rev = (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0));
-        const cat = reportCatById[i.id] || reportCatByLabel[i.name] || 'Uncategorised';
-        const group = deriveGroupVariant(i).group;
-        const c = (byCat[cat] = byCat[cat] || { qty: 0, revenue: 0, products: {} });
-        c.qty += i.qty || 0; c.revenue += rev; catTotal += rev;
-        const p = (c.products[group] = c.products[group] || { qty: 0, revenue: 0 });
-        p.qty += i.qty || 0; p.revenue += rev;
-      }));
+      // first/repeat = number of orders containing the category (or product) — each order counted once
+      const bump = (x, o) => { if (o._custType === 'new') x.first++; else if (o._custType === 'repeat') x.repeat++; };
+      orders.forEach(o => {
+        const seenCat = new Set(), seenProd = new Set();
+        (o.items || []).forEach(i => {
+          const rev = (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0));
+          const cat = reportCatById[i.id] || reportCatByLabel[i.name] || 'Uncategorised';
+          const group = deriveGroupVariant(i).group;
+          const c = (byCat[cat] = byCat[cat] || { qty: 0, revenue: 0, first: 0, repeat: 0, products: {} });
+          c.qty += i.qty || 0; c.revenue += rev; catTotal += rev;
+          const p = (c.products[group] = c.products[group] || { qty: 0, revenue: 0, first: 0, repeat: 0 });
+          p.qty += i.qty || 0; p.revenue += rev;
+          if (!seenCat.has(cat)) { seenCat.add(cat); bump(c, o); }
+          const pk = cat + '\u0000' + group;
+          if (!seenProd.has(pk)) { seenProd.add(pk); bump(p, o); }
+        });
+      });
       const cTot = catTotal || 1;
       const catArr = Object.entries(byCat).map(([name, v]) => ({ name, ...v, share: Math.round(v.revenue / cTot * 100) })).sort((a, b) => b.revenue - a.revenue);
       repCategoryRows = [];
       let chtml = '';
       catArr.forEach(c => {
-        chtml += `<tr><td><strong>${c.name}</strong></td><td style="text-align:center"><strong>${c.qty}</strong></td><td style="text-align:right"><strong>${fmt(c.revenue)}</strong></td><td style="text-align:right"><strong>${c.share}%</strong></td></tr>`;
-        repCategoryRows.push({ name: c.name, qty: c.qty, revenue: c.revenue, share: c.share });
+        chtml += `<tr><td><strong>${c.name}</strong></td><td style="text-align:center"><strong>${c.qty}</strong></td><td style="text-align:right"><strong>${fmt(c.revenue)}</strong></td><td style="text-align:right"><strong>${c.share}%</strong></td><td style="text-align:center"><strong>${c.first}</strong></td><td style="text-align:center"><strong>${c.repeat}</strong></td></tr>`;
+        repCategoryRows.push({ name: c.name, qty: c.qty, revenue: c.revenue, share: c.share, first: c.first, repeat: c.repeat });
         Object.entries(c.products).map(([pn, pv]) => ({ pn, ...pv })).sort((a, b) => b.revenue - a.revenue).forEach(p => {
-          chtml += `<tr><td style="padding-left:2rem;color:var(--stone)">${p.pn}</td><td style="text-align:center">${p.qty}</td><td style="text-align:right">${fmt(p.revenue)}</td><td style="text-align:right"></td></tr>`;
-          repCategoryRows.push({ name: '   ' + p.pn, qty: p.qty, revenue: p.revenue, share: '' });
+          chtml += `<tr><td style="padding-left:2rem;color:var(--stone)">${p.pn}</td><td style="text-align:center">${p.qty}</td><td style="text-align:right">${fmt(p.revenue)}</td><td style="text-align:right"></td><td style="text-align:center">${p.first}</td><td style="text-align:center">${p.repeat}</td></tr>`;
+          repCategoryRows.push({ name: '   ' + p.pn, qty: p.qty, revenue: p.revenue, share: '', first: p.first, repeat: p.repeat });
         });
       });
       document.getElementById('repCategoryBody').innerHTML = catArr.length
-        ? chtml : '<tr><td colspan="4" class="loading">No sales in this range.</td></tr>';
+        ? chtml : '<tr><td colspan="6" class="loading">No sales in this range.</td></tr>';
 
       // Monthly breakdown
       const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -3198,8 +3249,8 @@ Thank you for shopping with Pebble Store 🌿`;
 
     window.exportReportsCSV = () => {
       const nl = String.fromCharCode(10);
-      let csv = 'Sales by Category' + nl + 'Category / Product,Qty,Revenue,Share %' + nl;
-      csv += repCategoryRows.map(r => `"${String(r.name).trim().replace(/"/g, '""')}",${r.qty},${r.revenue},${r.share}`).join(nl);
+      let csv = 'Sales by Category' + nl + 'Category / Product,Qty,Revenue,Share %,First-time Orders,Repeat Orders' + nl;
+      csv += repCategoryRows.map(r => `"${String(r.name).trim().replace(/"/g, '""')}",${r.qty},${r.revenue},${r.share},${r.first},${r.repeat}`).join(nl);
       csv += nl + nl + 'First-time vs Repeat Orders' + nl + 'Type,Orders,Customers,Revenue,Share of Orders %' + nl;
       csv += repCustRows.map(r => `${r.label},${r.orders},${r.customers},${r.revenue},${r.share}`).join(nl);
       csv += nl + nl + 'Monthly Summary' + nl + 'Month,Orders,First-time Orders,Repeat Orders,Items,Revenue' + nl;

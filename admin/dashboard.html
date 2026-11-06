@@ -231,10 +231,10 @@
         <table>
           <thead><tr>
             <th style="width:32px;text-align:center"><input type="checkbox" id="orderSelectAll" onclick="toggleSelectAll(this)" title="Select all shown"/></th>
-            <th>Date</th><th>Customer</th><th>Phone</th><th>Items</th>
+            <th>Date</th><th>Customer</th><th>Phone</th><th>Referred By</th><th>Items</th>
             <th>Total</th><th>Payment</th><th>Status</th><th>Tracking</th><th>Actions</th>
           </tr></thead>
-          <tbody id="ordersBody"><tr><td colspan="10" class="loading">Loading orders…</td></tr></tbody>
+          <tbody id="ordersBody"><tr><td colspan="11" class="loading">Loading orders…</td></tr></tbody>
         </table>
       </div>
       <div style="text-align:center;margin-top:1rem">
@@ -405,7 +405,7 @@
       </div>
       <div class="stats-grid" id="custStats"></div>
       <div style="display:flex;gap:0.6rem;margin-bottom:0.8rem;flex-wrap:wrap;align-items:center">
-        <input id="custSearch" type="search" placeholder="🔍 Search by name or phone number…" oninput="searchCustomers()" style="flex:1;min-width:240px;max-width:420px;font-family:'Jost',sans-serif;font-size:0.88rem;padding:0.55rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"/>
+        <input id="custSearch" type="search" placeholder="🔍 Search by name, phone or referrer…" oninput="searchCustomers()" style="flex:1;min-width:240px;max-width:420px;font-family:'Jost',sans-serif;font-size:0.88rem;padding:0.55rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"/>
         <span id="custCount" style="font-size:0.75rem;color:var(--stone)"></span>
       </div>
       <div id="custFilters" style="display:flex;gap:0.6rem;margin-bottom:0.8rem;flex-wrap:wrap;align-items:center"></div>
@@ -422,12 +422,13 @@
             <th style="cursor:pointer" onclick="sortCustomers('name',null)">Name ↕</th>
             <th>Phone</th>
             <th>Email</th>
+            <th>Referred By</th>
             <th>Address</th>
             <th style="cursor:pointer" onclick="sortCustomers('orders',null)">Orders ↕</th>
             <th style="cursor:pointer" onclick="sortCustomers('spent',null)">Total Spent ↕</th>
             <th style="cursor:pointer" onclick="sortCustomers('recent',null)">Last Order ↕</th>
           </tr></thead>
-          <tbody id="customersBody"><tr><td colspan="7" class="loading">Loading…</td></tr></tbody>
+          <tbody id="customersBody"><tr><td colspan="8" class="loading">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -445,6 +446,7 @@
       <div style="display:flex;gap:0.8rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:1.2rem;padding:0.8rem;background:var(--cream)">
         <div class="fg"><label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone)">From</label><input type="date" id="repFrom" onchange="loadReports()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"/></div>
         <div class="fg"><label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone)">To</label><input type="date" id="repTo" onchange="loadReports()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"/></div>
+        <div class="fg"><label style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--stone)">Referred by</label><select id="repRef" onchange="renderReports()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.5rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none;min-width:150px"><option value="">All</option></select></div>
         <button class="btn btn-ghost btn-sm" onclick="resetReportFilter()">Clear dates</button>
         <span id="repRangeInfo" style="font-size:0.75rem;color:var(--stone);margin-left:auto"></span>
       </div>
@@ -454,6 +456,8 @@
         <div class="stat-card"><div class="stat-label">Orders</div><div class="stat-value" id="repOrders">—</div></div>
         <div class="stat-card"><div class="stat-label">Items Sold</div><div class="stat-value" id="repItems">—</div></div>
         <div class="stat-card"><div class="stat-label">Avg Order</div><div class="stat-value clay" id="repAvg">—</div></div>
+        <div class="stat-card"><div class="stat-label">First-time Revenue</div><div class="stat-value green" id="repRevFirst">—</div></div>
+        <div class="stat-card"><div class="stat-label">Repeat Revenue</div><div class="stat-value green" id="repRevRepeat">—</div></div>
       </div>
 
       <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.2rem">First-time vs Repeat Orders</div>
@@ -465,11 +469,20 @@
         </table>
       </div>
 
+      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.2rem">Sales by Referrer</div>
+      <div style="font-size:0.72rem;color:var(--stone);margin-bottom:0.6rem">All referrers in the date range (not affected by the Referred-by filter).</div>
+      <div class="table-wrap" style="margin-bottom:1.6rem">
+        <table>
+          <thead><tr><th>Referred By</th><th style="text-align:center">Orders</th><th style="text-align:center">First-time</th><th style="text-align:center">Repeat</th><th style="text-align:right">Revenue</th><th style="text-align:right">Share</th></tr></thead>
+          <tbody id="repRefBody"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+
       <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.6rem">Sales by Category</div>
       <div class="table-wrap" style="margin-bottom:1.6rem">
         <table>
-          <thead><tr><th>Category</th><th style="text-align:center">Qty</th><th style="text-align:right">Revenue</th><th style="text-align:right">Share</th><th style="text-align:center">First-time orders</th><th style="text-align:center">Repeat orders</th></tr></thead>
-          <tbody id="repCategoryBody"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody>
+          <thead><tr><th>Category</th><th style="text-align:center">Qty</th><th style="text-align:right">Revenue</th><th style="text-align:right">Share</th><th style="text-align:center">First-time orders</th><th style="text-align:center">Repeat orders</th><th style="text-align:right">First-time ₹</th><th style="text-align:right">Repeat ₹</th></tr></thead>
+          <tbody id="repCategoryBody"><tr><td colspan="8" class="loading">Loading…</td></tr></tbody>
         </table>
       </div>
 
@@ -484,8 +497,8 @@
       <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--dark);margin:0.5rem 0 0.6rem">Monthly Summary</div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Month</th><th style="text-align:center">Orders</th><th style="text-align:center">First-time</th><th style="text-align:center">Repeat</th><th style="text-align:center">Items</th><th style="text-align:right">Revenue</th></tr></thead>
-          <tbody id="repMonthlyBody"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody>
+          <thead><tr><th>Month</th><th style="text-align:center">Orders</th><th style="text-align:center">First-time</th><th style="text-align:center">Repeat</th><th style="text-align:center">Items</th><th style="text-align:right">Revenue</th><th style="text-align:right">First-time ₹</th><th style="text-align:right">Repeat ₹</th></tr></thead>
+          <tbody id="repMonthlyBody"><tr><td colspan="8" class="loading">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -870,6 +883,7 @@
         </div>
         <div class="mfg"><label>Email</label><input id="noEmail" type="email" placeholder="email@example.com"/></div>
         <div class="mfg"><label>Notes</label><input id="noNotes" placeholder="Special instructions" style="text-transform:uppercase"/></div>
+        <div class="mfg"><label>Sale Referred By</label><input id="noReferred" list="refList" placeholder="Who referred this sale (optional)" style="text-transform:uppercase"/><datalist id="refList"></datalist></div>
       </div>
 
       <div class="mfg" style="margin-bottom:1rem;max-width:220px"><label>Order Date</label><input type="date" id="noDate"/></div>
@@ -1112,7 +1126,7 @@
         updateLoadMoreBtn();
         refreshOrderStats();
         applyOrderFilters();
-      } catch (err) { document.getElementById('ordersBody').innerHTML = `<tr><td colspan="10" class="loading">Error: ${err.message}</td></tr>`; }
+      } catch (err) { document.getElementById('ordersBody').innerHTML = `<tr><td colspan="11" class="loading">Error: ${err.message}</td></tr>`; }
     };
 
     // Append the next page of orders to the table (keeps current filters applied).
@@ -1147,7 +1161,7 @@
     const AGE_RANK = { 'row-age-danger': 0, 'row-age-warn': 1, '': 2 };
 
     function renderOrdersTable(orders) {
-      if (!orders.length) { document.getElementById('ordersBody').innerHTML = '<tr><td colspan="10" class="loading">No orders found.</td></tr>'; return; }
+      if (!orders.length) { document.getElementById('ordersBody').innerHTML = '<tr><td colspan="11" class="loading">No orders found.</td></tr>'; return; }
         const sc = { new:'badge-new', confirmed:'badge-confirmed', ready:'badge-ready', dispatched:'badge-dispatched', delivered:'badge-delivered', cancelled:'badge-cancelled' };
         // Red first, then yellow, then the rest — stable, so date order is kept within each group
         orders = [...orders].sort((a, b) => AGE_RANK[orderAgeClass(a)] - AGE_RANK[orderAgeClass(b)]);
@@ -1185,6 +1199,7 @@
             <td style="white-space:nowrap;font-size:0.78rem">${date}<br><span style="color:var(--stone);font-size:0.72rem">#${o.orderNo != null ? o.orderNo : '—'}</span></td>
             <td>${o.priority ? '<span title="Priority order">⭐ </span>' : ''}<strong>${o.name}</strong>${o.source === 'direct' ? ' <span style="font-size:0.62rem;background:#fde9c9;color:#9a5b00;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">DIRECT</span>' : ''}${o.source === 'admin' ? ' <span style="font-size:0.62rem;background:#e8d5ff;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">ADMIN</span>' : ''}<br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
             <td>${normPhone(o.phone) || o.phone || ''}</td>
+            <td style="font-size:0.78rem"><span style="cursor:pointer" title="Click to set / change" onclick="setReferredBy('${o.id}')">${o.referredBy ? `<strong>${o.referredBy}</strong>` : '<span style="color:var(--stone)">＋ add</span>'}</span></td>
             <td class="order-items">${items}</td>
             <td><strong>₹${o.total}</strong></td>
             <td>${o.paid
@@ -1197,6 +1212,19 @@
           </tr>`;
         }).join('');
     }
+
+    // Set / change who referred a sale — works for any order, whatever its status
+    window.setReferredBy = async (id) => {
+      const o = allOrders.find(x => x.id === id);
+      if (!o) return;
+      const v = prompt('Sale referred by (leave blank to clear):', o.referredBy || '');
+      if (v === null) return;
+      try {
+        await updateDoc(doc(db, 'orders', id), { referredBy: v.trim().toUpperCase(), updatedAt: new Date().toISOString() });
+        toast('✅ Referral saved');
+        loadOrders();
+      } catch (err) { toast('❌ ' + err.message); }
+    };
 
     window.markAsPaid = async (id) => {
       try {
@@ -1407,6 +1435,12 @@
     const escapeHtml = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
     // Normalise a phone to its last 10 digits so +91 / spacing variants match
     const normPhone = (p) => String(p ?? '').replace(/\D/g, '').slice(-10);
+    // "Sale referred by" helpers — names are stored uppercase so filters/groups match
+    const refNamesFrom = (arr) => [...new Set(arr.map(o => String((o && o.referredBy) || '').trim().toUpperCase()).filter(Boolean))].sort();
+    function fillRefDatalist() {
+      const all = [...allOrders, ...allCustomers.flatMap(c => c.list || [])];
+      document.getElementById('refList').innerHTML = refNamesFrom(all).map(n => `<option value="${n}">`).join('');
+    }
     // Grouped-product label: "Group — Variant" when grouped, else the plain name
     const prodLabel = (p) => p && p.productGroup ? `${p.productGroup}${p.variant ? ' — ' + p.variant : ''}` : (p ? p.name : '');
     // Split an address at commas onto separate lines, but keep short parts (≤15 chars) together
@@ -2437,9 +2471,14 @@ Thank you for shopping with Pebble Store 🌿`;
           }
         });
         allCustomers = Object.values(map);
+        // Referred-by for a customer = from their earliest order that has one
+        allCustomers.forEach(c => {
+          const first = [...c.list].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || '')).find(o => String(o.referredBy || '').trim());
+          c.referredBy = first ? String(first.referredBy).trim().toUpperCase() : '';
+        });
         renderCustomers(currentCustomerSort);
       } catch (err) {
-        document.getElementById('customersBody').innerHTML = `<tr><td colspan="7" class="loading">Error: ${err.message}</td></tr>`;
+        document.getElementById('customersBody').innerHTML = `<tr><td colspan="8" class="loading">Error: ${err.message}</td></tr>`;
       }
     };
 
@@ -2454,7 +2493,9 @@ Thank you for shopping with Pebble Store 🌿`;
 
     window.searchCustomers = () => renderCustomers(currentCustomerSort);
     let custMin = 0;          // minimum number of (non-cancelled) orders; 0 = everyone
+    let custRef = '';          // referred-by filter ('' = all, '__none__' = no referrer)
     let custLapsed = false;   // only repeat customers with no order in the last 2 months
+    window.setCustRef = (v) => { custRef = v; renderCustomers(currentCustomerSort); };
     window.setCustMin = (n) => { custMin = n; if (n < 2) custLapsed = false; renderCustomers(currentCustomerSort); };
     window.toggleCustLapsed = (on = !custLapsed) => {
       custLapsed = on;
@@ -2470,7 +2511,7 @@ Thank you for shopping with Pebble Store 🌿`;
 
     function renderCustomers(sortField) {
       if (!allCustomers.length) {
-        document.getElementById('customersBody').innerHTML = '<tr><td colspan="7" class="loading">No customers yet.</td></tr>';
+        document.getElementById('customersBody').innerHTML = '<tr><td colspan="8" class="loading">No customers yet.</td></tr>';
         document.getElementById('custCount').textContent = '';
         return;
       }
@@ -2485,21 +2526,24 @@ Thank you for shopping with Pebble Store 🌿`;
         card('Lapsed Repeat', lapsedN, 'no order in last 2 months', 'toggleCustLapsed(true)');
 
       // Filter chip + search by name (any part) or phone number (digits, any part)
-      const base = allCustomers.filter(c => c.validCount >= custMin && (!custLapsed || isLapsedCust(c)));
+      const base = allCustomers.filter(c => c.validCount >= custMin && (!custLapsed || isLapsedCust(c)) &&
+        (!custRef || (custRef === '__none__' ? !c.referredBy : c.referredBy === custRef)));
       const chip = (label, on, click) => `<button class="filter-btn${on ? ' active' : ''}" onclick="${click}">${label}</button>`;
       document.getElementById('custFilters').innerHTML =
         '<span style="font-size:0.72rem;color:var(--stone);text-transform:uppercase;letter-spacing:0.08em">Orders:</span>' +
         chip('All', custMin === 0, 'setCustMin(0)') +
         [2, 3, 5, 10].map(n => chip(`${n}+ orders (${allCustomers.filter(c => c.validCount >= n).length})`, custMin === n, `setCustMin(${n})`)).join('') +
         '<span style="width:1px;height:1.4rem;background:rgba(92,61,46,0.2);margin:0 0.3rem"></span>' +
-        chip(`No order in last 2 months (${lapsedN})`, custLapsed, 'toggleCustLapsed()');
+        chip(`No order in last 2 months (${lapsedN})`, custLapsed, 'toggleCustLapsed()') +
+        '<span style="font-size:0.72rem;color:var(--stone);text-transform:uppercase;letter-spacing:0.08em;margin-left:0.6rem">Referred by:</span>' +
+        `<select onchange="setCustRef(this.value)" style="font-family:'Jost',sans-serif;font-size:0.8rem;padding:0.35rem 0.6rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"><option value="">All</option><option value="__none__"${custRef === '__none__' ? ' selected' : ''}>— No referrer —</option>${[...new Set(allCustomers.map(c => c.referredBy).filter(Boolean))].sort().map(n => `<option value="${n}"${custRef === n ? ' selected' : ''}>${n}</option>`).join('')}</select>`;
       const q = (document.getElementById('custSearch').value || '').trim().toLowerCase();
       const qDigits = q.replace(/\D/g, '');
       const matches = !q ? base : base.filter(c =>
-        c.name.toLowerCase().includes(q) || (qDigits && String(c.key).includes(qDigits)));
-      document.getElementById('custCount').textContent = (q || custMin || custLapsed) ? `${matches.length} of ${allCustomers.length} customers` : `${allCustomers.length} customers`;
+        c.name.toLowerCase().includes(q) || (c.referredBy || '').toLowerCase().includes(q) || (qDigits && String(c.key).includes(qDigits)));
+      document.getElementById('custCount').textContent = (q || custMin || custLapsed || custRef) ? `${matches.length} of ${allCustomers.length} customers` : `${allCustomers.length} customers`;
       if (!matches.length) {
-        document.getElementById('customersBody').innerHTML = '<tr><td colspan="7" class="loading">No customer matches your search.</td></tr>';
+        document.getElementById('customersBody').innerHTML = '<tr><td colspan="8" class="loading">No customer matches your search.</td></tr>';
         return;
       }
 
@@ -2519,6 +2563,7 @@ Thank you for shopping with Pebble Store 🌿`;
           <td><strong>${c.name}</strong></td>
           <td>${normPhone(c.phone) || c.phone}</td>
           <td>${c.email}</td>
+          <td style="font-size:0.78rem">${c.referredBy || '<span style="color:var(--stone)">—</span>'}</td>
           <td style="font-size:0.78rem;max-width:160px">${c.address}</td>
           <td style="text-align:center">${c.orders}</td>
           <td><strong>₹${c.spent.toLocaleString('en-IN')}</strong></td>
@@ -2545,7 +2590,7 @@ Thank you for shopping with Pebble Store 🌿`;
 
       document.getElementById('custModalName').textContent = c.name;
       document.getElementById('custModalContact').innerHTML =
-        `📞 +91 ${c.key}${c.email && c.email !== '—' ? ' · ✉️ ' + c.email : ''}${c.address && c.address !== '—' ? '<br>📍 ' + c.address : ''}`;
+        `📞 +91 ${c.key}${c.email && c.email !== '—' ? ' · ✉️ ' + c.email : ''}${c.address && c.address !== '—' ? '<br>📍 ' + c.address : ''}${c.referredBy ? '<br>🤝 Referred by ' + c.referredBy : ''}`;
       document.getElementById('custModalStats').innerHTML =
         card('Orders', valid.length) + card('Total Spent', fmt(spent), 'green') +
         card('Avg Order', fmt(valid.length ? Math.round(spent / valid.length) : 0), 'clay') +
@@ -2769,11 +2814,12 @@ Thank you for shopping with Pebble Store 🌿`;
 
     window.openNewOrderModal = async () => {
       await ensureProductsLoaded();
+      fillRefDatalist();
       editingOrderId = null;
       document.getElementById('noModalTitle').textContent = '➕ New Manual Order';
       setDirectMode(false);
       // Reset form
-      ['noName','noPhone','noAltPhone','noAddress','noEmail','noNotes','noAddrLine','noAddrArea','noAddrCity','noAddrState','noAddrPincode'].forEach(id => document.getElementById(id).value = '');
+      ['noName','noPhone','noAltPhone','noAddress','noEmail','noNotes','noReferred','noAddrLine','noAddrArea','noAddrCity','noAddrState','noAddrPincode'].forEach(id => document.getElementById(id).value = '');
       setAddrMode('fields');
       const _t = new Date();
       document.getElementById('noDate').value = new Date(_t.getTime() - _t.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -2793,6 +2839,7 @@ Thank you for shopping with Pebble Store 🌿`;
     // Edit an existing (non-dispatched) order — reuses the New Order modal
     window.openEditOrder = async (id) => {
       await ensureProductsLoaded();
+      fillRefDatalist();
       const order = allOrders.find(o => o.id === id);
       if (!order) { toast('❌ Order not found'); return; }
       editingOrderId = id;
@@ -2812,6 +2859,7 @@ Thank you for shopping with Pebble Store 🌿`;
       setAddrMode(hasFields ? 'fields' : 'whole');
       document.getElementById('noEmail').value   = order.email   || '';
       document.getElementById('noNotes').value   = order.notes   || '';
+      document.getElementById('noReferred').value = order.referredBy || '';
       document.getElementById('noShipping').value = order.shipping || 0;
       document.getElementById('noDiscount').value = order.discount || 0;
       document.getElementById('noPaid').value   = order.paid ? 'true' : 'false';
@@ -2917,6 +2965,7 @@ Thank you for shopping with Pebble Store 🌿`;
       const setIfEmpty = (id, val) => { const el = document.getElementById(id); if (el && !el.value.trim() && val) el.value = val; };
       setIfEmpty('noName', match.name);
       setIfEmpty('noEmail', match.email);
+      setIfEmpty('noReferred', match.referredBy);
       setIfEmpty('noAltPhone', match.altPhone);
       const matchHasFields = match.addrLine || match.addrArea || match.addrCity || match.addrState || match.addrPincode;
       if (matchHasFields) {
@@ -2998,6 +3047,7 @@ Thank you for shopping with Pebble Store 🌿`;
         address,
         addrLine, addrArea, addrCity, addrState, addrPincode,
         notes:    document.getElementById('noNotes').value.trim().toUpperCase(),
+        referredBy: document.getElementById('noReferred').value.trim().toUpperCase(),
         items,
         subtotal,
         shipping: shippingVal,
@@ -3038,7 +3088,7 @@ Thank you for shopping with Pebble Store 🌿`;
     // ══════════════════════════════
     let reportOrders = [];
     let reportPriorPhones = new Set();   // customers who ordered before the report range
-    let repCustRows = [];
+    let repCustRows = [], repRefRows = [];
     let repMonthlyRows = [], repProductRows = [], repCategoryRows = [];
     let reportCatById = {}, reportCatByLabel = {}, reportGroupById = {}, reportVariantById = {};
 
@@ -3091,6 +3141,11 @@ Thank you for shopping with Pebble Store 🌿`;
           priorQuery ? getDocs(priorQuery) : Promise.resolve(null)
         ]);
         reportOrders = oSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Referrer filter options (keep the current selection if still present)
+        const sel = document.getElementById('repRef'), keep = sel.value;
+        sel.innerHTML = '<option value="">All</option><option value="__none__">— No referrer —</option>' +
+          refNamesFrom(reportOrders).map(n => `<option value="${n}">${n}</option>`).join('');
+        if ([...sel.options].some(op => op.value === keep)) sel.value = keep;
         reportPriorPhones = new Set();
         if (priorSnap) priorSnap.docs.forEach(d => {
           const o = d.data();
@@ -3106,7 +3161,7 @@ Thank you for shopping with Pebble Store 🌿`;
         });
         renderReports();
       } catch (err) {
-        document.getElementById('repMonthlyBody').innerHTML = `<tr><td colspan="6" class="loading">Error: ${err.message}</td></tr>`;
+        document.getElementById('repMonthlyBody').innerHTML = `<tr><td colspan="8" class="loading">Error: ${err.message}</td></tr>`;
       }
     };
 
@@ -3125,14 +3180,40 @@ Thank you for shopping with Pebble Store 🌿`;
 
       // Classify each order as new (customer's first ever) or repeat, oldest first
       const seen = new Set(reportPriorPhones);
-      const cust = { new: { orders: 0, revenue: 0, phones: new Set() }, repeat: { orders: 0, revenue: 0, phones: new Set() }, unknown: { orders: 0, revenue: 0, phones: new Set() } };
       [...orders].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || '')).forEach(o => {
         const k = normPhone(o.phone);
-        const type = !k ? 'unknown' : (seen.has(k) ? 'repeat' : 'new');
+        o._custType = !k ? 'unknown' : (seen.has(k) ? 'repeat' : 'new');
         if (k) seen.add(k);
-        o._custType = type;
-        cust[type].orders++; cust[type].revenue += o.total || 0;
-        if (k) cust[type].phones.add(k);
+      });
+
+      // Sales by referrer — over every referrer in the date range
+      const refOrders = orders;
+      const byRef = {};
+      refOrders.forEach(o => {
+        const r = String(o.referredBy || '').trim().toUpperCase() || '— None —';
+        const x = (byRef[r] = byRef[r] || { orders: 0, first: 0, repeat: 0, revenue: 0 });
+        x.orders++; x.revenue += o.total || 0;
+        if (o._custType === 'new') x.first++; else if (o._custType === 'repeat') x.repeat++;
+      });
+      const refTot = refOrders.reduce((t, o) => t + (o.total || 0), 0) || 1;
+      repRefRows = Object.entries(byRef).map(([name, v]) => ({ name, ...v, share: Math.round(v.revenue / refTot * 100) }))
+        .sort((a, b) => (a.name === '— None —') - (b.name === '— None —') || b.revenue - a.revenue);
+      document.getElementById('repRefBody').innerHTML = repRefRows.length
+        ? repRefRows.map(r => `<tr><td><strong>${r.name}</strong></td><td style="text-align:center">${r.orders}</td><td style="text-align:center">${r.first}</td><td style="text-align:center">${r.repeat}</td><td style="text-align:right"><strong>₹${Number(r.revenue).toLocaleString('en-IN')}</strong></td><td style="text-align:right">${r.share}%</td></tr>`).join('')
+        : '<tr><td colspan="6" class="loading">No orders in this range.</td></tr>';
+
+      // Referred-by filter applies to everything below
+      const refSel = document.getElementById('repRef').value;
+      if (refSel) orders = orders.filter(o => {
+        const r = String(o.referredBy || '').trim().toUpperCase();
+        return refSel === '__none__' ? !r : r === refSel;
+      });
+
+      const cust = { new: { orders: 0, revenue: 0, phones: new Set() }, repeat: { orders: 0, revenue: 0, phones: new Set() }, unknown: { orders: 0, revenue: 0, phones: new Set() } };
+      orders.forEach(o => {
+        const t = o._custType, k = normPhone(o.phone);
+        cust[t].orders++; cust[t].revenue += o.total || 0;
+        if (k) cust[t].phones.add(k);
       });
 
       const fmt = n => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -3145,8 +3226,10 @@ Thank you for shopping with Pebble Store 🌿`;
       document.getElementById('repOrders').textContent  = count;
       document.getElementById('repItems').textContent   = itemsSold;
       document.getElementById('repAvg').textContent     = fmt(avg);
-      document.getElementById('repRangeInfo').textContent =
-        (from || to) ? `${from || '…'} → ${to || '…'} · excludes cancelled` : 'All time · excludes cancelled';
+      document.getElementById('repRevFirst').textContent  = fmt(cust.new.revenue);
+      document.getElementById('repRevRepeat').textContent = fmt(cust.repeat.revenue);
+      document.getElementById('repRangeInfo').textContent = (refSel ? `Referrer: ${refSel === '__none__' ? 'none' : refSel} · ` : '') +
+        ((from || to) ? `${from || '…'} → ${to || '…'} · excludes cancelled` : 'All time · excludes cancelled');
 
       // New vs repeat summary
       const custLabels = { new: 'First-time orders', repeat: 'Repeat orders', unknown: 'No phone number' };
@@ -3167,10 +3250,11 @@ Thank you for shopping with Pebble Store 🌿`;
           const rev = (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0));
           const cat = reportCatById[i.id] || reportCatByLabel[i.name] || 'Uncategorised';
           const group = deriveGroupVariant(i).group;
-          const c = (byCat[cat] = byCat[cat] || { qty: 0, revenue: 0, first: 0, repeat: 0, products: {} });
+          const c = (byCat[cat] = byCat[cat] || { qty: 0, revenue: 0, first: 0, repeat: 0, firstRev: 0, repeatRev: 0, products: {} });
           c.qty += i.qty || 0; c.revenue += rev; catTotal += rev;
-          const p = (c.products[group] = c.products[group] || { qty: 0, revenue: 0, first: 0, repeat: 0 });
+          const p = (c.products[group] = c.products[group] || { qty: 0, revenue: 0, first: 0, repeat: 0, firstRev: 0, repeatRev: 0 });
           p.qty += i.qty || 0; p.revenue += rev;
+          if (o._custType === 'new') { c.firstRev += rev; p.firstRev += rev; } else if (o._custType === 'repeat') { c.repeatRev += rev; p.repeatRev += rev; }
           if (!seenCat.has(cat)) { seenCat.add(cat); bump(c, o); }
           const pk = cat + '\u0000' + group;
           if (!seenProd.has(pk)) { seenProd.add(pk); bump(p, o); }
@@ -3181,15 +3265,15 @@ Thank you for shopping with Pebble Store 🌿`;
       repCategoryRows = [];
       let chtml = '';
       catArr.forEach(c => {
-        chtml += `<tr><td><strong>${c.name}</strong></td><td style="text-align:center"><strong>${c.qty}</strong></td><td style="text-align:right"><strong>${fmt(c.revenue)}</strong></td><td style="text-align:right"><strong>${c.share}%</strong></td><td style="text-align:center"><strong>${c.first}</strong></td><td style="text-align:center"><strong>${c.repeat}</strong></td></tr>`;
-        repCategoryRows.push({ name: c.name, qty: c.qty, revenue: c.revenue, share: c.share, first: c.first, repeat: c.repeat });
+        chtml += `<tr><td><strong>${c.name}</strong></td><td style="text-align:center"><strong>${c.qty}</strong></td><td style="text-align:right"><strong>${fmt(c.revenue)}</strong></td><td style="text-align:right"><strong>${c.share}%</strong></td><td style="text-align:center"><strong>${c.first}</strong></td><td style="text-align:center"><strong>${c.repeat}</strong></td><td style="text-align:right"><strong>${fmt(c.firstRev)}</strong></td><td style="text-align:right"><strong>${fmt(c.repeatRev)}</strong></td></tr>`;
+        repCategoryRows.push({ name: c.name, qty: c.qty, revenue: c.revenue, share: c.share, first: c.first, repeat: c.repeat, firstRev: c.firstRev, repeatRev: c.repeatRev });
         Object.entries(c.products).map(([pn, pv]) => ({ pn, ...pv })).sort((a, b) => b.revenue - a.revenue).forEach(p => {
-          chtml += `<tr><td style="padding-left:2rem;color:var(--stone)">${p.pn}</td><td style="text-align:center">${p.qty}</td><td style="text-align:right">${fmt(p.revenue)}</td><td style="text-align:right"></td><td style="text-align:center">${p.first}</td><td style="text-align:center">${p.repeat}</td></tr>`;
-          repCategoryRows.push({ name: '   ' + p.pn, qty: p.qty, revenue: p.revenue, share: '', first: p.first, repeat: p.repeat });
+          chtml += `<tr><td style="padding-left:2rem;color:var(--stone)">${p.pn}</td><td style="text-align:center">${p.qty}</td><td style="text-align:right">${fmt(p.revenue)}</td><td style="text-align:right"></td><td style="text-align:center">${p.first}</td><td style="text-align:center">${p.repeat}</td><td style="text-align:right">${fmt(p.firstRev)}</td><td style="text-align:right">${fmt(p.repeatRev)}</td></tr>`;
+          repCategoryRows.push({ name: '   ' + p.pn, qty: p.qty, revenue: p.revenue, share: '', first: p.first, repeat: p.repeat, firstRev: p.firstRev, repeatRev: p.repeatRev });
         });
       });
       document.getElementById('repCategoryBody').innerHTML = catArr.length
-        ? chtml : '<tr><td colspan="6" class="loading">No sales in this range.</td></tr>';
+        ? chtml : '<tr><td colspan="8" class="loading">No sales in this range.</td></tr>';
 
       // Monthly breakdown
       const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -3197,10 +3281,10 @@ Thank you for shopping with Pebble Store 🌿`;
       orders.forEach(o => {
         const d = new Date(o.createdAt);
         const key = isNaN(d.getTime()) ? '0000-00' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        (byMonth[key] = byMonth[key] || { orders: 0, newOrders: 0, repeatOrders: 0, items: 0, revenue: 0 });
+        (byMonth[key] = byMonth[key] || { orders: 0, newOrders: 0, repeatOrders: 0, items: 0, revenue: 0, firstRev: 0, repeatRev: 0 });
         byMonth[key].orders++;
-        if (o._custType === 'new') byMonth[key].newOrders++;
-        else if (o._custType === 'repeat') byMonth[key].repeatOrders++;
+        if (o._custType === 'new') { byMonth[key].newOrders++; byMonth[key].firstRev += o.total || 0; }
+        else if (o._custType === 'repeat') { byMonth[key].repeatOrders++; byMonth[key].repeatRev += o.total || 0; }
         byMonth[key].revenue += o.total || 0;
         byMonth[key].items   += (o.items || []).reduce((t, i) => t + (i.qty || 0), 0);
       });
@@ -3209,8 +3293,8 @@ Thank you for shopping with Pebble Store 🌿`;
         return { label: k === '0000-00' ? 'Unknown' : `${MON[parseInt(m) - 1]} ${y}`, ...byMonth[k] };
       });
       document.getElementById('repMonthlyBody').innerHTML = repMonthlyRows.length
-        ? repMonthlyRows.map(r => `<tr><td><strong>${r.label}</strong></td><td style="text-align:center">${r.orders}</td><td style="text-align:center">${r.newOrders}</td><td style="text-align:center">${r.repeatOrders}</td><td style="text-align:center">${r.items}</td><td style="text-align:right"><strong>${fmt(r.revenue)}</strong></td></tr>`).join('')
-        : '<tr><td colspan="6" class="loading">No orders in this range.</td></tr>';
+        ? repMonthlyRows.map(r => `<tr><td><strong>${r.label}</strong></td><td style="text-align:center">${r.orders}</td><td style="text-align:center">${r.newOrders}</td><td style="text-align:center">${r.repeatOrders}</td><td style="text-align:center">${r.items}</td><td style="text-align:right"><strong>${fmt(r.revenue)}</strong></td><td style="text-align:right">${fmt(r.firstRev)}</td><td style="text-align:right">${fmt(r.repeatRev)}</td></tr>`).join('')
+        : '<tr><td colspan="8" class="loading">No orders in this range.</td></tr>';
 
       // Product split — grouped by product, with size variants as sub-rows.
       // Item names for grouped products are stored as "Group — Variant".
@@ -3252,12 +3336,14 @@ Thank you for shopping with Pebble Store 🌿`;
 
     window.exportReportsCSV = () => {
       const nl = String.fromCharCode(10);
-      let csv = 'Sales by Category' + nl + 'Category / Product,Qty,Revenue,Share %,First-time Orders,Repeat Orders' + nl;
-      csv += repCategoryRows.map(r => `"${String(r.name).trim().replace(/"/g, '""')}",${r.qty},${r.revenue},${r.share},${r.first},${r.repeat}`).join(nl);
+      let csv = 'Sales by Category' + nl + 'Category / Product,Qty,Revenue,Share %,First-time Orders,Repeat Orders,First-time Revenue,Repeat Revenue' + nl;
+      csv += repCategoryRows.map(r => `"${String(r.name).trim().replace(/"/g, '""')}",${r.qty},${r.revenue},${r.share},${r.first},${r.repeat},${r.firstRev},${r.repeatRev}`).join(nl);
+      csv += nl + nl + 'Sales by Referrer' + nl + 'Referred By,Orders,First-time,Repeat,Revenue,Share %' + nl;
+      csv += repRefRows.map(r => `"${r.name.replace(/"/g, '""')}",${r.orders},${r.first},${r.repeat},${r.revenue},${r.share}`).join(nl);
       csv += nl + nl + 'First-time vs Repeat Orders' + nl + 'Type,Orders,Customers,Revenue,Share of Orders %' + nl;
       csv += repCustRows.map(r => `${r.label},${r.orders},${r.customers},${r.revenue},${r.share}`).join(nl);
-      csv += nl + nl + 'Monthly Summary' + nl + 'Month,Orders,First-time Orders,Repeat Orders,Items,Revenue' + nl;
-      csv += repMonthlyRows.map(r => `${r.label},${r.orders},${r.newOrders},${r.repeatOrders},${r.items},${r.revenue}`).join(nl);
+      csv += nl + nl + 'Monthly Summary' + nl + 'Month,Orders,First-time Orders,Repeat Orders,Items,Revenue,First-time Revenue,Repeat Revenue' + nl;
+      csv += repMonthlyRows.map(r => `${r.label},${r.orders},${r.newOrders},${r.repeatOrders},${r.items},${r.revenue},${r.firstRev},${r.repeatRev}`).join(nl);
       csv += nl + nl + 'Product Split' + nl + 'Product,Qty,Price Per Unit,Total' + nl;
       csv += repProductRows.map(r => `"${String(r.name).trim().replace(/"/g, '""')}",${r.qty},${r.unit},${r.revenue}`).join(nl);
       const blob = new Blob([csv], { type: 'text/csv' });

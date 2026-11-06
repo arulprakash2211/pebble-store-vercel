@@ -65,6 +65,9 @@
     .btn-clay{background:var(--clay);color:white}.btn-clay:hover{background:#8a6640}
     .btn-blue{background:#2980b9;color:white}.btn-blue:hover{background:#2471a3}
     .action-btns{display:flex;flex-direction:column;gap:3px;min-width:90px}
+    #ordersBody .action-btns{gap:2px;min-width:0}
+    #ordersBody .action-btns .btn{margin-top:0 !important;padding:0.14rem 0.4rem;font-size:0.62rem;letter-spacing:0;text-transform:none;text-align:left;white-space:nowrap;line-height:1.35}
+    #ordersBody .action-btns span{font-size:0.62rem !important}
     .filter-btn{padding:0.35rem 0.9rem;border:1.5px solid rgba(92,61,46,0.25);background:transparent;color:var(--stone);font-family:'Jost',sans-serif;font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;transition:all 0.2s;font-weight:500;border-radius:2px}
     .filter-btn:hover{border-color:var(--bark);color:var(--bark)}
     .filter-btn.active{background:var(--bark);color:var(--cream);border-color:var(--bark)}
@@ -232,10 +235,10 @@
         <table>
           <thead><tr>
             <th style="width:32px;text-align:center"><input type="checkbox" id="orderSelectAll" onclick="toggleSelectAll(this)" title="Select all shown"/></th>
-            <th>Date</th><th>Customer</th><th>Phone</th><th>Referred By</th><th>Items</th>
-            <th>Total</th><th>Payment</th><th>Status</th><th>Tracking</th><th>Actions</th>
+            <th>Actions</th><th>Date</th><th>Customer</th><th>Phone</th><th>Items</th>
+            <th>Total</th><th>Payment</th><th>Status</th><th>Tracking</th>
           </tr></thead>
-          <tbody id="ordersBody"><tr><td colspan="11" class="loading">Loading orders…</td></tr></tbody>
+          <tbody id="ordersBody"><tr><td colspan="10" class="loading">Loading orders…</td></tr></tbody>
         </table>
       </div>
       <div style="text-align:center;margin-top:1rem">
@@ -1166,7 +1169,7 @@
         updateLoadMoreBtn();
         refreshOrderStats();
         applyOrderFilters();
-      } catch (err) { document.getElementById('ordersBody').innerHTML = `<tr><td colspan="11" class="loading">Error: ${err.message}</td></tr>`; }
+      } catch (err) { document.getElementById('ordersBody').innerHTML = `<tr><td colspan="10" class="loading">Error: ${err.message}</td></tr>`; }
     };
 
     // Append the next page of orders to the table (keeps current filters applied).
@@ -1201,7 +1204,7 @@
     const AGE_RANK = { 'row-age-danger': 0, 'row-age-warn': 1, '': 2 };
 
     function renderOrdersTable(orders) {
-      if (!orders.length) { document.getElementById('ordersBody').innerHTML = '<tr><td colspan="11" class="loading">No orders found.</td></tr>'; return; }
+      if (!orders.length) { document.getElementById('ordersBody').innerHTML = '<tr><td colspan="10" class="loading">No orders found.</td></tr>'; return; }
         const sc = { new:'badge-new', confirmed:'badge-confirmed', ready:'badge-ready', dispatched:'badge-dispatched', delivered:'badge-delivered', cancelled:'badge-cancelled' };
         // Red first, then yellow, then the rest — stable, so date order is kept within each group
         orders = [...orders].sort((a, b) => AGE_RANK[orderAgeClass(a)] - AGE_RANK[orderAgeClass(b)]);
@@ -1236,10 +1239,10 @@
           const ageClass = orderAgeClass(o);
           return `<tr class="${ageClass}">
             <td style="text-align:center"><input type="checkbox" class="order-check" value="${o.id}" ${selectedOrderIds.has(o.id) ? 'checked' : ''} onclick="toggleOrderSelect('${o.id}',this)"/></td>
+            <td><div class="action-btns">${actions}</div></td>
             <td style="white-space:nowrap;font-size:0.78rem">${date}<br><span style="color:var(--stone);font-size:0.72rem">#${o.orderNo != null ? o.orderNo : '—'}</span></td>
             <td>${o.priority ? '<span title="Priority order">⭐ </span>' : ''}<strong>${o.name}</strong>${o.source === 'direct' ? ' <span style="font-size:0.62rem;background:#fde9c9;color:#9a5b00;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">DIRECT</span>' : ''}${o.source === 'admin' ? ' <span style="font-size:0.62rem;background:#e8d5ff;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">ADMIN</span>' : ''}<br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
             <td>${normPhone(o.phone) || o.phone || ''}</td>
-            <td style="font-size:0.78rem"><span style="cursor:pointer" title="Click to set / change" onclick="setReferredBy('${o.id}')">${o.referredBy ? `<strong>${o.referredBy}</strong>` : '<span style="color:var(--stone)">＋ add</span>'}</span></td>
             <td class="order-items">${items}</td>
             <td><strong>₹${o.total}</strong></td>
             <td>${o.paid
@@ -1248,23 +1251,9 @@
             }</td>
             <td><span class="badge ${sc[o.status] || 'badge-new'}">${o.status === 'ready' ? 'ready for dispatch' : o.status}</span></td>
             <td>${trackingHtml}</td>
-            <td><div class="action-btns">${actions}</div></td>
           </tr>`;
         }).join('');
     }
-
-    // Set / change who referred a sale — works for any order, whatever its status
-    window.setReferredBy = async (id) => {
-      const o = allOrders.find(x => x.id === id);
-      if (!o) return;
-      const v = prompt('Sale referred by (leave blank to clear):', o.referredBy || '');
-      if (v === null) return;
-      try {
-        await updateDoc(doc(db, 'orders', id), { referredBy: v.trim().toUpperCase(), updatedAt: new Date().toISOString() });
-        toast('✅ Referral saved');
-        loadOrders();
-      } catch (err) { toast('❌ ' + err.message); }
-    };
 
     window.markAsPaid = async (id) => {
       try {

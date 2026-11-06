@@ -403,6 +403,10 @@
       <div class="page-header">
         <div><div class="page-title">Customers</div><div class="page-sub">Built from order history</div></div>
       </div>
+      <div style="display:flex;gap:0.6rem;margin-bottom:0.8rem;flex-wrap:wrap;align-items:center">
+        <input id="custSearch" type="search" placeholder="🔍 Search by name or phone number…" oninput="searchCustomers()" style="flex:1;min-width:240px;max-width:420px;font-family:'Jost',sans-serif;font-size:0.88rem;padding:0.55rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"/>
+        <span id="custCount" style="font-size:0.75rem;color:var(--stone)"></span>
+      </div>
       <div style="display:flex;gap:0.6rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
         <span style="font-size:0.72rem;color:var(--stone);text-transform:uppercase;letter-spacing:0.08em">Sort by:</span>
         <button class="filter-btn active" onclick="sortCustomers('name',this)">Name</button>
@@ -795,6 +799,23 @@
       <div id="waQR" style="display:none;text-align:center;margin-top:1rem">
         <div id="waQRCode" style="display:inline-block;padding:12px;background:#fff;border:1px solid rgba(92,61,46,0.15)"></div>
         <div style="font-size:0.75rem;color:var(--stone);margin-top:0.5rem;max-width:280px;margin-left:auto;margin-right:auto">Scan with your phone's camera → opens WhatsApp with this message ready to send to the customer.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUSTOMER DETAIL -->
+  <div class="modal-overlay" id="customerModal">
+    <div class="modal" style="max-width:760px">
+      <button class="modal-close" onclick="closeModal('customerModal')">×</button>
+      <div class="modal-title" id="custModalName">Customer</div>
+      <div id="custModalContact" style="font-size:0.82rem;color:var(--stone);margin-bottom:1rem"></div>
+      <div class="stats-grid" id="custModalStats" style="margin-bottom:1.2rem"></div>
+      <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--stone);font-weight:500;margin-bottom:0.5rem">Orders</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Order</th><th>Items</th><th style="text-align:right">Total</th><th>Status</th><th>Paid</th></tr></thead>
+          <tbody id="custModalOrders"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -2382,6 +2403,8 @@ Thank you for shopping with Pebble Store 🌿`;
           if (!key) return;
           if (!map[key]) {
             map[key] = {
+              key,
+              list:     [],
               name:     o.name || '—',
               phone:    o.phone || key,
               email:    o.email || '—',
@@ -2392,6 +2415,7 @@ Thank you for shopping with Pebble Store 🌿`;
             };
           }
           map[key].orders++;
+          map[key].list.push({ id: d.id, ...o });
           map[key].spent += o.total || 0;
           // Keep the most recent order's details as the customer's display record
           if ((o.createdAt || '') > map[key].lastOrder) {
@@ -2418,13 +2442,27 @@ Thank you for shopping with Pebble Store 🌿`;
       renderCustomers(field);
     };
 
+    window.searchCustomers = () => renderCustomers(currentCustomerSort);
+
     function renderCustomers(sortField) {
       if (!allCustomers.length) {
         document.getElementById('customersBody').innerHTML = '<tr><td colspan="7" class="loading">No customers yet.</td></tr>';
+        document.getElementById('custCount').textContent = '';
         return;
       }
 
-      const sorted = [...allCustomers].sort((a, b) => {
+      // Search by name (any part) or phone number (digits, any part)
+      const q = (document.getElementById('custSearch').value || '').trim().toLowerCase();
+      const qDigits = q.replace(/\D/g, '');
+      const matches = !q ? allCustomers : allCustomers.filter(c =>
+        c.name.toLowerCase().includes(q) || (qDigits && String(c.key).includes(qDigits)));
+      document.getElementById('custCount').textContent = q ? `${matches.length} of ${allCustomers.length} customers` : `${allCustomers.length} customers`;
+      if (!matches.length) {
+        document.getElementById('customersBody').innerHTML = '<tr><td colspan="7" class="loading">No customer matches your search.</td></tr>';
+        return;
+      }
+
+      const sorted = [...matches].sort((a, b) => {
         if (sortField === 'name')    return a.name.localeCompare(b.name);
         if (sortField === 'orders')  return b.orders - a.orders;
         if (sortField === 'spent')   return b.spent - a.spent;
@@ -2436,7 +2474,7 @@ Thank you for shopping with Pebble Store 🌿`;
         const lastDate = c.lastOrder
           ? new Date(c.lastOrder).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })
           : '—';
-        return `<tr>
+        return `<tr style="cursor:pointer" title="View orders &amp; summary" onclick="showCustomer('${c.key}')">
           <td><strong>${c.name}</strong></td>
           <td>${normPhone(c.phone) || c.phone}</td>
           <td>${c.email}</td>
@@ -2447,6 +2485,47 @@ Thank you for shopping with Pebble Store 🌿`;
         </tr>`;
       }).join('');
     }
+
+    // Customer detail: summary + all their orders
+    window.showCustomer = (key) => {
+      const c = allCustomers.find(x => x.key === key);
+      if (!c) return;
+      const fmt = n => '₹' + Number(n || 0).toLocaleString('en-IN');
+      const dateOf = o => o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+      const all = [...c.list].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      const valid = all.filter(o => o.status !== 'cancelled');
+      const cancelled = all.length - valid.length;
+      const spent = valid.reduce((t, o) => t + (o.total || 0), 0);
+      const due = valid.filter(o => !o.paid).reduce((t, o) => t + (o.total || 0), 0);
+      const itemsBought = valid.reduce((t, o) => t + (o.items || []).reduce((u, i) => u + (i.qty || 0), 0), 0);
+      const first = valid.length ? dateOf(valid[valid.length - 1]) : '—';
+      const last  = valid.length ? dateOf(valid[0]) : '—';
+      const card = (label, val, cls = '') => `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value ${cls}" style="font-size:1.3rem">${val}</div></div>`;
+
+      document.getElementById('custModalName').textContent = c.name;
+      document.getElementById('custModalContact').innerHTML =
+        `📞 +91 ${c.key}${c.email && c.email !== '—' ? ' · ✉️ ' + c.email : ''}${c.address && c.address !== '—' ? '<br>📍 ' + c.address : ''}`;
+      document.getElementById('custModalStats').innerHTML =
+        card('Orders', valid.length) + card('Total Spent', fmt(spent), 'green') +
+        card('Avg Order', fmt(valid.length ? Math.round(spent / valid.length) : 0), 'clay') +
+        card('Items Bought', itemsBought) + card('Payment Due', fmt(due), due ? 'clay' : '') +
+        card('First Order', first) + card('Last Order', last) +
+        (cancelled ? card('Cancelled', cancelled) : '');
+
+      const sc = { new:'badge-new', confirmed:'badge-confirmed', ready:'badge-ready', dispatched:'badge-dispatched', delivered:'badge-delivered', cancelled:'badge-cancelled' };
+      document.getElementById('custModalOrders').innerHTML = all.map(o => {
+        const items = (o.items || []).map(i => `${i.name} ×${i.qty}`).join(', ');
+        return `<tr>
+          <td style="white-space:nowrap;font-size:0.78rem">${dateOf(o)}</td>
+          <td style="font-size:0.78rem">#${o.orderNo != null ? o.orderNo : '—'}${o.source === 'direct' ? ' <span title="Direct sale">🛍️</span>' : ''}</td>
+          <td style="font-size:0.78rem;max-width:240px">${items}</td>
+          <td style="text-align:right"><strong>${fmt(o.total)}</strong></td>
+          <td><span class="badge ${sc[o.status] || 'badge-new'}">${o.status === 'ready' ? 'ready for dispatch' : o.status}</span></td>
+          <td style="font-size:0.72rem">${o.paid ? '<span style="color:var(--moss);font-weight:600">✓ Paid</span>' : 'Unpaid'}</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('customerModal').classList.add('open');
+    };
 
     // ══════════════════════════════
     // CSV UPLOAD
@@ -3136,7 +3215,7 @@ Thank you for shopping with Pebble Store 🌿`;
 
     // Click-outside closes these modals. NOT newOrderModal — it holds a lot of
     // typed data, so accidental outside clicks must not discard it (use Cancel/✕).
-    ['dispatchModal','stockModal','packingModal','whatsappModal','materialModal','stockInModal','stockOutModal','matHistoryModal'].forEach(id => {
+    ['dispatchModal','customerModal','stockModal','packingModal','whatsappModal','materialModal','stockInModal','stockOutModal','matHistoryModal'].forEach(id => {
       document.getElementById(id).addEventListener('click', e => { if (e.target === document.getElementById(id)) closeModal(id); });
     });
     // Scanner: clicking outside stops the camera too

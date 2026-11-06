@@ -1077,7 +1077,8 @@
     function updateOrderCount() {
       const el = document.getElementById('orderCount');
       if (el) el.textContent = `${filteredOrders.length} of ${allOrders.length} orders` +
-        (selectedOrderIds.size ? ` · ${selectedOrderIds.size} selected` : '');
+        (selectedOrderIds.size ? ` · ${selectedOrderIds.size} selected` : '') +
+        (ordersHasMore ? ' · older orders not loaded — use Load more' : '');
       renderOrderBulkBar();
     }
 
@@ -1257,12 +1258,25 @@
       if (btn) btn.style.display = ordersHasMore ? 'inline-block' : 'none';
     }
 
+    // Open orders are always loaded in full, so a New / Confirmed / Ready / Dispatched order is never
+    // hidden just because it is older than the newest page (the tab counts cover every order).
+    const OPEN_STATUSES = ['new', 'confirmed', 'ready', 'dispatched'];
+    async function fetchOpenOrders() {
+      const snap = await getDocs(query(collection(db, 'orders'), where('status', 'in', OPEN_STATUSES)));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+    function mergeOrders(a, b) {   // de-duplicate by id, newest first
+      const m = new Map();
+      [...a, ...b].forEach(o => m.set(o.id, o));
+      return [...m.values()].sort((x, y) => (y.createdAt || '').localeCompare(x.createdAt || ''));
+    }
+
     window.loadOrders = async () => {
       try {
         lastOrderDoc = null; ordersHasMore = false;
         const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(ORDERS_PAGE_SIZE));
-        const snap = await getDocs(q);
-        allOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const [snap, open] = await Promise.all([getDocs(q), fetchOpenOrders().catch(() => [])]);
+        allOrders = mergeOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })), open);
         lastOrderDoc = snap.docs[snap.docs.length - 1] || null;
         ordersHasMore = snap.docs.length === ORDERS_PAGE_SIZE;
         updateLoadMoreBtn();
@@ -1279,7 +1293,7 @@
       try {
         const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), startAfter(lastOrderDoc), limit(ORDERS_PAGE_SIZE));
         const snap = await getDocs(q);
-        allOrders = allOrders.concat(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        allOrders = mergeOrders(allOrders, snap.docs.map(d => ({ id: d.id, ...d.data() })));
         lastOrderDoc = snap.docs[snap.docs.length - 1] || lastOrderDoc;
         ordersHasMore = snap.docs.length === ORDERS_PAGE_SIZE;
         applyOrderFilters();

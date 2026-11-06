@@ -408,12 +408,7 @@
         <input id="custSearch" type="search" placeholder="🔍 Search by name or phone number…" oninput="searchCustomers()" style="flex:1;min-width:240px;max-width:420px;font-family:'Jost',sans-serif;font-size:0.88rem;padding:0.55rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"/>
         <span id="custCount" style="font-size:0.75rem;color:var(--stone)"></span>
       </div>
-      <div style="display:flex;gap:0.6rem;margin-bottom:0.8rem;flex-wrap:wrap;align-items:center">
-        <span style="font-size:0.72rem;color:var(--stone);text-transform:uppercase;letter-spacing:0.08em">Show:</span>
-        <button class="filter-btn active" data-cf="all" onclick="setCustFilter('all')">All</button>
-        <button class="filter-btn" data-cf="repeat" onclick="setCustFilter('repeat')">Repeat customers</button>
-        <button class="filter-btn" data-cf="lapsed" onclick="setCustFilter('lapsed')">Repeat · no order in 2 months</button>
-      </div>
+      <div id="custFilters" style="display:flex;gap:0.6rem;margin-bottom:0.8rem;flex-wrap:wrap;align-items:center"></div>
       <div style="display:flex;gap:0.6rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
         <span style="font-size:0.72rem;color:var(--stone);text-transform:uppercase;letter-spacing:0.08em">Sort by:</span>
         <button class="filter-btn active" onclick="sortCustomers('name',this)">Name</button>
@@ -2458,10 +2453,12 @@ Thank you for shopping with Pebble Store 🌿`;
     };
 
     window.searchCustomers = () => renderCustomers(currentCustomerSort);
-    let custFilter = 'all';   // all | repeat | lapsed
-    window.setCustFilter = (f) => {
-      custFilter = f;
-      document.querySelectorAll('[data-cf]').forEach(b => b.classList.toggle('active', b.dataset.cf === f));
+    let custMin = 0;          // minimum number of (non-cancelled) orders; 0 = everyone
+    let custLapsed = false;   // only repeat customers with no order in the last 2 months
+    window.setCustMin = (n) => { custMin = n; if (n < 2) custLapsed = false; renderCustomers(currentCustomerSort); };
+    window.toggleCustLapsed = (on = !custLapsed) => {
+      custLapsed = on;
+      if (on && custMin < 2) custMin = 2;   // lapsed only applies to repeat customers
       renderCustomers(currentCustomerSort);
     };
     // A repeat customer = 2+ non-cancelled orders; lapsed = last order more than 2 months ago
@@ -2481,20 +2478,26 @@ Thank you for shopping with Pebble Store 🌿`;
       // Summary cards (always over all customers)
       const repeatN = allCustomers.filter(isRepeatCust).length;
       const lapsedN = allCustomers.filter(isLapsedCust).length;
-      const card = (label, val, sub, f) => `<div class="stat-card" style="cursor:pointer" onclick="setCustFilter('${f}')"><div class="stat-label">${label}</div><div class="stat-value">${val}</div><div style="font-size:0.7rem;color:var(--stone);margin-top:0.2rem">${sub}</div></div>`;
+      const card = (label, val, sub, f) => `<div class="stat-card" style="cursor:pointer" onclick="${f}"><div class="stat-label">${label}</div><div class="stat-value">${val}</div><div style="font-size:0.7rem;color:var(--stone);margin-top:0.2rem">${sub}</div></div>`;
       document.getElementById('custStats').innerHTML =
-        card('Total Customers', allCustomers.length, 'unique phone numbers', 'all') +
-        card('Repeat Customers', repeatN, `${Math.round(repeatN / allCustomers.length * 100)}% ordered 2+ times`, 'repeat') +
-        card('Lapsed Repeat', lapsedN, 'no order in last 2 months', 'lapsed');
+        card('Total Customers', allCustomers.length, 'unique phone numbers', 'setCustMin(0)') +
+        card('Repeat Customers', repeatN, `${Math.round(repeatN / allCustomers.length * 100)}% ordered 2+ times`, 'setCustMin(2)') +
+        card('Lapsed Repeat', lapsedN, 'no order in last 2 months', 'toggleCustLapsed(true)');
 
       // Filter chip + search by name (any part) or phone number (digits, any part)
-      const base = custFilter === 'repeat' ? allCustomers.filter(isRepeatCust)
-                 : custFilter === 'lapsed' ? allCustomers.filter(isLapsedCust) : allCustomers;
+      const base = allCustomers.filter(c => c.validCount >= custMin && (!custLapsed || isLapsedCust(c)));
+      const chip = (label, on, click) => `<button class="filter-btn${on ? ' active' : ''}" onclick="${click}">${label}</button>`;
+      document.getElementById('custFilters').innerHTML =
+        '<span style="font-size:0.72rem;color:var(--stone);text-transform:uppercase;letter-spacing:0.08em">Orders:</span>' +
+        chip('All', custMin === 0, 'setCustMin(0)') +
+        [2, 3, 5, 10].map(n => chip(`${n}+ orders (${allCustomers.filter(c => c.validCount >= n).length})`, custMin === n, `setCustMin(${n})`)).join('') +
+        '<span style="width:1px;height:1.4rem;background:rgba(92,61,46,0.2);margin:0 0.3rem"></span>' +
+        chip(`No order in last 2 months (${lapsedN})`, custLapsed, 'toggleCustLapsed()');
       const q = (document.getElementById('custSearch').value || '').trim().toLowerCase();
       const qDigits = q.replace(/\D/g, '');
       const matches = !q ? base : base.filter(c =>
         c.name.toLowerCase().includes(q) || (qDigits && String(c.key).includes(qDigits)));
-      document.getElementById('custCount').textContent = (q || custFilter !== 'all') ? `${matches.length} of ${allCustomers.length} customers` : `${allCustomers.length} customers`;
+      document.getElementById('custCount').textContent = (q || custMin || custLapsed) ? `${matches.length} of ${allCustomers.length} customers` : `${allCustomers.length} customers`;
       if (!matches.length) {
         document.getElementById('customersBody').innerHTML = '<tr><td colspan="7" class="loading">No customer matches your search.</td></tr>';
         return;

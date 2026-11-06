@@ -407,6 +407,7 @@
       <div style="display:flex;gap:0.6rem;margin-bottom:0.8rem;flex-wrap:wrap;align-items:center">
         <input id="custSearch" type="search" placeholder="🔍 Search by name, phone or referrer…" oninput="searchCustomers()" style="flex:1;min-width:240px;max-width:420px;font-family:'Jost',sans-serif;font-size:0.88rem;padding:0.55rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none"/>
         <span id="custCount" style="font-size:0.75rem;color:var(--stone)"></span>
+        <span id="custBulk" style="margin-left:auto"></span>
       </div>
       <div id="custFilters" style="display:flex;gap:0.6rem;margin-bottom:0.8rem;flex-wrap:wrap;align-items:center"></div>
       <div style="display:flex;gap:0.6rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
@@ -427,8 +428,9 @@
             <th style="cursor:pointer" onclick="sortCustomers('orders',null)">Orders ↕</th>
             <th style="cursor:pointer" onclick="sortCustomers('spent',null)">Total Spent ↕</th>
             <th style="cursor:pointer" onclick="sortCustomers('recent',null)">Last Order ↕</th>
+            <th></th>
           </tr></thead>
-          <tbody id="customersBody"><tr><td colspan="8" class="loading">Loading…</td></tr></tbody>
+          <tbody id="customersBody"><tr><td colspan="9" class="loading">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -518,9 +520,10 @@
         <select id="waKindSelect" onchange="switchWaKind()" style="font-family:'Jost',sans-serif;font-size:0.85rem;padding:0.45rem 0.7rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--warm-white);color:var(--dark);outline:none">
           <option value="dispatched">Dispatched</option>
           <option value="delivered">Delivered</option>
+          <option value="winback">Win-back (no order in 2 months)</option>
         </select>
       </div>
-      <div style="font-size:0.75rem;color:var(--stone);margin-bottom:0.8rem">Offered after an order is marked Dispatched or Delivered, and from the 💬 WhatsApp button on those orders (to resend). Click a placeholder to insert it at the cursor; it is replaced with the real order details when sending.</div>
+      <div style="font-size:0.75rem;color:var(--stone);margin-bottom:0.8rem">Dispatched / Delivered: offered after the status change and from the 💬 WhatsApp button on those orders (to resend). Win-back: sent from the 💬 button on the Customers page — put your offer in it. Click a placeholder to insert it at the cursor; it is replaced with the real order details when sending.</div>
       <div id="waPlaceholders" style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.8rem"></div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem" class="wa-settings-grid">
@@ -809,6 +812,7 @@
       <div style="display:flex;gap:0.8rem;margin-top:0.3rem;flex-wrap:wrap">
         <button class="btn btn-green" onclick="waOpenWeb()">🌐 Open WhatsApp Web</button>
         <button class="btn btn-ghost" onclick="waShowQR()">📱 Show QR (scan on phone)</button>
+        <button class="btn btn-clay" id="waNextBtn" style="display:none" onclick="waNext()"></button>
         <button class="btn btn-ghost" onclick="closeModal('whatsappModal')">Done</button>
       </div>
       <div id="waQR" style="display:none;text-align:center;margin-top:1rem">
@@ -1912,7 +1916,7 @@ Total: ₹{total}
 Track your order: {trackUrl}
 
 Thank you for shopping with Pebble Store 🌿`;
-    const WA_PLACEHOLDERS = [
+    const WA_PH_ORDER = [
       ['{name}', 'Customer name'], ['{orderNo}', 'Order number'], ['{courier}', 'Courier'],
       ['{trackingId}', 'Tracking ID'], ['{items}', 'Item list'], ['{total}', 'Order total'], ['{trackUrl}', 'Tracking page link']
     ];
@@ -1925,10 +1929,25 @@ Items:
 We hope you love it! If you have any questions, just reply to this message.
 
 Thank you for shopping with Pebble Store 🌿`;
-    // kind → { field in settings/whatsapp, default text, modal title }
+    const WA_WINBACK_TEMPLATE =
+`Hi {firstName}, we miss you at Pebble Store! 🌿
+
+It's been a while since your last order ({lastOrderDate}). As a thank-you for being a valued customer, here's a special offer just for you:
+
+🎁 [Write your offer here — e.g. 10% off your next order with code WELCOME10]
+
+Shop now: {shopUrl}
+
+Hope to see you again soon!`;
+    const WA_PH_WINBACK = [
+      ['{name}', 'Customer full name'], ['{firstName}', 'First name'], ['{lastOrderDate}', 'Date of last order'],
+      ['{daysSince}', 'Days since last order'], ['{orders}', 'Number of orders'], ['{totalSpent}', 'Total spent (₹)'], ['{shopUrl}', 'Store link']
+    ];
+    // kind → { field in settings/whatsapp, default text, modal title, placeholder chips }
     const WA_KINDS = {
-      dispatched: { field: 'dispatchTemplate',  def: WA_DEFAULT_TEMPLATE,   title: '💬 Send Dispatch Update on WhatsApp' },
-      delivered:  { field: 'deliveredTemplate', def: WA_DELIVERED_TEMPLATE, title: '💬 Send Delivery Update on WhatsApp' }
+      dispatched: { field: 'dispatchTemplate',  def: WA_DEFAULT_TEMPLATE,   title: '💬 Send Dispatch Update on WhatsApp', ph: WA_PH_ORDER },
+      delivered:  { field: 'deliveredTemplate', def: WA_DELIVERED_TEMPLATE, title: '💬 Send Delivery Update on WhatsApp', ph: WA_PH_ORDER },
+      winback:    { field: 'winbackTemplate',   def: WA_WINBACK_TEMPLATE,   title: '💬 Win-back Message on WhatsApp',     ph: WA_PH_WINBACK }
     };
     let waTemplatesCache = null;
     async function getWaTemplates() {
@@ -1951,10 +1970,26 @@ Thank you for shopping with Pebble Store 🌿`;
       return tpl.replace(/\{(\w+)\}/g, (m, k) => (k in v ? v[k] : m));
     }
 
-    window.openWhatsAppSend = async (order, courier, trackingId, kind = 'dispatched') => {
-      const digits = normPhone(order.phone);
+    let waQueue = [], waQueueIdx = 0;   // for "message all" on the Customers page
+    // Open the WhatsApp popup with a filled-in template for any recipient
+    async function composeWa(phone, name, kind, vars) {
+      const digits = normPhone(phone);
       waPhone = digits.length === 10 ? '91' + digits : digits;
-      const msg = fillWaTemplate((await getWaTemplates())[kind], {
+      const msg = fillWaTemplate((await getWaTemplates())[kind], vars);
+      document.getElementById('waTo').textContent =
+        `To: ${name || 'Customer'}${waPhone ? '  ·  +' + waPhone : '  ·  (no phone number)'}`;
+      document.getElementById('waTitle').textContent = WA_KINDS[kind].title;
+      document.getElementById('waMessage').value = msg;
+      const nb = document.getElementById('waNextBtn');
+      nb.style.display = waQueue.length > 1 ? '' : 'none';
+      nb.textContent = `Next customer ▶ (${waQueueIdx + 1} of ${waQueue.length})`;
+      document.getElementById('whatsappModal').classList.add('open');
+      if (waPhone) waShowQR(); else document.getElementById('waQR').style.display = 'none';
+    }
+    window.openWhatsAppSend = async (order, courier, trackingId, kind = 'dispatched') => {
+      waQueue = [];
+      const digits = normPhone(order.phone);
+      await composeWa(order.phone, order.name, kind, {
         name: order.name || '',
         orderNo: order.orderNo != null ? '#' + order.orderNo : '',
         courier, trackingId,
@@ -1962,12 +1997,36 @@ Thank you for shopping with Pebble Store 🌿`;
         total: order.total != null ? order.total : '',
         trackUrl: `${location.origin}/track.html${digits ? '?phone=' + digits : ''}`
       });
-      document.getElementById('waTo').textContent =
-        `To: ${order.name || 'Customer'}${waPhone ? '  ·  +' + waPhone : '  ·  (no phone number on order)'}`;
-      document.getElementById('waTitle').textContent = WA_KINDS[kind].title;
-      document.getElementById('waMessage').value = msg;
-      document.getElementById('whatsappModal').classList.add('open');
-      waShowQR();   // show the QR by default
+    };
+    // Win-back: message a customer who hasn't ordered for a while (template + offer set in Settings)
+    const toTitle = t => String(t || '').toLowerCase().replace(/\b\w/g, ch => ch.toUpperCase());
+    function composeWinback(c) {
+      const valid = c.list.filter(o => o.status !== 'cancelled');
+      const last = c.lastValid ? new Date(c.lastValid) : null;
+      const name = toTitle(c.name === '—' ? '' : c.name);
+      return composeWa(c.key, name, 'winback', {
+        name, firstName: name.split(' ')[0] || 'there',
+        lastOrderDate: last ? last.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+        daysSince: last ? Math.floor((Date.now() - last.getTime()) / 86400000) : '',
+        orders: valid.length,
+        totalSpent: valid.reduce((t, o) => t + (o.total || 0), 0),
+        shopUrl: location.origin
+      });
+    }
+    window.waWinback = (key) => {
+      const c = allCustomers.find(x => x.key === key);
+      if (!c) return;
+      waQueue = []; waQueueIdx = 0;
+      composeWinback(c);
+    };
+    window.waWinbackAll = () => {
+      waQueue = custShown.slice(); waQueueIdx = 0;
+      if (!waQueue.length) return;
+      composeWinback(waQueue[0]);
+    };
+    window.waNext = () => {
+      if (waQueueIdx + 1 < waQueue.length) { waQueueIdx++; composeWinback(waQueue[waQueueIdx]); }
+      else { closeModal('whatsappModal'); toast('✅ That was the last customer in the list'); }
     };
     function waLink() {
       const text = encodeURIComponent(document.getElementById('waMessage').value);
@@ -1994,27 +2053,30 @@ Thank you for shopping with Pebble Store 🌿`;
     };
 
     // ── Settings: WhatsApp template editor ──
+    function renderWaChips(kind) {
+      const box = document.getElementById('waPlaceholders');
+      box.innerHTML = '';
+      WA_KINDS[kind].ph.forEach(([ph, label]) => {
+        const b = document.createElement('button');
+        b.className = 'btn btn-ghost btn-sm'; b.title = label; b.textContent = ph;
+        b.onclick = () => insertWaPlaceholder(ph);
+        box.appendChild(b);
+      });
+    }
     let waDrafts = {};          // unsaved editor text per kind
     let waEditKind = 'dispatched';
     window.loadWaSettings = async () => {
-      const box = document.getElementById('waPlaceholders');
-      if (!box.children.length) {
-        WA_PLACEHOLDERS.forEach(([ph, label]) => {
-          const b = document.createElement('button');
-          b.className = 'btn btn-ghost btn-sm'; b.title = label; b.textContent = ph;
-          b.onclick = () => insertWaPlaceholder(ph);
-          box.appendChild(b);
-        });
-      }
       waTemplatesCache = null;   // re-read so the editor always shows what is saved
       waDrafts = { ...(await getWaTemplates()) };
       waEditKind = document.getElementById('waKindSelect').value;
+      renderWaChips(waEditKind);
       document.getElementById('waTemplateInput').value = waDrafts[waEditKind];
       renderWaPreview();
     };
     window.switchWaKind = () => {
       waDrafts[waEditKind] = document.getElementById('waTemplateInput').value;   // keep unsaved edits
       waEditKind = document.getElementById('waKindSelect').value;
+      renderWaChips(waEditKind);
       document.getElementById('waTemplateInput').value = waDrafts[waEditKind];
       renderWaPreview();
     };
@@ -2029,7 +2091,8 @@ Thank you for shopping with Pebble Store 🌿`;
       document.getElementById('waTemplatePreview').textContent = fillWaTemplate(document.getElementById('waTemplateInput').value, {
         name: 'Priya', orderNo: '#1024', courier: 'India Post', trackingId: 'EW123456789IN',
         items: '• Neem Soap x2\n• Hibiscus Shampoo 210ml x1', total: 560,
-        trackUrl: location.origin + '/track.html?phone=9876543210'
+        trackUrl: location.origin + '/track.html?phone=9876543210',
+        firstName: 'Priya', lastOrderDate: '12 Aug 2026', daysSince: 85, orders: 4, totalSpent: 2150, shopUrl: location.origin
       });
     };
     window.saveWaTemplate = async () => {
@@ -2478,7 +2541,7 @@ Thank you for shopping with Pebble Store 🌿`;
         });
         renderCustomers(currentCustomerSort);
       } catch (err) {
-        document.getElementById('customersBody').innerHTML = `<tr><td colspan="8" class="loading">Error: ${err.message}</td></tr>`;
+        document.getElementById('customersBody').innerHTML = `<tr><td colspan="9" class="loading">Error: ${err.message}</td></tr>`;
       }
     };
 
@@ -2491,9 +2554,14 @@ Thank you for shopping with Pebble Store 🌿`;
       renderCustomers(field);
     };
 
+    function renderCustBulk() {
+      document.getElementById('custBulk').innerHTML = custLapsed && custShown.length
+        ? `<button class="btn btn-green btn-sm" onclick="waWinbackAll()">💬 Message all ${custShown.length} customers one by one</button>` : '';
+    }
     window.searchCustomers = () => renderCustomers(currentCustomerSort);
     let custMin = 0;          // minimum number of (non-cancelled) orders; 0 = everyone
     let custRef = '';          // referred-by filter ('' = all, '__none__' = no referrer)
+    let custShown = [];       // customers currently listed (for "message all")
     let custLapsed = false;   // only repeat customers with no order in the last 2 months
     window.setCustRef = (v) => { custRef = v; renderCustomers(currentCustomerSort); };
     window.setCustMin = (n) => { custMin = n; if (n < 2) custLapsed = false; renderCustomers(currentCustomerSort); };
@@ -2511,7 +2579,7 @@ Thank you for shopping with Pebble Store 🌿`;
 
     function renderCustomers(sortField) {
       if (!allCustomers.length) {
-        document.getElementById('customersBody').innerHTML = '<tr><td colspan="8" class="loading">No customers yet.</td></tr>';
+        document.getElementById('customersBody').innerHTML = '<tr><td colspan="9" class="loading">No customers yet.</td></tr>';
         document.getElementById('custCount').textContent = '';
         return;
       }
@@ -2543,7 +2611,8 @@ Thank you for shopping with Pebble Store 🌿`;
         c.name.toLowerCase().includes(q) || (c.referredBy || '').toLowerCase().includes(q) || (qDigits && String(c.key).includes(qDigits)));
       document.getElementById('custCount').textContent = (q || custMin || custLapsed || custRef) ? `${matches.length} of ${allCustomers.length} customers` : `${allCustomers.length} customers`;
       if (!matches.length) {
-        document.getElementById('customersBody').innerHTML = '<tr><td colspan="8" class="loading">No customer matches your search.</td></tr>';
+        custShown = []; renderCustBulk();
+        document.getElementById('customersBody').innerHTML = '<tr><td colspan="9" class="loading">No customer matches your search.</td></tr>';
         return;
       }
 
@@ -2555,6 +2624,7 @@ Thank you for shopping with Pebble Store 🌿`;
         return 0;
       });
 
+      custShown = sorted; renderCustBulk();
       document.getElementById('customersBody').innerHTML = sorted.map(c => {
         const lastDate = c.lastOrder
           ? new Date(c.lastOrder).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })
@@ -2568,6 +2638,7 @@ Thank you for shopping with Pebble Store 🌿`;
           <td style="text-align:center">${c.orders}</td>
           <td><strong>₹${c.spent.toLocaleString('en-IN')}</strong></td>
           <td style="font-size:0.78rem;white-space:nowrap">${lastDate}</td>
+          <td><button class="btn btn-sm btn-green" title="Send WhatsApp message" onclick="event.stopPropagation();waWinback('${c.key}')">💬</button></td>
         </tr>`;
       }).join('');
     }

@@ -1111,6 +1111,7 @@
       { label: '↩ Yet to Dispatch',  cls: 'btn-red',   elig: o => o.status === 'dispatched',
         confirm: n => `Move ${plural(n, 'order')} back to "Ready for Dispatch"? Their courier / tracking details will be removed so they can be dispatched again.`,
         fields: o => ({ status: 'ready', ...stamp(), tracking: deleteField(), ...(o.tracking ? { previousTracking: o.tracking } : {}) }), done: 'moved back to Ready for Dispatch' },
+      { label: '🔁 Send Again',       cls: 'btn-red',   elig: o => ['dispatched', 'delivered'].includes(o.status) && !isDirect(o), run: bulkReship },
       { label: '✗ Cancel',           cls: 'btn-red',   elig: o => ['new', 'confirmed', 'ready'].includes(o.status),
         confirm: n => `Cancel ${plural(n, 'order')}?`,
         fields: () => ({ status: 'cancelled', ...stamp() }), done: 'cancelled' },
@@ -1184,6 +1185,20 @@
       }
       toast(`🗑️ ${plural(els.length, 'order')} deleted`);
       finishBulk(els);
+    }
+    // Missed / damaged / returned parcel: put the order back to New to be confirmed and dispatched again.
+    // The same order is reused (sales aren't double-counted); the earlier courier details are kept in trackingHistory.
+    async function bulkReship(els) {
+      const reason = prompt(`Send ${plural(els.length, 'order')} again?\n\nThey go back to New so you can Confirm → Mark Ready → Dispatch again, and the old tracking is cleared.\n\nReason (e.g. Courier missed / Damaged / Returned):`, '');
+      if (reason === null) return;
+      const why = reason.trim();
+      const now = new Date().toISOString();
+      await bulkUpdate(els, o => ({
+        status: 'new', ...stamp(), tracking: deleteField(),
+        reshipCount: (o.reshipCount || 0) + 1,
+        reshipReason: why,
+        trackingHistory: [...(o.trackingHistory || []), ...(o.tracking ? [{ ...o.tracking, reason: why, resetAt: now }] : [])]
+      }), 'moved back to New to send again');
     }
     // Live courier status for each selected order (also saves it / marks delivered, via /api/track)
     async function bulkCheckTracking(els) {
@@ -1343,7 +1358,7 @@
             <td style="text-align:center"><input type="checkbox" class="order-check" value="${o.id}" ${selectedOrderIds.has(o.id) ? 'checked' : ''} onclick="toggleOrderSelect('${o.id}',this)"/></td>
             <td><div class="action-btns">${actions}</div></td>
             <td style="white-space:nowrap;font-size:0.78rem">${date}<br><span style="color:var(--stone);font-size:0.72rem">#${o.orderNo != null ? o.orderNo : '—'}</span></td>
-            <td>${o.priority ? '<span title="Priority order">⭐ </span>' : ''}<strong>${o.name}</strong>${o.source === 'direct' ? ' <span style="font-size:0.62rem;background:#fde9c9;color:#9a5b00;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">DIRECT</span>' : ''}${o.source === 'admin' ? ' <span style="font-size:0.62rem;background:#e8d5ff;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">ADMIN</span>' : ''}<br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
+            <td>${o.priority ? '<span title="Priority order">⭐ </span>' : ''}<strong>${o.name}</strong>${o.reshipCount ? ` <span title="Sent again${o.reshipReason ? ': ' + escapeHtml(o.reshipReason) : ''}" style="font-size:0.62rem;background:#fde2e0;color:#a93226;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">🔁 RESEND${o.reshipCount > 1 ? ' ×' + o.reshipCount : ''}</span>` : ''}${o.source === 'direct' ? ' <span style="font-size:0.62rem;background:#fde9c9;color:#9a5b00;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">DIRECT</span>' : ''}${o.source === 'admin' ? ' <span style="font-size:0.62rem;background:#e8d5ff;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">ADMIN</span>' : ''}<br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
             <td>${normPhone(o.phone) || o.phone || ''}</td>
             <td class="order-items">${items}</td>
             <td><strong>₹${o.total}</strong></td>

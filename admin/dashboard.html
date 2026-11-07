@@ -761,6 +761,11 @@
         </select>
         <input type="text" id="courierOther" placeholder="Enter courier name" style="display:none;margin-top:0.5rem;font-family:'Jost',sans-serif;font-size:0.88rem;padding:0.65rem 0.8rem;border:1.5px solid rgba(92,61,46,0.2);background:var(--cream);color:var(--dark);outline:none;border-radius:0;width:100%"/>
       </div>
+      <div class="mfg" id="dispatchItemsWrap">
+        <label>Items in this shipment</label>
+        <div id="dispatchItems"></div>
+        <div id="dispatchItemsNote" style="font-size:0.72rem;color:var(--stone);margin-top:0.3rem"></div>
+      </div>
       <div class="mfg"><label>Tracking ID *</label>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
           <input id="trackingId" placeholder="e.g. 1234567890" style="flex:1;min-width:120px"/>
@@ -1256,17 +1261,19 @@
         const tc = tabCt[elId] && document.getElementById(tabCt[elId]); if (tc) tc.textContent = '(' + n + ')';
       };
       try {
+        // part orders (from split shipments) are not extra orders
+        const partsN = (await getCountFromServer(query(collection(db, 'orders'), where('splitPart', '>=', 1)))).data().count;
         await Promise.all(Object.entries(ids).map(async ([elId, status]) => {
           const c = status
             ? query(collection(db, 'orders'), where('status', '==', status))
             : collection(db, 'orders');
           const agg = await getCountFromServer(c);
-          setBoth(elId, agg.data().count);
+          setBoth(elId, agg.data().count - (status ? 0 : partsN));
         }));
       } catch (err) {
         // Fallback: derive from whatever is loaded (older SDKs without aggregation)
         const o = allOrders;
-        setBoth('statTotal',      o.length);
+        setBoth('statTotal',      o.filter(x => !x.splitOf).length);
         setBoth('statNew',        o.filter(x => x.status === 'new').length);
         setBoth('statConfirmed',  o.filter(x => x.status === 'confirmed').length);
         setBoth('statReady',      o.filter(x => x.status === 'ready').length);
@@ -1357,8 +1364,8 @@
           return `<tr class="${ageClass}">
             <td style="text-align:center"><input type="checkbox" class="order-check" value="${o.id}" ${selectedOrderIds.has(o.id) ? 'checked' : ''} onclick="toggleOrderSelect('${o.id}',this)"/></td>
             <td><div class="action-btns">${actions}</div></td>
-            <td style="white-space:nowrap;font-size:0.78rem">${date}<br><span style="color:var(--stone);font-size:0.72rem">#${o.orderNo != null ? o.orderNo : '—'}</span></td>
-            <td>${o.priority ? '<span title="Priority order">⭐ </span>' : ''}<strong>${o.name}</strong>${o.reshipCount ? ` <span title="Sent again${o.reshipReason ? ': ' + escapeHtml(o.reshipReason) : ''}" style="font-size:0.62rem;background:#fde2e0;color:#a93226;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">🔁 RESEND${o.reshipCount > 1 ? ' ×' + o.reshipCount : ''}</span>` : ''}${o.source === 'direct' ? ' <span style="font-size:0.62rem;background:#fde9c9;color:#9a5b00;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">DIRECT</span>' : ''}${o.source === 'admin' ? ' <span style="font-size:0.62rem;background:#e8d5ff;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">ADMIN</span>' : ''}<br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
+            <td style="white-space:nowrap;font-size:0.78rem">${date}<br><span style="color:var(--stone);font-size:0.72rem">#${o.orderNo != null ? o.orderNo : '—'}${o.splitPart ? '-P' + o.splitPart : ''}</span></td>
+            <td>${o.priority ? '<span title="Priority order">⭐ </span>' : ''}<strong>${o.name}</strong>${o.reshipCount ? ` <span title="Sent again${o.reshipReason ? ': ' + escapeHtml(o.reshipReason) : ''}" style="font-size:0.62rem;background:#fde2e0;color:#a93226;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">🔁 RESEND${o.reshipCount > 1 ? ' ×' + o.reshipCount : ''}</span>` : ''}${o.splitPart ? ` <span title="Part ${o.splitPart} of a split order" style="font-size:0.62rem;background:#e3ecf7;color:#1f4e79;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">PART ${o.splitPart}</span>` : ''}${o.partsShipped ? ` <span title="Items still to dispatch; earlier parts already sent" style="font-size:0.62rem;background:#e3ecf7;color:#1f4e79;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">${o.partsShipped} PART${o.partsShipped > 1 ? 'S' : ''} SENT</span>` : ''}${o.source === 'direct' ? ' <span style="font-size:0.62rem;background:#fde9c9;color:#9a5b00;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">DIRECT</span>' : ''}${o.source === 'admin' ? ' <span style="font-size:0.62rem;background:#e8d5ff;color:#5b21b6;padding:0.1rem 0.4rem;border-radius:2px;font-weight:600;letter-spacing:0.06em">ADMIN</span>' : ''}<br><span style="font-size:0.72rem;color:var(--light-text)">${o.address || ''}</span></td>
             <td>${normPhone(o.phone) || o.phone || ''}</td>
             <td class="order-items">${items}</td>
             <td><strong>₹${o.total}</strong></td>
@@ -1799,6 +1806,13 @@ ${RECEIPT_CSS}
       document.getElementById('courierOther').style.display = 'none';
       document.getElementById('trackingId').value = '';
       document.getElementById('dispatchTitle').textContent = '📦 Mark as Dispatched';
+      // Item picker — reduce quantities to dispatch only part of the order now
+      const dOrder = allOrders.find(x => x.id === id);
+      const dItems = (dOrder && dOrder.items) || [];
+      document.getElementById('dispatchItemsWrap').style.display = dItems.length ? '' : 'none';
+      document.getElementById('dispatchItems').innerHTML = dItems.map((it, i) =>
+        `<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem"><span style="flex:1;font-size:0.82rem">${escapeHtml(it.name)}</span><input type="number" class="dp-qty" min="0" max="${it.qty || 0}" value="${it.qty || 0}" oninput="dispatchItemsChanged()" style="width:64px;text-align:right"/><span style="font-size:0.75rem;color:var(--stone);white-space:nowrap">of ${it.qty || 0}</span></div>`).join('');
+      dispatchItemsChanged();
       document.getElementById('dispatchConfirmBtn').textContent = '✓ Confirm Dispatch';
       document.getElementById('dispatchModal').classList.add('open');
     };
@@ -1818,6 +1832,7 @@ ${RECEIPT_CSS}
       }
       toggleOtherCourier();
       document.getElementById('trackingId').value = (o.tracking && o.tracking.trackingId) || '';
+      document.getElementById('dispatchItemsWrap').style.display = 'none';
       document.getElementById('dispatchTitle').textContent = '✏️ Edit Tracking';
       document.getElementById('dispatchConfirmBtn').textContent = '✓ Update Tracking';
       document.getElementById('dispatchModal').classList.add('open');
@@ -2005,6 +2020,47 @@ ${RECEIPT_CSS}
       }
     };
 
+    window.dispatchItemsChanged = () => {
+      const o = allOrders.find(x => x.id === currentDispatchOrderId);
+      const total = ((o && o.items) || []).reduce((t, i) => t + (i.qty || 0), 0);
+      const sent = [...document.querySelectorAll('#dispatchItems .dp-qty')].reduce((t, el) => t + Math.max(0, Math.min(+el.max, parseInt(el.value, 10) || 0)), 0);
+      document.getElementById('dispatchItemsNote').textContent = !total || sent >= total
+        ? 'Whole order will be dispatched. Reduce a quantity (or set 0) to send only part of it now.'
+        : sent === 0 ? 'Choose at least one item to dispatch.'
+        : `Partial shipment: ${sent} of ${total} items now. The rest stays Ready for Dispatch, to dispatch later with its own tracking ID.`;
+    };
+
+    // Dispatch only some items: the shipped items become a linked "part" order (own tracking / status);
+    // the original keeps the remaining items. Part orders are not counted as extra orders in stats & reports.
+    async function dispatchPartial(order, qtys, courier, trackingId, sentISO) {
+      const unit = it => it.price != null ? it.price : ((it.subtotal || 0) / (it.qty || 1));
+      const line = (it, q) => ({ ...it, qty: q, subtotal: unit(it) * q });
+      const items = order.items || [];
+      const shipItems = items.map((it, i) => qtys[i] > 0 ? line(it, qtys[i]) : null).filter(Boolean);
+      const remainItems = items.map((it, i) => (it.qty - qtys[i]) > 0 ? line(it, it.qty - qtys[i]) : null).filter(Boolean);
+      const sum = arr => arr.reduce((t, i) => t + (i.subtotal || 0), 0);
+      const part = (order.partsShipped || 0) + 1;
+      const now = new Date().toISOString();
+
+      const { id, tracking, previousTracking, trackingHistory, reshipCount, reshipReason, origItems, partsShipped, splitOf, splitPart, ...base } = order;
+      const child = {
+        ...base,
+        items: shipItems, subtotal: sum(shipItems), shipping: 0, discount: 0, total: sum(shipItems),
+        status: 'dispatched', tracking: { courier, trackingId, dispatchedAt: sentISO },
+        statusChangedAt: sentISO, updatedAt: now,
+        splitOf: order.id, splitPart: part
+      };
+      const childRef = doc(collection(db, 'orders'));
+      const batch = writeBatch(db);
+      batch.set(childRef, child);
+      batch.update(doc(db, 'orders', order.id), {
+        items: remainItems, subtotal: sum(remainItems), total: Math.max(0, (order.total || 0) - sum(shipItems)),
+        partsShipped: part, origItems: order.origItems || items, updatedAt: now
+      });
+      await batch.commit();
+      return { ...child, id: childRef.id };
+    }
+
     window.confirmDispatch = async () => {
       const sel = document.getElementById('courierSelect').value;
       const courier = sel === 'other' ? document.getElementById('courierOther').value.trim() : sel;
@@ -2025,6 +2081,21 @@ ${RECEIPT_CSS}
           closeModal('dispatchModal');
           loadOrders();
           return;
+        }
+        // Item picker: dispatch only some items?
+        const items = order.items || [];
+        const qtys = [...document.querySelectorAll('#dispatchItems .dp-qty')].map(el => Math.max(0, Math.min(+el.max, parseInt(el.value, 10) || 0)));
+        if (items.length && qtys.length === items.length) {
+          const sent = qtys.reduce((a, b) => a + b, 0);
+          if (sent === 0) { toast('⚠️ Choose at least one item to dispatch'); return; }
+          if (sent < items.reduce((t, i) => t + (i.qty || 0), 0)) {
+            const child = await dispatchPartial(order, qtys, courier, trackingId, sentISO);
+            toast(`✅ Part ${child.splitPart} dispatched — the rest stays Ready for Dispatch`);
+            closeModal('dispatchModal');
+            loadOrders();
+            openWhatsAppSend(child, courier, trackingId);
+            return;
+          }
         }
         await updateDoc(doc(db, 'orders', currentDispatchOrderId), {
           status: 'dispatched',
@@ -2149,7 +2220,7 @@ Hope to see you again soon!`;
       const digits = normPhone(order.phone);
       await composeWa(order.phone, order.name, kind, {
         name: order.name || '',
-        orderNo: order.orderNo != null ? '#' + order.orderNo : '',
+        orderNo: order.orderNo != null ? '#' + order.orderNo + (order.splitPart ? ` (part ${order.splitPart})` : '') : '',
         courier, trackingId,
         dispatchDate: fmtShortDate(order.tracking && order.tracking.dispatchedAt),
         items: (order.items || []).map(i => `• ${i.name} x${i.qty}`).join('\n'),
@@ -2671,10 +2742,10 @@ Hope to see you again soon!`;
               lastOrder: o.createdAt || ''
             };
           }
-          map[key].orders++;
+          if (!o.splitOf) map[key].orders++;   // a part of a split order is not another order
           map[key].list.push({ id: d.id, ...o });
           if (o.status !== 'cancelled') {   // repeat / lapsed are based on real (non-cancelled) orders
-            map[key].validCount++;
+            if (!o.splitOf) map[key].validCount++;
             if ((o.createdAt || '') > map[key].lastValid) map[key].lastValid = o.createdAt || '';
           }
           map[key].spent += o.total || 0;
@@ -2811,6 +2882,7 @@ Hope to see you again soon!`;
       const itemsBought = valid.reduce((t, o) => t + (o.items || []).reduce((u, i) => u + (i.qty || 0), 0), 0);
       const first = valid.length ? dateOf(valid[valid.length - 1]) : '—';
       const last  = valid.length ? dateOf(valid[0]) : '—';
+      const orderCount = valid.filter(o => !o.splitOf).length;   // parts of split orders aren't extra orders
       const addrs = [...new Set(all.map(addrKeyOf).filter(Boolean))];   // distinct addresses, latest first
       const card = (label, val, cls = '') => `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value ${cls}" style="font-size:1.3rem">${val}</div></div>`;
 
@@ -2818,8 +2890,8 @@ Hope to see you again soon!`;
       document.getElementById('custModalContact').innerHTML =
         `📞 +91 ${c.key}${c.email && c.email !== '—' ? ' · ✉️ ' + c.email : ''}${addrs.map((a, i) => '<br>📍 ' + (addrs.length > 1 ? `<span style="color:var(--stone)">${i === 0 ? 'Latest' : 'Alt ' + i}:</span> ` : '') + escapeHtml(a)).join('')}${c.referredBy ? '<br>🤝 Referred by ' + c.referredBy : ''}`;
       document.getElementById('custModalStats').innerHTML =
-        card('Orders', valid.length) + card('Total Spent', fmt(spent), 'green') +
-        card('Avg Order', fmt(valid.length ? Math.round(spent / valid.length) : 0), 'clay') +
+        card('Orders', orderCount) + card('Total Spent', fmt(spent), 'green') +
+        card('Avg Order', fmt(orderCount ? Math.round(spent / orderCount) : 0), 'clay') +
         card('Items Bought', itemsBought) + card('Payment Due', fmt(due), due ? 'clay' : '') +
         card('First Order', first) + card('Last Order', last) +
         (cancelled ? card('Cancelled', cancelled) : '');
@@ -2829,7 +2901,7 @@ Hope to see you again soon!`;
         const items = (o.items || []).map(i => `${i.name} ×${i.qty}`).join(', ');
         return `<tr>
           <td style="white-space:nowrap;font-size:0.78rem">${dateOf(o)}</td>
-          <td style="font-size:0.78rem">#${o.orderNo != null ? o.orderNo : '—'}${o.source === 'direct' ? ' <span title="Direct sale">🛍️</span>' : ''}</td>
+          <td style="font-size:0.78rem">#${o.orderNo != null ? o.orderNo : '—'}${o.splitPart ? '-P' + o.splitPart : ''}${o.source === 'direct' ? ' <span title="Direct sale">🛍️</span>' : ''}</td>
           <td style="font-size:0.78rem;max-width:240px">${items}</td>
           <td style="text-align:right"><strong>${fmt(o.total)}</strong></td>
           <td><span class="badge ${sc[o.status] || 'badge-new'}">${o.status === 'ready' ? 'ready for dispatch' : o.status}</span></td>
@@ -3494,13 +3566,19 @@ Hope to see you again soon!`;
       if (from) orders = orders.filter(o => (o.createdAt || '') >= from);
       if (to)   orders = orders.filter(o => (o.createdAt || '') <= to + 'T23:59:59');
 
+      // Parts of split shipments belong to their parent order: they add revenue / items, but not an order
+      const reportIds = new Set(orders.map(o => o.id));
+      const isPartOf = o => !!(o.splitOf && reportIds.has(o.splitOf));
       // Classify each order as new (customer's first ever) or repeat, oldest first
       const seen = new Set(reportPriorPhones);
-      [...orders].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || '')).forEach(o => {
+      [...orders].filter(o => !isPartOf(o)).sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || '')).forEach(o => {
         const k = normPhone(o.phone);
         o._custType = !k ? 'unknown' : (seen.has(k) ? 'repeat' : 'new');
         if (k) seen.add(k);
       });
+      const typeById = {};
+      orders.forEach(o => { if (!isPartOf(o)) typeById[o.id] = o._custType; });
+      orders.forEach(o => { if (isPartOf(o)) o._custType = typeById[o.splitOf] || 'unknown'; });
 
       // Sales by referrer — over every referrer in the date range
       const refOrders = orders;
@@ -3508,8 +3586,8 @@ Hope to see you again soon!`;
       refOrders.forEach(o => {
         const r = String(o.referredBy || '').trim().toUpperCase() || '— None —';
         const x = (byRef[r] = byRef[r] || { orders: 0, first: 0, repeat: 0, revenue: 0 });
-        x.orders++; x.revenue += o.total || 0;
-        if (o._custType === 'new') x.first++; else if (o._custType === 'repeat') x.repeat++;
+        x.revenue += o.total || 0;
+        if (!isPartOf(o)) { x.orders++; if (o._custType === 'new') x.first++; else if (o._custType === 'repeat') x.repeat++; }
       });
       const refTot = refOrders.reduce((t, o) => t + (o.total || 0), 0) || 1;
       repRefRows = Object.entries(byRef).map(([name, v]) => ({ name, ...v, share: Math.round(v.revenue / refTot * 100) }))
@@ -3528,14 +3606,15 @@ Hope to see you again soon!`;
       const cust = { new: { orders: 0, revenue: 0, phones: new Set() }, repeat: { orders: 0, revenue: 0, phones: new Set() }, unknown: { orders: 0, revenue: 0, phones: new Set() } };
       orders.forEach(o => {
         const t = o._custType, k = normPhone(o.phone);
-        cust[t].orders++; cust[t].revenue += o.total || 0;
+        if (!isPartOf(o)) cust[t].orders++;
+        cust[t].revenue += o.total || 0;
         if (k) cust[t].phones.add(k);
       });
 
       const fmt = n => '₹' + Number(n || 0).toLocaleString('en-IN');
       const revenue   = orders.reduce((s, o) => s + (o.total || 0), 0);
       const itemsSold = orders.reduce((s, o) => s + (o.items || []).reduce((t, i) => t + (i.qty || 0), 0), 0);
-      const count     = orders.length;
+      const count     = orders.filter(o => !isPartOf(o)).length;
       const avg       = count ? Math.round(revenue / count) : 0;
 
       document.getElementById('repRevenue').textContent = fmt(revenue);
@@ -3560,8 +3639,10 @@ Hope to see you again soon!`;
       let catTotal = 0;
       // first/repeat = number of orders containing the category (or product) — each order counted once
       const bump = (x, o) => { if (o._custType === 'new') x.first++; else if (o._custType === 'repeat') x.repeat++; };
+      const seenRoot = {};   // an order (and its parts) counts once per category / product
       orders.forEach(o => {
-        const seenCat = new Set(), seenProd = new Set();
+        const sr = (seenRoot[o.splitOf || o.id] = seenRoot[o.splitOf || o.id] || { cat: new Set(), prod: new Set() });
+        const seenCat = sr.cat, seenProd = sr.prod;
         (o.items || []).forEach(i => {
           const rev = (i.subtotal != null ? i.subtotal : (i.price || 0) * (i.qty || 0));
           const cat = reportCatById[i.id] || reportCatByLabel[i.name] || 'Uncategorised';
@@ -3598,9 +3679,10 @@ Hope to see you again soon!`;
         const d = new Date(o.createdAt);
         const key = isNaN(d.getTime()) ? '0000-00' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         (byMonth[key] = byMonth[key] || { orders: 0, newOrders: 0, repeatOrders: 0, items: 0, revenue: 0, firstRev: 0, repeatRev: 0 });
-        byMonth[key].orders++;
-        if (o._custType === 'new') { byMonth[key].newOrders++; byMonth[key].firstRev += o.total || 0; }
-        else if (o._custType === 'repeat') { byMonth[key].repeatOrders++; byMonth[key].repeatRev += o.total || 0; }
+        const part = isPartOf(o);
+        if (!part) byMonth[key].orders++;
+        if (o._custType === 'new') { if (!part) byMonth[key].newOrders++; byMonth[key].firstRev += o.total || 0; }
+        else if (o._custType === 'repeat') { if (!part) byMonth[key].repeatOrders++; byMonth[key].repeatRev += o.total || 0; }
         byMonth[key].revenue += o.total || 0;
         byMonth[key].items   += (o.items || []).reduce((t, i) => t + (i.qty || 0), 0);
       });
